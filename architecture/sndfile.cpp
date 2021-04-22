@@ -5,8 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
-
+/******************* BEGIN sndfile.cpp ****************/
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
@@ -32,6 +31,7 @@
  ************************************************************************
  ************************************************************************/
 
+#include <libgen.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -46,15 +46,15 @@
 #include <map>
 #include <iostream>
 
+#include "faust/dsp/dsp.h"
 #include "faust/gui/console.h"
 #include "faust/gui/FUI.h"
-#include "faust/dsp/dsp.h"
 #include "faust/dsp/dsp-tools.h"
 #include "faust/misc.h"
 
 #ifndef FAUSTFLOAT
 #define FAUSTFLOAT float
-#endif  
+#endif
 
 #define READ_SAMPLE sf_readf_float
 //#define READ_SAMPLE sf_readf_double
@@ -111,6 +111,16 @@ ztimedmap GUI::gTimedZoneMap;
 
 int main(int argc, char* argv[])
 {
+    char name[256];
+    char rcfilename[256];
+    char* home = getenv("HOME");
+    snprintf(name, 256, "%s", basename(argv[0]));
+    snprintf(rcfilename, 256, "%s/.%src", home, name);
+    
+    // Recall state before handling commands
+    FUI finterface;
+    DSP.buildUserInterface(&finterface);
+    
     CMDUI* interface = new CMDUI(argc, argv, true);
     DSP.buildUserInterface(interface);
     if (argc == 1) {
@@ -119,7 +129,8 @@ int main(int argc, char* argv[])
     }
     interface->process_command(INPUT_OUTPUT_FILE);
     
-    unsigned int num_samples = loptrm(&argc, argv, "--continue", "-c", 0);
+    long num_samples = loptrm(&argc, argv, "--continue", "-c", 0);
+    bool is_rc = loptrm(&argc, argv, "-rc", "-rc", 0);
     
     SNDFILE* in_sf;
     SNDFILE* out_sf;
@@ -151,8 +162,15 @@ int main(int argc, char* argv[])
     Deinterleaver sep(kFrames, in_info.channels, DSP.getNumInputs());
     Interleaver ilv(kFrames, DSP.getNumOutputs(), DSP.getNumOutputs());
     
-    // init signal processor
+    // init DSP with SR
     DSP.init(in_info.samplerate);
+    
+    // Possibly restore saved state
+    if (is_rc) {
+        finterface.recallState(rcfilename);
+    }
+    
+    // modify the UI values according to the command line options, after init
     interface->process_init();
     
     // process all samples
@@ -178,6 +196,9 @@ int main(int argc, char* argv[])
     }
     
     sf_close(out_sf);
+    if (is_rc) {
+        finterface.saveState(rcfilename);
+    }
 }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
+/******************* END sndfile.cpp ****************/

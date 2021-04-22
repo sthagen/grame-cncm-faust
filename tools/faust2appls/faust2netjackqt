@@ -85,7 +85,7 @@ do
         MIDIDEFS="DEFINES += MIDICTRL"
     elif [ ${p:0:1} = "-" ]; then
 	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
+	elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
 	    FILES="$FILES $p"
 	else
 	    OPTIONS="$OPTIONS $p"        
@@ -157,7 +157,10 @@ EndOfCode
     ) > /dev/null || exit
 
     rm -rf "$SRCDIR/${f%.dsp}$EXT"
-    cp -r "$TMP/${f%.dsp}$EXT" "$SRCDIR/${f%.dsp}$EXT"
+    cp -a "$TMP/${f%.dsp}$EXT" "$SRCDIR/${f%.dsp}$EXT"
+    if [[ $(uname) == Darwin ]]; then
+        codesign --sign - --deep --force "$SRCDIR/${f%.dsp}$EXT"
+    fi
     rm -rf "$TDR"
 
     # collect binary file name for FaustGIDE

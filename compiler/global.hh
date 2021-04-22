@@ -423,6 +423,8 @@ struct global {
     // Trying to accelerate type convergence
     Type TREC;  // kVect ou kScal ?
 
+    res RES;
+    
     Sym  CONS;
     Sym  NIL;
     Tree nil;
@@ -519,7 +521,6 @@ struct global {
     bool   gPrintXMLSwitch;
     bool   gPrintJSONSwitch;
     bool   gPrintDocSwitch;
-    int    gBalancedSwitch;
     string gArchFile;
     bool   gExportDSP;
 
@@ -563,15 +564,19 @@ struct global {
     }
 
     bool hasVarType(const string& name) { return gVarTypeTable.find(name) != gVarTypeTable.end(); }
+    
+    BasicTyped* genBasicTyped(Typed::VarType type);
 
-    Typed::VarType getVarType(const string& name) { return gVarTypeTable[name]->getType(); }
+    Typed::VarType getVarType(const string& name);
+    
+    void setVarType(const string& name, Typed::VarType type);
 
     bool isMathForeignFunction(const string& name)
     {
         return (gMathForeignFunctions.find(name) != gMathForeignFunctions.end());
     }
 
-    void printCompilationOptions(ostream& dst, bool backend = true);
+    void printCompilationOptions(stringstream& dst, bool backend = true);
 
     void initTypeSizeMap();
 

@@ -312,6 +312,8 @@ void CodeContainer::produceInfoFunctions(int tabs, const string& classname, cons
     generateGetInputs(subst("getNumInputs$0", classname), obj, ismethod, isvirtual)->accept(producer);
     generateGetOutputs(subst("getNumOutputs$0", classname), obj, ismethod, isvirtual)->accept(producer);
 
+    /*
+    // 03/04/21: suppressed fo now
     // Input Rates
     producer->Tab(tabs);
     generateGetInputRate(subst("getInputRate$0", classname), obj, ismethod, isvirtual)->accept(producer);
@@ -319,6 +321,7 @@ void CodeContainer::produceInfoFunctions(int tabs, const string& classname, cons
     // Output Rates
     producer->Tab(tabs);
     generateGetOutputRate(subst("getOutputRate$0", classname), obj, ismethod, isvirtual)->accept(producer);
+    */
 }
 
 void CodeContainer::generateDAGLoopInternal(CodeLoop* loop, BlockInst* block, DeclareVarInst* count, bool omp)
@@ -372,6 +375,15 @@ void CodeContainer::generateDAGLoop(BlockInst* block, DeclareVarInst* count)
 
 void CodeContainer::processFIR(void)
 {
+    // Types used in 'compute' prototype
+    gGlobal->setVarType("count", Typed::kInt32);
+    gGlobal->setVarType("inputs", Typed::kFloatMacro_ptr_ptr);
+    gGlobal->setVarType("outputs", Typed::kFloatMacro_ptr_ptr);
+    
+    // Types used in 'compute' prototype in -os mode
+    gGlobal->setVarType("iControl", Typed::kInt32_ptr);
+    gGlobal->setVarType("fControl", Typed::kFloatMacro_ptr);
+    
     // Possibly add "fSamplingRate" field
     generateSR();
 
@@ -458,43 +470,56 @@ void CodeContainer::printMacros(ostream& fout, int n)
 {
     // generate user interface macros if needed
     if (gGlobal->gUIMacroSwitch) {
-        tab(n, fout);
-        fout << "#ifdef FAUST_UIMACROS";
-        tab(n + 1, fout);
-        tab(n + 1, fout);
-        for (auto& it : gGlobal->gMetaDataSet) {
-            if (it.first == tree("filename")) {
-                fout << "#define FAUST_FILE_NAME " << **(it.second.begin());
-                break;
+        if (gGlobal->gOutputLang == "c" || gGlobal->gOutputLang == "cpp") {
+            tab(n, fout);
+            fout << "#ifdef FAUST_UIMACROS";
+            tab(n + 1, fout);
+            tab(n + 1, fout);
+            for (auto& it : gGlobal->gMetaDataSet) {
+                if (it.first == tree("filename")) {
+                    fout << "#define FAUST_FILE_NAME " << **(it.second.begin());
+                    break;
+                }
             }
+            tab(n + 1, fout);
+            fout << "#define FAUST_CLASS_NAME " << "\"" << fKlassName << "\"";
+            tab(n + 1, fout);
+            fout << "#define FAUST_INPUTS " << fNumInputs;
+            tab(n + 1, fout);
+            fout << "#define FAUST_OUTPUTS " << fNumOutputs;
+            tab(n + 1, fout);
+            fout << "#define FAUST_ACTIVES " << fNumActives;
+            tab(n + 1, fout);
+            fout << "#define FAUST_PASSIVES " << fNumPassives;
+            tab(n, fout);
+            printlines(n + 1, fUIMacro, fout);
+            tab(n, fout);
+            tab(n, fout);
+            {
+                fout << "\t" << "#define FAUST_LIST_ACTIVES(p) \\";
+                printlines(n + 2, fUIMacroActives, fout);
+                tab(n, fout);
+                tab(n, fout);
+            }
+            {
+                fout << "\t" << "#define FAUST_LIST_PASSIVES(p) \\";
+                printlines(n + 2, fUIMacroPassives, fout);
+                tab(n, fout);
+                tab(n, fout);
+            }
+            fout << "#endif" << endl;
+        } else if (gGlobal->gOutputLang == "rust") {
+            fout << "pub const FAUST_INPUTS: i32 = " << fNumInputs << ";";
+            tab(n, fout);
+            fout << "pub const FAUST_OUTPUTS: i32 = " << fNumOutputs << ";";
+            tab(n, fout);
+            fout << "pub const FAUST_ACTIVES: i32 = " << fNumActives << ";";
+            tab(n, fout);
+            fout << "pub const FAUST_PASSIVES: i32 = " << fNumPassives << ";";
+            tab(n, fout);
+        } else {
+            faustassert(false);
         }
-        tab(n + 1, fout);
-        fout << "#define FAUST_CLASS_NAME " << "\"" << fKlassName << "\"";
-        tab(n + 1, fout);
-        fout << "#define FAUST_INPUTS " << fNumInputs;
-        tab(n + 1, fout);
-        fout << "#define FAUST_OUTPUTS " << fNumOutputs;
-        tab(n + 1, fout);
-        fout << "#define FAUST_ACTIVES " << fNumActives;
-        tab(n + 1, fout);
-        fout << "#define FAUST_PASSIVES " << fNumPassives;
-        tab(n, fout);
-        printlines(n + 1, fUIMacro, fout);
-        tab(n, fout);
-        tab(n, fout);
-        {
-            fout << "\t" << "#define FAUST_LIST_ACTIVES(p) \\";
-            printlines(n + 2, fUIMacroActives, fout);
-            tab(n, fout);
-            tab(n, fout);
-        }
-        {
-            fout << "\t" << "#define FAUST_LIST_PASSIVES(p) \\";
-            printlines(n + 2, fUIMacroPassives, fout);
-            tab(n, fout);
-            tab(n, fout);
-        }
-        fout << "#endif" << endl;
     }
 }
 

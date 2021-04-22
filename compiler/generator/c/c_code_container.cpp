@@ -28,6 +28,11 @@
 
 using namespace std;
 
+/*
+ C backend and module description:
+ - in -os mode, CScalarOneSampleCodeContainer2 separates part of the DSP state in iZone and fZone (possibly to be allocated elsewhere)
+*/
+
 map<string, bool> CInstVisitor::gFunctionSymbolTable;
 
 dsp_factory_base* CCodeContainer::produceFactory()
@@ -40,7 +45,8 @@ dsp_factory_base* CCodeContainer::produceFactory()
 CodeContainer* CCodeContainer::createScalarContainer(const string& name, int sub_container_type)
 {
     return (gGlobal->gOneSample)
-        ? new CScalarOneSampleCodeContainer(name, 0, 1, fOut, sub_container_type)
+        ? new CScalarOneSampleCodeContainer1(name, 0, 1, fOut, sub_container_type)
+        //? new CScalarOneSampleCodeContainer2(name, 0, 1, fOut, sub_container_type)
         : new CScalarCodeContainer(name, 0, 1, fOut, sub_container_type);
 }
 
@@ -49,9 +55,6 @@ CodeContainer* CCodeContainer::createContainer(const string& name, int numInputs
     gGlobal->gDSPStruct = true;
     CodeContainer* container;
 
-    if (gGlobal->gMemoryManager) {
-        throw faustexception("ERROR : -mem not supported for C\n");
-    }
     if (gGlobal->gOpenCLSwitch) {
         throw faustexception("ERROR : OpenCL not supported for C\n");
     }
@@ -67,7 +70,8 @@ CodeContainer* CCodeContainer::createContainer(const string& name, int numInputs
         container = new CVectorCodeContainer(name, numInputs, numOutputs, dst);
     } else {
         container = (gGlobal->gOneSample)
-            ? new CScalarOneSampleCodeContainer(name, numInputs, numOutputs, dst, kInt)
+            ? new CScalarOneSampleCodeContainer1(name, numInputs, numOutputs, dst, kInt)
+            //? new CScalarOneSampleCodeContainer2(name, numInputs, numOutputs, dst, kInt)
             : new CScalarCodeContainer(name, numInputs, numOutputs, dst, kInt);
     }
 
@@ -149,11 +153,12 @@ void CCodeContainer::produceClass()
 {
     int n = 0;
 
+    tab(n, *fOut);
     *fOut << "#ifdef __cplusplus" << endl;
     *fOut << "extern \"C\" {" << endl;
     *fOut << "#endif" << endl;
     tab(n, *fOut);
-
+  
     // Libraries
     printLibrary(*fOut);
     printIncludeFile(*fOut);
@@ -361,7 +366,7 @@ void CCodeContainer::produceClass()
     *fOut << "#endif" << endl;
 }
 
-void CScalarOneSampleCodeContainer::produceClass()
+void CScalarOneSampleCodeContainer1::produceClass()
 {
     int n = 0;
     
@@ -371,13 +376,20 @@ void CScalarOneSampleCodeContainer::produceClass()
     *fOut << "#endif" << endl;
     tab(n, *fOut);
     
+    *fOut << "#if defined(_WIN32)" << endl;
+    *fOut << "#define RESTRICT __restrict" << endl;
+    *fOut << "#else" << endl;
+    *fOut << "#define RESTRICT __restrict__" << endl;
+    *fOut << "#endif" << endl;
+    tab(n, *fOut);
+    
     // Libraries
     printLibrary(*fOut);
     printIncludeFile(*fOut);
     
     // Sub containers
     mergeSubContainers();
- 
+    
     // Functions
     tab(n, *fOut);
     fCodeProducer->Tab(n);
@@ -393,7 +405,7 @@ void CScalarOneSampleCodeContainer::produceClass()
     *fOut << "#define exp10f __exp10f" << endl;
     *fOut << "#define exp10 __exp10" << endl;
     *fOut << "#endif" << endl;
-     
+    
     if (gGlobal->gLightMode) {
         tab(n, *fOut);
         *fOut << "#define max(a,b) ((a < b) ? b : a)\n";
@@ -414,16 +426,270 @@ void CScalarOneSampleCodeContainer::produceClass()
     tab(n, *fOut);
     
     tab(n, *fOut);
-    *fOut << "#define FAUST_INPUTS " << fNumInputs << endl;
-    *fOut << "#define FAUST_OUTPUTS  " << fNumOutputs << endl;
+    *fOut << "#define FAUST_INT_CONTROLS " << fInt32ControlNum << endl;
+    *fOut << "#define FAUST_REAL_CONTROLS " << fRealControlNum << endl;
+    
+    tab(n, *fOut);
+    *fOut << "#ifndef TESTBENCH";
+    
+    // Memory methods
+    tab(n, *fOut);
+    if (!gGlobal->gLightMode) {
+        
+        if (fAllocateInstructions->fCode.size() > 0) {
+            tab(n, *fOut);
+            *fOut << "static void allocate" << fKlassName << "(" << fKlassName << "* dsp) {";
+            tab(n + 1, *fOut);
+            generateAllocate(fCodeProducer);
+            tab(n, *fOut);
+            *fOut << "}";
+        }
+        tab(n, *fOut);
+        
+        if (fDestroyInstructions->fCode.size() > 0) {
+            tab(n, *fOut);
+            *fOut << "static void destroy" << fKlassName << "(" << fKlassName << "* dsp) {";
+            tab(n + 1, *fOut);
+            generateDestroy(fCodeProducer);
+            tab(n, *fOut);
+            *fOut << "}";
+            tab(n, *fOut);
+        }
+        
+        *fOut << fKlassName << "* new" << fKlassName << "() { ";
+        tab(n + 1, *fOut);
+        *fOut << fKlassName << "* dsp = (" << fKlassName << "*)calloc(1, sizeof(" << fKlassName << "));";
+        if (fAllocateInstructions->fCode.size() > 0) {
+            tab(n + 1, *fOut);
+            *fOut << "allocate" << fKlassName << "(dsp);";
+        }
+        tab(n + 1, *fOut);
+        *fOut << "return dsp;";
+        tab(n, *fOut);
+        *fOut << "}";
+        
+        tab(n, *fOut);
+        tab(n, *fOut);
+        *fOut << "void delete" << fKlassName << "(" << fKlassName << "* dsp) { ";
+        if (fDestroyInstructions->fCode.size() > 0) {
+            tab(n + 1, *fOut);
+            *fOut << "destroy" << fKlassName << "(dsp);";
+        }
+        tab(n + 1, *fOut);
+        *fOut << "free(dsp);";
+        tab(n, *fOut);
+        *fOut << "}";
+        
+        // Print metadata declaration
+        tab(n, *fOut);
+        produceMetadata(n);
+    }
+    
+    // Get sample rate method
+    tab(n, *fOut);
+    fCodeProducer->Tab(n);
+    generateGetSampleRate("getSampleRate" + fKlassName, "dsp", false, false)->accept(fCodeProducer);
+    
+    tab(n, *fOut);
+    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    
+    // Inits
+    
+    // TODO
+    /*
+     CInstVisitor codeproducer1(fOut, "");
+     codeproducer1.Tab(n+1);
+     generateStaticInitFun("classInit" + fKlassName, false)->accept(&codeproducer1);
+     generateInstanceInitFun("instanceInit" + fKlassName, false, false)->accept(&codeproducer2);
+     */
+    
+    // Dummy
+    tab(n, *fOut);
+    *fOut << "void classInit" << fKlassName << "(int sample_rate) {}";
+    tab(n, *fOut);
+    
+    tab(n, *fOut);
+    *fOut << "void staticInit" << fKlassName << "(" << fKlassName << "* dsp, int sample_rate) {";
+    {
+        tab(n + 1, *fOut);
+        fCodeProducer->Tab(n + 1);
+        // Rename 'sig' in 'dsp', remove 'dsp' allocation, inline subcontainers 'instanceInit' and 'fill' function call
+        inlineSubcontainersFunCalls(fStaticInitInstructions)->accept(fCodeProducer);
+    }
+    back(1, *fOut);
+    *fOut << "}";
+    
+    tab(n, *fOut);
+    tab(n, *fOut);
+    *fOut << "void instanceResetUserInterface" << fKlassName << "(" << fKlassName << "* dsp) {";
+    {
+        tab(n + 1, *fOut);
+        fCodeProducer->Tab(n + 1);
+        generateResetUserInterface(fCodeProducer);
+    }
+    back(1, *fOut);
+    *fOut << "}";
+    
+    tab(n, *fOut);
+    tab(n, *fOut);
+    *fOut << "void instanceClear" << fKlassName << "(" << fKlassName << "* dsp) {";
+    {
+        tab(n + 1, *fOut);
+        fCodeProducer->Tab(n + 1);
+        generateClear(fCodeProducer);
+    }
+    back(1, *fOut);
+    *fOut << "}";
+    
+    tab(n, *fOut);
+    tab(n, *fOut);
+    *fOut << "void instanceConstants" << fKlassName << "(" << fKlassName << "* dsp, int sample_rate) {";
+    {
+        tab(n + 1, *fOut);
+        fCodeProducer->Tab(n + 1);
+        // Rename 'sig' in 'dsp', remove 'dsp' allocation, inline subcontainers 'instanceInit' and 'fill' function call
+        inlineSubcontainersFunCalls(fInitInstructions)->accept(fCodeProducer);
+    }
+    back(1, *fOut);
+    *fOut << "}";
+    
+    tab(n, *fOut);
+    tab(n, *fOut);
+    *fOut << "void instanceInit" << fKlassName << "(" << fKlassName << "* dsp, int sample_rate) {";
+    // staticInit has to be called for each instance since the tables are actually not shared between instances
+    tab(n + 1, *fOut);
+    *fOut << "staticInit" << fKlassName << "(dsp, sample_rate);";
+    tab(n + 1, *fOut);
+    *fOut << "instanceConstants" << fKlassName << "(dsp, sample_rate);";
+    tab(n + 1, *fOut);
+    *fOut << "instanceResetUserInterface" << fKlassName << "(dsp);";
+    tab(n + 1, *fOut);
+    *fOut << "instanceClear" << fKlassName << "(dsp);";
+    tab(n, *fOut);
+    *fOut << "}";
+    
+    tab(n, *fOut);
+    tab(n, *fOut);
+    *fOut << "void init" << fKlassName << "(" << fKlassName << "* dsp, int sample_rate) {";
+    tab(n + 1, *fOut);
+    *fOut << "instanceInit" << fKlassName << "(dsp, sample_rate);";
+    tab(n, *fOut);
+    *fOut << "}";
+    
+    if (!gGlobal->gLightMode) {
+        // User interface
+        tab(n, *fOut);
+        tab(n, *fOut);
+        *fOut << "void buildUserInterface" << fKlassName << "(" << fKlassName << "* dsp, UIGlue* ui_interface) {";
+        tab(n + 1, *fOut);
+        fCodeProducer->Tab(n + 1);
+        generateUserInterface(fCodeProducer);
+        back(1, *fOut);
+        *fOut << "}";
+    }
+    
+    tab(n, *fOut);
+    tab(n, *fOut);
+    *fOut << "void control" << fKlassName << "(" << fKlassName << "* dsp, " << subst("int* RESTRICT iControl, $0* RESTRICT fControl) {", xfloat());
+    tab(n + 1, *fOut);
+    fCodeProducer->Tab(n + 1);
+    // Generates local variables declaration and setup
+    generateComputeBlock(fCodeProducer);
+    back(1, *fOut);
+    *fOut << "}" << endl;
+    
+    tab(n, *fOut);
+    *fOut << "int getNumIntControls" << fKlassName << "(" << fKlassName << "* dsp) { return "
+          << fInt32ControlNum << "; }";
+    tab(n, *fOut);
+    
+    tab(n, *fOut);
+    *fOut << "int getNumRealControls" << fKlassName << "(" << fKlassName << "* dsp) { return "
+          << fRealControlNum << "; }";
+    
+    // Compute
+    generateCompute(n);
+    
+    tab(n, *fOut);
+    *fOut << "#endif // TESTBENCH" << endl;
+    tab(n, *fOut);
+    
+    // Generate user interface macros if needed
+    printMacros(*fOut, n);
+    
+    *fOut << "#ifdef __cplusplus" << endl;
+    *fOut << "}" << endl;
+    *fOut << "#endif" << endl;
+}
+
+void CScalarOneSampleCodeContainer2::produceClass()
+{
+    int n = 0;
+    
+    tab(n, *fOut);
+    *fOut << "#ifdef __cplusplus" << endl;
+    *fOut << "extern \"C\" {" << endl;
+    *fOut << "#endif" << endl;
+    tab(n, *fOut);
+    
+    *fOut << "#if defined(_WIN32)" << endl;
+    *fOut << "#define RESTRICT __restrict" << endl;
+    *fOut << "#else" << endl;
+    *fOut << "#define RESTRICT __restrict__" << endl;
+    *fOut << "#endif" << endl;
+    tab(n, *fOut);
+    
+    // Libraries
+    printLibrary(*fOut);
+    printIncludeFile(*fOut);
+    
+    // Sub containers
+    mergeSubContainers();
+    
+    // Functions
+    tab(n, *fOut);
+    fCodeProducer->Tab(n);
+    
+    generateGlobalDeclarations(fCodeProducer);
+    
+    tab(n, *fOut);
+    *fOut << "#ifndef FAUSTCLASS " << endl;
+    *fOut << "#define FAUSTCLASS " << fKlassName << endl;
+    *fOut << "#endif" << endl;
+    
+    *fOut << "#ifdef __APPLE__ " << endl;
+    *fOut << "#define exp10f __exp10f" << endl;
+    *fOut << "#define exp10 __exp10" << endl;
+    *fOut << "#endif" << endl;
+    
+    if (gGlobal->gLightMode) {
+        tab(n, *fOut);
+        *fOut << "#define max(a,b) ((a < b) ? b : a)\n";
+        *fOut << "#define min(a,b) ((a < b) ? a : b)\n";
+        tab(n, *fOut);
+    }
+    
+    tab(n, *fOut);
+    *fOut << "typedef struct {";
+    tab(n + 1, *fOut);
+    
+    // Fields
+    fCodeProducer->Tab(n + 1);
+    generateDeclarations(fCodeProducer);
+    
+    back(1, *fOut);
+    *fOut << "} " << fKlassName << ";";
+    tab(n, *fOut);
+    
     tab(n, *fOut);
     *fOut << "#define FAUST_INT_CONTROLS " << fInt32ControlNum << endl;
     *fOut << "#define FAUST_REAL_CONTROLS " << fRealControlNum << endl;
+    
     tab(n, *fOut);
     *fOut << "#define FAUST_INT_ZONE " << static_cast<CInstVisitor1*>(fCodeProducer)->getIntZoneSize() << endl;
     *fOut << "#define FAUST_FLOAT_ZONE " << static_cast<CInstVisitor1*>(fCodeProducer)->getRealZoneSize();
-    
     tab(n, *fOut);
+    
     tab(n, *fOut);
     *fOut << "#ifndef TESTBENCH";
     
@@ -529,7 +795,7 @@ void CScalarOneSampleCodeContainer::produceClass()
     
     tab(n, *fOut);
     tab(n, *fOut);
-    *fOut << "void instanceClear" << fKlassName << subst("(int* iZone, $0* fZone) {", xfloat());
+    *fOut << "void instanceClear" << fKlassName << "(" << fKlassName << "* dsp, " << subst("int* iZone, $0* fZone) {", xfloat());
     {
         tab(n + 1, *fOut);
         fCodeProducer->Tab(n + 1);
@@ -561,7 +827,7 @@ void CScalarOneSampleCodeContainer::produceClass()
     tab(n + 1, *fOut);
     *fOut << "instanceResetUserInterface" << fKlassName << "(dsp);";
     tab(n + 1, *fOut);
-    *fOut << "instanceClear" << fKlassName << "(iZone, fZone);";
+    *fOut << "instanceClear" << fKlassName << "(dsp, iZone, fZone);";
     tab(n, *fOut);
     *fOut << "}";
     
@@ -586,7 +852,8 @@ void CScalarOneSampleCodeContainer::produceClass()
     }
     
     tab(n, *fOut);
-    *fOut << "void control" << fKlassName << "(" << fKlassName << "* dsp, " << subst("int* iControl, $0* fControl, int* iZone, $0* fZone) {", xfloat());
+    tab(n, *fOut);
+    *fOut << "void control" << fKlassName << "(" << fKlassName << "* dsp, " << subst("int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", xfloat());
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     // Generates local variables declaration and setup
@@ -598,14 +865,17 @@ void CScalarOneSampleCodeContainer::produceClass()
     *fOut << "int getNumIntControls" << fKlassName << "(" << fKlassName << "* dsp) { return "
           << fInt32ControlNum << "; }";
     tab(n, *fOut);
+    
     tab(n, *fOut);
     *fOut << "int getNumRealControls" << fKlassName << "(" << fKlassName << "* dsp) { return "
           << fRealControlNum << "; }";
     tab(n, *fOut);
+    
     tab(n, *fOut);
     *fOut << "int getiZoneSize" << fKlassName << "(" << fKlassName << "* dsp) { return "
           << static_cast<CInstVisitor1*>(fCodeProducer)->getIntZoneSize() << "; }";
     tab(n, *fOut);
+    
     tab(n, *fOut);
     *fOut << "int getfZoneSize" << fKlassName << "(" << fKlassName << "* dsp) { return "
           << static_cast<CInstVisitor1*>(fCodeProducer)->getRealZoneSize() << "; }";
@@ -664,10 +934,9 @@ CScalarCodeContainer::CScalarCodeContainer(const string& name, int numInputs, in
     fSubContainerType = sub_container_type;
 }
 
-void CScalarCodeContainer::generateCompute(int n)
+void CScalarCodeContainer::generateComputeAux(int n)
 {
     // Generates declaration
-    tab(n, *fOut);
     tab(n, *fOut);
     *fOut << "void compute" << fKlassName << "(" << fKlassName
           << subst("* dsp, int $0, $1** inputs, $1** outputs) {", fFullCount, xfloat());
@@ -692,13 +961,47 @@ void CScalarCodeContainer::generateCompute(int n)
 }
 
 // Special version for -os generation mode
-void CScalarOneSampleCodeContainer::generateCompute(int n)
+void CScalarOneSampleCodeContainer1::generateComputeAux(int n)
 {
     // Generates declaration
     tab(n, *fOut);
+    if (gGlobal->gInPlace) {
+        *fOut << "void compute" << fKlassName << "(" << fKlassName
+        << subst("* dsp, $0* inputs, $0* outputs, int* RESTRICT iControl, $0* RESTRICT fControl) {", xfloat());
+    } else {
+        *fOut << "void compute" << fKlassName << "(" << fKlassName
+        << subst("* dsp, $0* RESTRICT inputs, $0* RESTRICT outputs, int* RESTRICT iControl, $0* RESTRICT fControl) {", xfloat());
+    }
+    tab(n + 1, *fOut);
+    fCodeProducer->Tab(n + 1);
+    
+    // Generates one sample computation
+    BlockInst* block = fCurLoop->generateOneSample();
+    block->accept(fCodeProducer);
+    
+    /*
+     // TODO : atomic switch
+     // Currently for soundfile management
+     */
+    generatePostComputeBlock(fCodeProducer);
+    
+    back(1, *fOut);
+    *fOut << "}" << endl;
+}
+
+// Special version for -os generation mode with iZone and fZone
+void CScalarOneSampleCodeContainer2::generateComputeAux(int n)
+{
+    // Generates declaration
     tab(n, *fOut);
-    *fOut << "void compute" << fKlassName << "(" << fKlassName
-          << subst("* dsp, $0* inputs, $0* outputs, int* iControl, $0* fControl, int* iZone, $0* fZone) {", xfloat());
+    if (gGlobal->gInPlace) {
+        *fOut << "void compute" << fKlassName << "(" << fKlassName
+        << subst("* dsp, $0* inputs, $0* outputs, int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", xfloat());
+        
+    } else {
+        *fOut << "void compute" << fKlassName << "(" << fKlassName
+        << subst("* dsp, $0* RESTRICT inputs, $0* RESTRICT outputs, int* RESTRICT iControl, $0* RESTRICT fControl, int* RESTRICT iZone, $0* RESTRICT fZone) {", xfloat());
+    }
     tab(n + 1, *fOut);
     fCodeProducer->Tab(n + 1);
     
@@ -722,13 +1025,8 @@ CVectorCodeContainer::CVectorCodeContainer(const string& name, int numInputs, in
 {
 }
 
-void CVectorCodeContainer::generateCompute(int n)
+void CVectorCodeContainer::generateComputeAux(int n)
 {
-    // Possibly generate separated functions
-    fCodeProducer->Tab(n);
-    tab(n, *fOut);
-    generateComputeFunctions(fCodeProducer);
-
     // Generates declaration
     tab(n, *fOut);
     *fOut << "void compute" << fKlassName << "(" << fKlassName
@@ -752,13 +1050,8 @@ COpenMPCodeContainer::COpenMPCodeContainer(const string& name, int numInputs, in
 {
 }
 
-void COpenMPCodeContainer::generateCompute(int n)
+void COpenMPCodeContainer::generateComputeAux(int n)
 {
-    // Possibly generate separated functions
-    fCodeProducer->Tab(n);
-    tab(n, *fOut);
-    generateComputeFunctions(fCodeProducer);
-
     // Compute declaration
     tab(n, *fOut);
     *fOut << "void compute" << fKlassName << "(" << fKlassName
@@ -783,13 +1076,8 @@ CWorkStealingCodeContainer::CWorkStealingCodeContainer(const string& name, int n
 {
 }
 
-void CWorkStealingCodeContainer::generateCompute(int n)
+void CWorkStealingCodeContainer::generateComputeAux(int n)
 {
-    // Possibly generate separated functions
-    fCodeProducer->Tab(n);
-    tab(n, *fOut);
-    generateComputeFunctions(fCodeProducer);
-
     // Generates "computeThread" code
     tab(n, *fOut);
     *fOut << "static void computeThread" << fKlassName << "(" << fKlassName << "* dsp, int num_thread) {";

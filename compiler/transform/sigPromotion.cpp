@@ -47,7 +47,7 @@ Tree SignalPromotion::transformation(Tree sig)
     }
 
     // Binary operations
-    // kAdd, kSub, kMul, kDiv, kRem, kLsh, kRsh, kGT, kLT, kGE, kLE, kEQ, kNE, kAND, kOR, kXOR };
+    // kAdd, kSub, kMul, kDiv, kRem, kLsh, kARsh, kGT, kLT, kGE, kLE, kEQ, kNE, kAND, kOR, kXOR };
     else if (isSigBinOp(sig, &i, x, y)) {
         Type tx = getCertifiedSigType(x);
         Type ty = getCertifiedSigType(y);
@@ -83,6 +83,14 @@ Tree SignalPromotion::transformation(Tree sig)
             case kDiv:
                 // the result of a division is always a float
                 return sigBinOp(i, smartFloatCast(tx, self(x)), smartFloatCast(ty, self(y)));
+
+            case kAND:
+            case kOR:
+            case kXOR:
+            case kLsh:
+            case kARsh:
+                // these operations require integers
+                return sigBinOp(i, smartIntCast(tx, self(x)), smartIntCast(ty, self(y)));
 
             default:
                 // TODO: no clear rules here

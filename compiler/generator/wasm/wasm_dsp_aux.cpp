@@ -50,14 +50,15 @@ dsp_factory_table<SDsp_factory> wasm_dsp_factory::gWasmFactoryTable;
 #ifndef FAUST_LIB
 #include "faust/dsp/poly-wasm-dsp.h"
 #endif
-#include "faust/gui/SoundUI.h"
+
+//#include "faust/gui/SoundUI.h"
 
 wasm_dsp_factory::wasm_dsp_factory(int instance, const std::string& json)
 {
     fFactory = nullptr;
     fInstance = instance;
     fDecoder = createJSONUIDecoder(json);
-    fSoundUI = new SoundUI();
+    //fSoundUI = new SoundUI();
 }
 
 wasm_dsp_factory::~wasm_dsp_factory()
@@ -72,7 +73,7 @@ wasm_dsp_factory::~wasm_dsp_factory()
     */
     delete fFactory;
     delete fDecoder;
-    delete fSoundUI;
+    //delete fSoundUI;
 }
 
 wasm_dsp_factory* wasm_dsp_factory::createWasmDSPFactory(int instance, const std::string& json)
@@ -179,7 +180,7 @@ wasm_dsp::wasm_dsp(wasm_dsp_factory* factory) : fFactory(factory)
     if (fFactory->fMapUI.getParamsCount() == 0) {
         buildUserInterface(&fFactory->fMapUI);
     }
-    buildUserInterface(factory->fSoundUI);
+    //buildUserInterface(factory->fSoundUI);
 }
 
 wasm_dsp::~wasm_dsp()
@@ -497,9 +498,11 @@ wasm_dsp_factory::wasm_dsp_factory(dsp_factory_base* factory)
 {
     fFactory = factory;
     fDecoder = nullptr;
+/*
 #ifdef EMCC
     fSoundUI = nullptr;
 #endif
+*/
 }
 
 string wasm_dsp_factory::getName()

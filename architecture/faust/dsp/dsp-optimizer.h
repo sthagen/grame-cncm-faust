@@ -1,5 +1,4 @@
 /************************** BEGIN dsp-optimizer.h **************************/
-
 /************************************************************************
     FAUST Architecture File
     Copyright (C) 2016-2020 GRAME, Centre National de Creation Musicale
@@ -59,6 +58,9 @@ class dsp_optimizer {
         bool fTrace;
         bool fControl;
         bool fNeedExp10;
+        int fDownSampling;
+        int fUpSampling;
+        int fFilter;
     
         std::string fFilename;
         std::string fInput;
@@ -71,16 +73,18 @@ class dsp_optimizer {
         {
             // First call with fCount = -1 will be used to estimate fCount by giving the wanted measure duration
             if (fCount == -1) {
-                measure_dsp_aux<REAL> mes(fDSP, fBufferSize, 5., fTrace, fControl);
+                measure_dsp_aux<REAL> mes(fDSP, fBufferSize, 5., fTrace, fControl, fDownSampling, fUpSampling, fFilter);
                 mes.measure();
                 // fCount is kept from the first duration measure
                 fCount = mes.getCount();
                 return mes.getStats();
             } else {
-                measure_dsp_aux<REAL> mes(fDSP, fBufferSize, fCount, fTrace, fControl);
+                measure_dsp_aux<REAL> mes(fDSP, fBufferSize, fCount, fTrace, fControl, fDownSampling, fUpSampling, fFilter);
                 for (int i = 0; i < run; i++) {
                     mes.measure();
-                    if (fTrace) std::cout << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << std::endl;
+                    if (fTrace) {
+                        std::cout << mes.getStats() << " MBytes/sec (DSP CPU % : " << (mes.getCPULoad() * 100) << " at " << BENCH_SAMPLE_RATE << " Hz)" << std::endl;
+                    }
                     FAUSTBENCH_LOG<double>(mes.getStats());
                 }
                 return mes.getStats();
@@ -268,13 +272,19 @@ class dsp_optimizer {
 
         static bool compareFun(std::pair<int, double> i, std::pair<int, double> j) { return (i.second > j.second); }
     
-        bool init(const std::string& filename, const std::string input,
-                  int argc, const char* argv[],
+        bool init(const std::string& filename,
+                  const std::string& input,
+                  int argc,
+                  const char* argv[],
                   const std::string& target,
-                  int buffer_size, int run,
+                  int buffer_size,
+                  int run,
                   int opt_level_max,
                   bool trace,
-                  bool control)
+                  bool control,
+                  int ds,
+                  int us,
+                  int filter)
         {
             fFilename = filename;
             fInput = input;
@@ -288,6 +298,9 @@ class dsp_optimizer {
             fTrace = trace;
             fControl = control;
             fNeedExp10 = false;
+            fDownSampling = ds;
+            fUpSampling = us;
+            fFilter = filter;
             
             init();
             
@@ -321,6 +334,9 @@ class dsp_optimizer {
          * @param opt_level - LLVM IR to IR optimization level (from -1 to 4, -1 means 'maximum possible value'
          * @param trace - whether to log the trace
          * @param control - whether to activate random changes of all control values at each cycle
+         * @param ds - downsampling factor
+         * @param us - upsampling factor
+         * @param filter - filter type
          * since the maximum value may change with new LLVM versions)
          */
         dsp_optimizer(const char* filename,
@@ -331,9 +347,12 @@ class dsp_optimizer {
                       int run = 1,
                       int opt_level = -1,
                       bool trace = true,
-                      bool control = false)
+                      bool control = false,
+                      int ds = 0,
+                      int us = 0,
+                      int filter = 0)
         {
-            if (!init(filename, "", argc, argv, target, buffer_size, run, opt_level, trace, control)) {
+            if (!init(filename, "", argc, argv, target, buffer_size, run, opt_level, trace, control, ds, us, filter)) {
                 throw std::bad_alloc();
             }
         }
@@ -349,6 +368,7 @@ class dsp_optimizer {
          * @param opt_level - LLVM IR to IR optimization level (from -1 to 4, -1 means 'maximum possible value'
          * since the maximum value may change with new LLVM versions)
          */
+        /*
         dsp_optimizer(const std::string& input,
                       int argc,
                       const char* argv[],
@@ -360,6 +380,7 @@ class dsp_optimizer {
                 throw std::bad_alloc();
             }
         }
+        */
     
         virtual ~dsp_optimizer()
         {}
@@ -403,4 +424,5 @@ class dsp_optimizer {
 };
 
 #endif
-/**************************  END  dsp-optimizer.h **************************/
+
+/************************** END dsp-optimizer.h **************************/

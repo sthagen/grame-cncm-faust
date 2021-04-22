@@ -36,6 +36,7 @@ all:
 	$(MAKE) cpp1
 	$(MAKE) ocpp
 	$(MAKE) c
+	$(MAKE) c1
 	$(MAKE) mute
 	$(MAKE) wasm
 	$(MAKE) wast
@@ -44,6 +45,7 @@ all:
 	$(MAKE) interp
 	$(MAKE) interp1
 	$(MAKE) rust
+	$(MAKE) dlang
 
 help:
 	@echo "-------- FAUST impulse response tests --------"
@@ -61,8 +63,10 @@ help:
 	@echo " 'llvm'   : check double output with llvm backend and various options"
 	@echo " 'llvm1'  : check double output with llvm backend in object code mode and various options"
 	@echo " 'interp' : check double output with interpreter backend and various options"
-	@echo " 'interp1' : check double output with interpreter/LLVM backend and various options"
+	@echo " 'interp1' : check double output with interpreter/llvm backend and various options"
 	@echo " 'rust'   : check double output with rust backend and various options"
+	@echo " 'soul'   : check double output with soul backend and various options"
+	@echo " 'dlang'  : check double output with D backend and various options"
 	@echo " 'me'     : check double outputs with the cpp backend in scalar with activated math exceptions"
 	@echo "Warning: you must have at least 10G available on your hard disk to run all the tests"
 	@echo
@@ -161,24 +165,26 @@ quad:
 mute: ir/mute  $(mutefiles)
 
 #########################################################################
-# web backends
+# web backends ('wasmdir/wastdir' used instead of 'outdir')
 web:
 	$(MAKE) wasm
 	$(MAKE) wast
 
 wasm:
 	$(MAKE) -f Make.web wasm
-	$(MAKE) -f Make.web wasm outdir=wasm/mapp FAUSTOPTIONS="-I dsp -mapp"
-	$(MAKE) -f Make.web wasm outdir=wasm/rui FAUSTOPTIONS="-I dsp -rui"
-	$(MAKE) -f Make.web wasm outdir=wasm/dlt0 FAUSTOPTIONS="-I dsp -dlt 0"
-	$(MAKE) -f Make.web wasm outdir=wasm/dlt256 FAUSTOPTIONS="-I dsp -dlt 256"
-	$(MAKE) -f Make.web wasm outdir=wasm/ftz1 FAUSTOPTIONS="-I dsp -ftz 1"
+	$(MAKE) -f Make.web wasm wasmdir=wasm/mapp FAUSTOPTIONS="-I dsp -mapp"
+	$(MAKE) -f Make.web wasm wasmdir=wasm/dlt0 FAUSTOPTIONS="-I dsp -dlt 0"
+	$(MAKE) -f Make.web wasm wasmdir=wasm/dlt256 FAUSTOPTIONS="-I dsp -dlt 256"
+	$(MAKE) -f Make.web wasm wasmdir=wasm/ftz1 FAUSTOPTIONS="-I dsp -ftz 1"
+	$(MAKE) -f Make.web wasm wasmdir=wasm/ftz2 FAUSTOPTIONS="-I dsp -ftz 2"
 
 wast:
 	$(MAKE) -f Make.web wast
-	$(MAKE) -f Make.web wast outdir=wast/dlt0 FAUSTOPTIONS="-I dsp -dlt 0"
-	$(MAKE) -f Make.web wast outdir=wast/dlt256 FAUSTOPTIONS="-I dsp -dlt 256"
-	$(MAKE) -f Make.web wast outdir=wast/ftz1 FAUSTOPTIONS="-I dsp -ftz 1"
+	$(MAKE) -f Make.web wast wastdir=wast/mapp FAUSTOPTIONS="-I dsp -mapp"
+	$(MAKE) -f Make.web wast wastdir=wast/dlt0 FAUSTOPTIONS="-I dsp -dlt 0"
+	$(MAKE) -f Make.web wast wastdir=wast/dlt256 FAUSTOPTIONS="-I dsp -dlt 256"
+	$(MAKE) -f Make.web wast wastdir=wast/ftz1 FAUSTOPTIONS="-I dsp -ftz 1"
+	$(MAKE) -f Make.web wast wastdir=wast/ftz2 FAUSTOPTIONS="-I dsp -ftz 2"
 
 #########################################################################
 # llvm backend
@@ -260,6 +266,12 @@ rust:
 soul:
 	$(MAKE) -f Make.soul FAUSTOPTIONS="-double"
 	$(MAKE) -f Make.soul soul outdir=soul/mapp FAUSTOPTIONS="-I dsp -mapp"
+
+#########################################################################
+# D backend
+dlang:
+	$(MAKE) -f Make.dlang outdir=dlang/double          FAUSTOPTIONS="-I dsp -double"
+	$(MAKE) -f Make.dlang outdir=dlang/double/vec      FAUSTOPTIONS="-I dsp -double -vec"
 
 #########################################################################
 # output directories

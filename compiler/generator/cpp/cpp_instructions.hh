@@ -46,7 +46,6 @@ class CPPInstVisitor : public TextInstVisitor {
     {
         // Mark all math.h functions as generated...
         gFunctionSymbolTable["abs"] = true;
-
         gFunctionSymbolTable["max"] = true;
         gFunctionSymbolTable["min"] = true;
 
@@ -147,10 +146,7 @@ class CPPInstVisitor : public TextInstVisitor {
         gPolyMathLibTable["sinf"]       = "std::sin";
         gPolyMathLibTable["sqrtf"]      = "std::sqrt";
         gPolyMathLibTable["tanf"]       = "std::tan";
-        
-        gPolyMathLibTable["isnanf"] = "std::isnan";
-        gPolyMathLibTable["isinff"] = "std::isinf";
-
+   
         // Polymath mapping double version
         gPolyMathLibTable["max_"] = "std::max<double>";
         gPolyMathLibTable["min_"] = "std::min<double>";
@@ -177,9 +173,6 @@ class CPPInstVisitor : public TextInstVisitor {
         gPolyMathLibTable["sin"]       = "std::sin";
         gPolyMathLibTable["sqrt"]      = "std::sqrt";
         gPolyMathLibTable["tan"]       = "std::tan";
-        
-        gPolyMathLibTable["isnan"] = "std::isnan";
-        gPolyMathLibTable["isinf"] = "std::isinf";
       
         // Polymath mapping quad version
         gPolyMathLibTable["max_l"] = "std::max<quad>";
@@ -207,10 +200,7 @@ class CPPInstVisitor : public TextInstVisitor {
         gPolyMathLibTable["sinl"]       = "std::sin";
         gPolyMathLibTable["sqrtl"]      = "std::sqrt";
         gPolyMathLibTable["tanl"]       = "std::tan";
-        
-        gPolyMathLibTable["isnanl"] = "std::isnan";
-        gPolyMathLibTable["isinfl"] = "std::isinf";
-    }
+     }
 
     virtual ~CPPInstVisitor() {}
 
@@ -364,6 +354,40 @@ class CPPInstVisitor : public TextInstVisitor {
         *fOut << "&";
         inst->fAddress->accept(this);
     }
+    
+    virtual void visit(BinopInst* inst)
+    {
+        // Special case for 'logical right-shift'
+        if (strcmp(gBinOpTable[inst->fOpcode]->fName, ">>>") == 0) {
+            TypingVisitor typing;
+            inst->fInst1->accept(&typing);
+            if (isInt64Type(typing.fCurType)) {
+                *fOut << "(int64_t(uint64_t(";
+            } else if (isInt32Type(typing.fCurType)) {
+                *fOut << "(int32_t(uint32_t(";
+            } else {
+                faustassert(false);
+            }
+            inst->fInst1->accept(this);
+            *fOut << ") >> ";
+            inst->fInst2->accept(this);
+            *fOut << "))w";
+        } else {
+            TextInstVisitor::visit(inst);
+        }
+    }
+    
+    virtual void visit(FixedPointNumInst* inst) { *fOut << "fixpoint_t(" << checkFloat(inst->fNum) << ")"; }
+    
+    virtual void visit(FixedPointArrayNumInst* inst)
+    {
+        char sep = '{';
+        for (size_t i = 0; i < inst->fNumTable.size(); i++) {
+            *fOut << sep << "fixpoint_t(" << checkFloat(inst->fNumTable[i]) << ")";
+            sep = ',';
+        }
+        *fOut << '}';
+    }
 
     virtual void visit(::CastInst* inst)
     {
@@ -388,7 +412,7 @@ class CPPInstVisitor : public TextInstVisitor {
                 *fOut << ")";
                 break;
             case Typed::kInt64:
-                *fOut << "*reinterpret_cast<long long*>(&";
+                *fOut << "*reinterpret_cast<int64_t*>(&";
                 inst->fInst->accept(this);
                 *fOut << ")";
                 break;

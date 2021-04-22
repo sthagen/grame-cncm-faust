@@ -262,5 +262,6 @@ inline bool testArg(const char* arg)
     return false;
 }
 
+vector<string> tokenizeString(const string& str, char sep);
 
 #endif

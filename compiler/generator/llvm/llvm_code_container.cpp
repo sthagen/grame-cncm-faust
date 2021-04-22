@@ -77,7 +77,7 @@ void LLVMCodeContainer::init(const string& name, int numInputs, int numOutputs, 
     
     // Set "-fast-math"
     FastMathFlags FMF;
-#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
+#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
     FMF.setFast();  // has replaced the following function
 #else
     FMF.setUnsafeAlgebra();
@@ -96,9 +96,6 @@ CodeContainer* LLVMCodeContainer::createContainer(const string& name, int numInp
     gGlobal->gDSPStruct = true;
     CodeContainer* container;
 
-    if (gGlobal->gMemoryManager) {
-        throw faustexception("ERROR : -mem not supported for LLVM\n");
-    }
     if (gGlobal->gFloatSize == 3) {
         throw faustexception("ERROR : quad format not supported for LLVM\n");
     }

@@ -1,0 +1,20 @@
+name: Ubuntu
+
+on:
+  push:
+    branches: 
+        - master
+        - master-dev
+  pull_request:
+    branches: [ master-dev ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build Faust
+      run: make

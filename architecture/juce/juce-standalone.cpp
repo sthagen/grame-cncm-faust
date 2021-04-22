@@ -72,7 +72,6 @@ class FaustComponent : public juce::AudioAppComponent, private juce::Timer
             bool midi_sync = false;
             int nvoices = 0;
             bool group = true;
-            mydsp_poly* dsp_poly = nullptr;
             
             mydsp* tmp_dsp = new mydsp();
             MidiMeta::analyse(tmp_dsp, midi_sync, nvoices);
@@ -81,31 +80,31 @@ class FaustComponent : public juce::AudioAppComponent, private juce::Timer
         #ifdef POLY2
             assert(nvoices > 0);
             std::cout << "Started with " << nvoices << " voices\n";
-            dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, group);
+            dsp* dsp = std::make_unique<mydsp_poly>(new mydsp(), nvoices, true, group);
                 
         #if MIDICTRL
             if (midi_sync) {
-                fDSP = std::make_unique<timed_dsp>(new dsp_sequencer(dsp_poly, new effect()));
+                fDSP = std::make_unique<timed_dsp>(new dsp_sequencer(dsp, new effect()));
             } else {
-                fDSP = std::make_unique<dsp_sequencer>(dsp_poly, new effect());
+                fDSP = std::make_unique<dsp_sequencer>(dsp, new effect());
             }
         #else
-            fDSP = std::make_unique<dsp_sequencer>(dsp_poly, new effect());
+            fDSP = std::make_unique<dsp_sequencer>(dsp, new effect());
         #endif
                 
         #else
             if (nvoices > 0) {
                 std::cout << "Started with " << nvoices << " voices\n";
-                dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, group);
+                dsp* dsp = new mydsp_poly(new mydsp(), nvoices, true, group);
                 
         #if MIDICTRL
                 if (midi_sync) {
-                    fDSP = std::make_unique<timed_dsp>(dsp_poly);
+                    fDSP = std::make_unique<timed_dsp>(dsp);
                 } else {
-                    fDSP = std::make_unique<decorator_dsp>(dsp_poly);
+                    fDSP = std::make_unique<decorator_dsp>(dsp);
                 }
         #else
-                fDSP = std::make_unique<decorator_dsp>(dsp_poly);
+                fDSP = std::make_unique<decorator_dsp>(dsp);
         #endif
             } else {
         #if MIDICTRL
@@ -125,7 +124,6 @@ class FaustComponent : public juce::AudioAppComponent, private juce::Timer
             
         #if defined(MIDICTRL)
             fMIDIHandler = std::make_unique<juce_midi>();
-            fMIDIHandler->addMidiIn(dsp_poly);
             fMIDIUI = std::make_unique<MidiUI>(fMIDIHandler.get());
             fDSP->buildUserInterface(fMIDIUI.get());
             if (!fMIDIUI->run()) {
@@ -145,10 +143,7 @@ class FaustComponent : public juce::AudioAppComponent, private juce::Timer
             auto file = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
                 .getParentDirectory().getParentDirectory().getChildFile("Resources");
             fSoundUI = std::make_unique<SoundUI>(file.getFullPathName().toStdString());
-            // SoundUI has to be dispatched on all internal voices
-            if (dsp_poly) dsp_poly->setGroup(false);
             fDSP->buildUserInterface(fSoundUI.get());
-            if (dsp_poly) dsp_poly->setGroup(group);
         #endif
             
             recommendedSize = fJuceGUI.getSize();
@@ -178,7 +173,12 @@ class FaustComponent : public juce::AudioAppComponent, private juce::Timer
             const int maxInputChannels = activeInputChannels.getHighestBit() + 1;
             const int maxOutputChannels = activeOutputChannels.getHighestBit() + 1;
             
-            // Possibly adapt DSP...
+            // Possible sample size adaptation
+            if (sizeof(FAUSTFLOAT) == 8) {
+                fDSP = std::make_unique<dsp_sample_adapter<FAUSTFLOAT, float>>(fDSP.release());
+            }
+            
+            // Possibly adapt DSP inputs/outputs number
             if (fDSP->getNumInputs() > maxInputChannels || fDSP->getNumOutputs() > maxOutputChannels) {
                 fDSP = std::make_unique<dsp_adapter>(fDSP.release(), maxInputChannels, maxOutputChannels, 4096);
             }
@@ -191,7 +191,7 @@ class FaustComponent : public juce::AudioAppComponent, private juce::Timer
 
         void getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill) override
         {
-            AVOIDDENORMALS;
+            juce::ScopedNoDenormals noDenormals;
             
             const float** inputs = (const float**)alloca(fDSP->getNumInputs() * sizeof(float));
             for (int i = 0; i < fDSP->getNumInputs(); i++) {

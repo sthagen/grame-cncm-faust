@@ -6,7 +6,6 @@
 #    STATIC    embed the backend in the faust static library
 #    DYNAMIC   embed the backend in the faust dynamic library
 #    WASM      embed the backend in the faust wasm library
-#    SOUL      embed the backend in the Faust wasm library
 
 set ( IOS            ON        CACHE BOOL    "Compiles for iOS"     FORCE )
 
@@ -15,6 +14,7 @@ set ( CPP_BACKEND    OFF       CACHE STRING  "Include CPP backend"       FORCE )
 set ( FIR_BACKEND    OFF       CACHE STRING  "Include FIR backend"       FORCE )
 set ( INTERP_BACKEND STATIC    CACHE STRING  "Include INTERPRETER backend" FORCE )
 set ( JAVA_BACKEND   OFF       CACHE STRING  "Include JAVA backend"       FORCE )
+set ( CSHARP_BACKEND OFF       CACHE STRING  "Include CSharp backend" FORCE )
 set ( LLVM_BACKEND   OFF       CACHE STRING  "Include LLVM backend"      FORCE )
 set ( OLDCPP_BACKEND OFF       CACHE STRING  "Include old CPP backend"   FORCE )
 set ( RUST_BACKEND   OFF       CACHE STRING  "Include RUST backend"      FORCE )

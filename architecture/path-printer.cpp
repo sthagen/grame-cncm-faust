@@ -5,8 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
-
+/******************* BEGIN path-printer.cpp ****************/
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
@@ -38,7 +37,7 @@
 #include "faust/misc.h"
 #include "faust/dsp/dsp.h"
 #include "faust/gui/meta.h"
-#include "faust/gui/UI.h"
+#include "faust/gui/DecoratorUI.h"
 #include "faust/gui/JSONUIDecoder.h"
 
 #ifdef SOUNDFILE
@@ -97,6 +96,5 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
-
+/******************* END path-printer.cpp ****************/
 

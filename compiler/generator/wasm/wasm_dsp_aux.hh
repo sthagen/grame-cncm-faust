@@ -317,16 +317,20 @@ class EXPORT wasm_dsp_factory : public dsp_factory, public faust_smartable {
     JSONUITemplatedDecoder*  fDecoder;
     int                      fInstance; // Index of wasm DSP instance
     MapUI                    fMapUI;
+/*
 #ifdef EMCC
     SoundUI* fSoundUI;
 #endif
+*/
 
    public:
     wasm_dsp_factory():fFactory(nullptr), fDecoder(nullptr), fInstance(0)
     {
+    /*
     #ifdef EMCC
         fSoundUI = nullptr;
     #endif
+    */
     }
     wasm_dsp_factory(dsp_factory_base* factory);
     wasm_dsp_factory(int instance, const std::string& json);

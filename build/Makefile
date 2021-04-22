@@ -11,7 +11,7 @@ system := $(shell echo $(system) | grep MINGW > /dev/null && echo MINGW || echo 
 # output directories
 FAUSTDIR ?= faustdir
 IOSDIR   := iosdir
-VERSION := 2.28.0
+VERSION := 2.32.6
 
 #===============================================================
 # current generator and backends
@@ -55,7 +55,6 @@ BUILDOPT ?= --config Release
 
 #===============================================================
 # options
-JOBS	 ?= -j 4
 BACKENDS ?= $(shell [ -f $(BCACHE) ] && (grep BACKENDS $(BCACHE) | cut -d= -f2) || echo regular.cmake)
 TARGETS  ?= $(shell [ -f $(TCACHE) ] && (grep TARGETS $(TCACHE) | cut -d= -f2) || echo regular.cmake)
 LIBSDIR  ?= $(shell [ -f $(LCACHE) ] && (grep LIBSDIR $(LCACHE) | cut -d= -f2) || echo lib)
@@ -64,24 +63,22 @@ EMCC 	 ?= emcc
 #===============================================================
 ifeq ($(GENERATOR), Xcode)
 	PROJ = $(FAUSTDIR)/faust.xcodeproj
-	JOBS ?= -jobs 4
 endif
 ifneq (,$(findstring Makefile, $(GENERATOR)))
 	PROJ = $(FAUSTDIR)/Makefile
 endif
-ifneq (,$(findstring "Visual Studio",$(GENERATOR)))
+ifneq (,$(findstring Visual Studio,$(GENERATOR)))
 	PROJ = $(FAUSTDIR)/faust.sln
-	JOBS ?= /maxcpucount:4
 endif
 
 #===============================================================
 # main targets
 all: $(PROJ)
-	cmake --build $(FAUSTDIR) $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) $(BUILDOPT) 
 
 full:
 	$(MAKE) cmake BACKENDS=all.cmake TARGETS=all.cmake 
-	cmake --build $(FAUSTDIR) $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) $(BUILDOPT) 
 
 clean:
 	cmake --build $(FAUSTDIR) --target clean
@@ -124,8 +121,7 @@ help:
 	@echo "  BUILDOPT=<cmake options>    : pass options to cmake at build time (default to $(BUILDOPT))."
 	@echo "  BACKENDS=<backends file>    : see 'Backends' below"
 	@echo "  TARGETS=<targets file>      : see 'Targets' below"
-	@echo "  JOBS    : intended to set the number of tasks to run in parallel (default is $(JOBS))"
-	@echo "  WORKLET : Compile wasm glue library for worklet (default is off)"
+	@echo "  WORKLET                     : Compile wasm glue library for worklet (default is off)"
 	@echo
 	@echo "Backends:"
 	@echo "  the FAUST backends currently included are described in the '$(BACKENDS)' file"
@@ -159,22 +155,22 @@ help:
 
 	
 faust: $(PROJ) 
-	cmake --build $(FAUSTDIR) --target faust $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target faust $(BUILDOPT) 
 
 osc: $(PROJ)
-	cmake --build $(FAUSTDIR) --target oscstatic $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target oscstatic $(BUILDOPT) 
 
 oscdynamic: $(PROJ)
-	cmake --build $(FAUSTDIR) --target oscdynamic $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target oscdynamic $(BUILDOPT) 
 
 oscandroid: $(PROJ)
 	cd ../architecture/osclib/android/&& ndk-build 
 
 http: $(PROJ)
-	cmake --build $(FAUSTDIR) --target httpstatic $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target httpstatic $(BUILDOPT) 
 
 httpdynamic: $(PROJ)
-	cmake --build $(FAUSTDIR) --target httpdynamic $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target httpdynamic $(BUILDOPT) 
 
 jsscripts: 
 	$(MAKE) -C ../architecture/httpdlib/src/hexa
@@ -253,19 +249,18 @@ native: $(FAUSTDIR)
 # building libraries
 #===============================================================
 staticlib: $(PROJ)
-	cmake --build $(FAUSTDIR) --target staticlib $(BUILDOPT)  -- $(JOBS) 
+	cmake --build $(FAUSTDIR) --target staticlib $(BUILDOPT)   
 
 dynamiclib: $(PROJ)
-	cmake --build $(FAUSTDIR) --target dynamiclib $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target dynamiclib $(BUILDOPT) 
 
 
 #===============================================================
 # building libfaust.a for ios
 #===============================================================
-ioslib: JOBS ?= -jobs 4
 ioslib: $(IOSDIR) $(IOSDIR)/faust.xcodeproj
-	cmake --build $(IOSDIR) --target staticlib $(BUILDOPT) -- $(JOBS)
-	cmake --build $(IOSDIR) --target oscstatic $(BUILDOPT) -- $(JOBS)
+	cmake --build $(IOSDIR) --target staticlib $(BUILDOPT) 
+	cmake --build $(IOSDIR) --target oscstatic $(BUILDOPT) 
 
 $(IOSDIR)/faust.xcodeproj: CMakeLists.txt backends/ios.cmake
 	cd $(IOSDIR) && cmake -C ../backends/ios.cmake ..  -DINCLUDE_STATIC=on -DINCLUDE_HTTP=off -G Xcode
@@ -311,7 +306,7 @@ wasmlib: $(FAUSTDIR) $(FAUSTDIR)/Makefile
 
 wasmglue: $(FAUSTDIR) $(FAUSTDIR)/Makefile
 	@$(MAKE) checkemcc
-	cmake --build $(FAUSTDIR) --target wasmglue $(BUILDOPT) -- $(JOBS)
+	cmake --build $(FAUSTDIR) --target wasmglue $(BUILDOPT) 
 
 checkemcc:
 	@which $(EMCC) > /dev/null || (echo "### emcc must be available from your PATH."; false;)
@@ -325,9 +320,10 @@ install:
 	if test -d ../.git; then git submodule update --init; fi
 	cd $(FAUSTDIR) && cmake .. -DCMAKE_INSTALL_PREFIX=$(PREFIX)
 	cmake  --build $(FAUSTDIR) --target install
-uninstall: installedfiles = $(shell cat $(installLog))
+
 uninstall: $(installLog)
-	rm -f $(installedfiles) $(installLog)
+	$(shell cat $(installLog) | xargs rm -f)
+	rm -f $(installLog)
 
 #===============================================================
 undefined:

@@ -109,7 +109,7 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
                 for (int i = 0; i < n; i++) {
                     recdraw(subsig[i], drawn, fout);
                     fout << 'S' << subsig[i] << " -> " << 'S' << sig << "[" << edgeattr(getCertifiedSigType(subsig[i]))
-                         << "];" << endl;
+                         << "]" << endl;
                 }
             }
         }
@@ -117,25 +117,35 @@ static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
     // cerr << --gGlobal->TABBER << "EXIT REC DRAW OF " << sig << endl;
 }
 
+string commonAttr(Type t)
+{
+    string sout;
+    // nature
+    if (t->nature() == kInt) {
+        sout += " color=\"blue\"";
+    } else {
+        sout += " color=\"red\"";
+    }
+    // vectorability
+    if (t->vectorability() == kVect && t->variability() == kSamp) {
+        sout += " style=\"bold\"";
+    }
+    return sout;
+}
+
 /**
  * Convert a signal type into edge attributes
  */
+
 static string edgeattr(Type t)
 {
-    string s;
-
-    // nature
-    if (t->nature() == kInt) {
-        s += " color=\"blue\"";
-    } else {
-        s += " color=\"red\"";
-    }
-
-    // vectorability
-    if (t->vectorability() == kVect && t->variability() == kSamp) {
-        s += " style=\"bold\"";
-    }
-    return s;
+    string sout(commonAttr(t));
+    sout += " label =\"";
+    sout += t->getInterval().toString();
+    sout += ", ";
+    sout += t->getRes().toString();
+    sout += "\"";
+    return sout;
 }
 
 /**
@@ -143,18 +153,17 @@ static string edgeattr(Type t)
  */
 static string nodeattr(Type t)
 {
-    string s = edgeattr(t);
+    string sout(commonAttr(t));
 
     // variability
     if (t->variability() == kKonst) {
-        s += " shape=\"box\"";
+        sout += " shape=\"box\"";
     } else if (t->variability() == kBlock) {
-        s += " shape=\"hexagon\"";
+        sout += " shape=\"hexagon\"";
     } else if (t->variability() == kSamp) {
-        s += " shape=\"ellipse\"";
+        sout += " shape=\"ellipse\"";
     }
-
-    return s;
+    return sout;
 }
 
 /**

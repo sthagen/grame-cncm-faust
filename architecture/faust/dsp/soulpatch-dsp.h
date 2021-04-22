@@ -53,14 +53,16 @@ class soulpatch_dsp : public dsp {
     
     private:
     
+        /*
         struct ConsolePrinter : public soul::patch::RefCountHelper<soul::patch::ConsoleMessageHandler, ConsolePrinter>
         {
-            /** Called when a message is sent to the console by the program. */
+            // Called when a message is sent to the console by the program.
             void handleConsoleMessage(uint64_t sampleCount, const char* endpointName, const char* message)
             {
                 std::cout << sampleCount << " " << endpointName << ": " << message << std::endl;
             }
         };
+        */
 
         bool startWith(const std::string& str, const std::string& prefix)
         {
@@ -120,8 +122,8 @@ class soulpatch_dsp : public dsp {
     
         // MIDI handling
         midi_handler* fMIDIHander;
-        std::vector<soul::patch::MIDIMessage> fMIDIInputMessages;
-        std::vector<soul::patch::MIDIMessage> fMIDIOutputMessages;
+        std::vector<soul::MIDIEvent> fMIDIInputMessages;
+        std::vector<soul::MIDIEvent> fMIDIOutputMessages;
     
     public:
 
@@ -441,13 +443,13 @@ soulpatch_dsp::soulpatch_dsp(soul_dsp_factory* factory, std::string& error_msg)
     
     fConfig.sampleRate = 44100;
     fConfig.maxFramesPerBlock = 4096;
-    fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr, nullptr);
+    fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr);
     if (!fPlayer->isPlayable()) {
         soul::patch::Span<soul::patch::CompilationMessage> errors = fPlayer->getCompileMessages();
         error_msg = "getCompileError";
         for (int i = 0; i < errors.size(); i++) {
             error_msg += " ";
-            error_msg += std::string(errors[i].fullMessage->getCharPointer());
+            error_msg += errors[i].getFullMessage();
         }
         error_msg += "\n";
         throw std::bad_alloc();
@@ -461,8 +463,7 @@ soulpatch_dsp::soulpatch_dsp(soul_dsp_factory* factory, std::string& error_msg)
 void soulpatch_dsp::init(int sample_rate)
 {
     fConfig.sampleRate = double(sample_rate);
-    fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr, nullptr);
-    //fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr, new ConsolePrinter());
+    fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr);
     fMIDIInputMessages.resize(1024);
     fMIDIOutputMessages.resize(1024);
     
@@ -568,7 +569,7 @@ class faust_soul_parser  {
                         brackets++;
                         continue;
                     } else {
-                        faust_block << line;
+                        faust_block << line << "\n";
                     }
                     continue;
                 } else {
@@ -592,7 +593,8 @@ class faust_soul_parser  {
             int argc1 = 0;
             const char* argv1[64];
             argv1[argc1++] = "-lang";
-            argv1[argc1++] = "soul";
+            //argv1[argc1++] = "soul";
+            argv1[argc1++] = "soul-hybrid";
             argv1[argc1++] = "-cn";
             argv1[argc1++] = name.c_str();
             argv1[argc1++] = "-o";
@@ -673,9 +675,10 @@ class faust_soul_parser  {
             return res;
         }
     
-        void createSOULPatch(const std::string& soulpatch_file, const std::string& soul_file)
+        void createSOULPatch(const std::string& soul_file)
         {
             // Generate "soulpatch" file
+            std::string soulpatch_file = soul_file + "patch";
             std::ofstream patch_file(soulpatch_file);
             patch_file << "{" << std::endl;
                 patch_file << "\t\"soulPatchV1\":" << std::endl;
@@ -697,4 +700,4 @@ class faust_soul_parser  {
 };
 
 #endif
-/**************************  END  soulpatch-dsp.h **************************/
+/************************** END soulpatch-dsp.h **************************/

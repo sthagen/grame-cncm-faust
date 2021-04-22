@@ -49,7 +49,7 @@
 static int infereSigOrder(Tree sig);
 
 /**
- * retrieve the order annotation (between 0 and 3) of a signal.
+ * Retrieve the order annotation (between 0 and 3) of a signal.
  * (compute the order the first time). Orders have the following meanings
  *	0 : numbers
  *	1 : constants
@@ -89,8 +89,8 @@ static int infereSigOrder(Tree sig)
     if (xt) {
         // return 3;
         vector<int> args;
-        for (int i = 0; i < sig->arity(); i++) {
-            args.push_back(O(sig->branch(i)));
+        for (int i1 = 0; i1 < sig->arity(); i1++) {
+            args.push_back(O(sig->branch(i1)));
         }
         return xt->infereSigOrder(args);
     }
@@ -219,13 +219,13 @@ static int infereSigOrder(Tree sig)
         return 3;
 
     else if (isList(sig)) {
-        int r = 0;
+        int r1 = 0;
         while (isList(sig)) {
-            int x = O(hd(sig));
-            if (x > r) r = x;
+            int x1 = O(hd(sig));
+            if (x1 > r1) r1 = x1;
             sig = tl(sig);
         }
-        return r;
+        return r1;
     }
 
     // unrecognized signal here

@@ -30,10 +30,10 @@
 #include <vector>
 
 /*
- #ifndef FAUSTFLOAT
- #define FAUSTFLOAT double
- #endif
- */
+#ifndef FAUSTFLOAT
+#define FAUSTFLOAT double
+#endif
+*/
 
 #include "faust/audio/jack-dsp.h"
 #include "faust/dsp/dsp-optimizer.h"
@@ -52,7 +52,7 @@
 #include "faust/gui/PrintUI.h"
 #include "faust/misc.h"
 
-#include "faust/dsp/llvm-dsp-adapter.h"
+#include "faust/dsp/dsp-compute-adapter.h"
 
 using namespace std;
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
     jackaudio_midi audio;
     string error_msg;
     
-    cout << "Libfaust version : " << getCLibFaustVersion () << endl;
+    cout << "Libfaust version : " << getCLibFaustVersion() << endl;
     
     int argc1 = 0;
     const char* argv1[64];
@@ -290,10 +290,7 @@ int main(int argc, char* argv[])
     } else {
         soundinterface = new SoundUI();
     }
-    // SoundUI has to be dispatched on all internal voices
-    if (dsp_poly) dsp_poly->setGroup(false);
     DSP->buildUserInterface(soundinterface);
-    if (dsp_poly) dsp_poly->setGroup(true);
     
     if (is_httpd) {
         httpdinterface = new httpdUI(name, DSP->getNumInputs(), DSP->getNumOutputs(), argc, argv);

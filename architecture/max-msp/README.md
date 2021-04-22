@@ -1,14 +1,14 @@
 # faust2max6/faust2msp
 
-faust2max6/faust2msp transform a Faust DSP program into a compiled Max/MSP external, and a ready-to-use patch to load and use it. Polyphonic and MIDI controllable synthesisers can be created.  Note that faust2msp is the old version compiling 32 bits external for Max5, and faust2max6 compiles 64 bits or 64/32 bits externals for Max6 and later versions, and should be preferably used. 
+The **faust2max6/faust2msp** tools transform a Faust DSP program into a compiled Max/MSP external, and a ready-to-use patch to load and use it. Polyphonic and MIDI controllable instruments can be created. Note that **faust2msp** is the old version compiling 32 bits external for Max5, and **faust2max6** compiles 64 bits or 64/32 bits externals for Max6 and later versions, and should be preferably used. 
 
 ## How to use
 
-faust2max6 is used with the following parameters: 
+**faust2max6** is used with the following options: 
 
 `faust2max6 [-opt native|generic] [-native] [-nvoices <num>] [-effect <effect.dsp>] [-midi] [-osc] [-us <factor>] [-ds <factor>] [-filter <filter>] [-universal] [-nopatch] [-nopost] [-soundfile/-soundfile-static] [additional Faust options (-vec -vs 8...)] <file.dsp>` 
 
-By default it will create *file~.mxo* external along with a *file.maxpat* patch file and a *ui.js* helper file, that will load the external and automatically create a User Interface (with sliders, buttons...) ready to control it. To be fully functional, the object still has to be connected to audio inputs/outputs or other elements in the patch. **Double-click** on the object allow to display its controls with their **label**, **range** and **complete path**. Note that  *-double* compilation mode is used by default in faust2max6.
+By default it will create *file~.mxo* external along with a *file.maxpat* patch file and a *ui.js* helper file, that will load the external and automatically create a User Interface (with sliders, buttons...) ready to control it. To be fully functional, the object still has to be connected to audio inputs/outputs or other elements in the patch. **Double-click** on the object allow to display its controls with their **label**, **range** and **complete path**. Note that  *-double* compilation mode is used by default in **faust2max6**.
 
 Attributes can be used at object creation time, for instance the following DSP code:
 
@@ -20,9 +20,26 @@ process = os.sawtooth(freq) * gain;
 ```
 can be started with the following `@freq 700` and `@gain 0.6` attributes to configure parameters at creation time. Note that labels containing whitespace (like "freq Hz") cannot be used as attributes, they will have to be renamed.
 
-## Options
+Depending of the number of audio inputs and outputs described in the DSP source code, the compiled .xmo/.xme object has:
+- N inlets, the first one being the message control one and a regular audio inlet, an all other audio inlets
+- M outlets, audio outs from 1 to M-1 (or 2 if MIDI outlet is created)
+- an output messages outlet 
+- the right most outlet is used to send MIDI messages if MIDI metadata are used in the DSP UI items, and is only created when the `-midi` option is used
 
-The following options are available: 
+The compiled .xmo/.xme object can be controlled with the following messages, which can be used depending of the parameters used at compilation time:
+
+- `polyphony <nvoices>` : to set the DSP in polyphonic mode with *nvoices* (note that the DSP code has to follow the [polyphonic convention](https://faustdoc.grame.fr/manual/midi/))
+- `osc <IP inport outport xmit[0|1] bundle[0|1]>`: to activate OSC control in input and output mode, possibly generating messages when *xmit = 1*, and in bundle mode when *bundle = 1* 
+- `midievent <midi message>`: to receive and decode MIDI messages
+- `init`: to generate all inputs and outputs control messages as a message list *[path, init, min, max]* that will be sent on the output messages outlet
+- `dump`: to generate all inputs and outputs control messages as a message list *[path, cur, min, max]* that will be sent on the output messages outlet 
+- `mute`: to mute audio rendering
+
+When the object has bargraphs, their values are sent in the right most outlet as a message list *[path, cur, min, max]*.
+
+## Options:
+
+Here are the available options:
 
   - `-opt native` : to activate the best compilation options for the native CPU
   - `-opt generic` : to activate the best compilation options for a generic CPU 
@@ -41,12 +58,12 @@ The following options are available:
   - `-soundfile-static`: when compiling DSP using 'soundfile' primitive, to add needed resources in static mode
   - `-help or -h` : shows the different options 
  
-The *faust2msp* tools has to be used to create old Max5 compatible externals, the *faust2max6* tools has to be used starting with Max6. 
+The *faust2msp* tools has to be used to create old Max5 compatible externals, the **faust2max6** tools has to be used starting with Max6. 
 
-## Configuration
+## Configuration:
 
-If you plan to use faust2max6/faust2msp on your own machine, you will have to:
+If you plan to use **faust2max6/faust2msp** on your own machine, you will have to:
 
 - install [Max/MSP SDK](https://cycling74.com/downloads/sdk)
 - edit the `faust/tools/faust2appls/faustpath` script to properly setup the $MAXSDK variable, then re-install the scripts again using `sudo make install`
-- alternatively you can locally change the $MAXSDK variable in a terminal using `export MAXSDK=/your/alternate/path`, then use faust2msp/faust2max6 in this terminal.
+- alternatively you can locally change the $MAXSDK variable in a terminal using `export MAXSDK=/your/alternate/path`, then use **faust2msp/faust2max6** in this terminal.

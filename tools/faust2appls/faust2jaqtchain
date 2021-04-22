@@ -61,7 +61,7 @@ do
 		HTTPLIBS="-lHTTPDFaust -lmicrohttpd"
     elif [ ${p:0:1} = "-" ]; then
 	    OPTIONS="$OPTIONS $p"
-	elif [[ -f "$p" ]]; then
+	elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
 	    FILES="$FILES $p"
     else
 	    OPTIONS="$OPTIONS $p"        
@@ -142,7 +142,10 @@ rm "$TMP/combined_dsp.cpp"
     make
 ) > /dev/null || exit
 
-cp -r "$TMP/chain$EXT" "$SRCDIR/chain$EXT"
+cp -a "$TMP/chain$EXT" "$SRCDIR/chain$EXT"
+if [[ $(uname) == Darwin ]]; then
+    codesign --sign - --deep --force "$SRCDIR/chain$EXT"
+fi
 rm -rf "$TDR"
 
 # collect binary file name for FaustGIDE

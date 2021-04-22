@@ -1,6 +1,6 @@
 /************************************************************************
  FAUST Architecture File
- Copyright (C) 2012-2019 GRAME, Centre National de Creation Musicale
+ Copyright (C) 2012-2020 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
  This Architecture section is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public License
@@ -61,7 +61,7 @@
 #include "ext_drag.h"
 
 #define DEFAULT_SOURCE_CODE "import(\"stdfaust.lib\");\nprocess=_,_;"
-#define FAUSTGEN_VERSION "1.47"
+#define FAUSTGEN_VERSION "1.50"
 #define FAUST_PDF_DOCUMENTATION "faust-quick-reference.pdf"
 #define FAUST_PDF_LIBRARY "library.pdf"
 
@@ -100,7 +100,6 @@ class faustgen_factory {
         
         set<faustgen*> fInstances;      // set of all DSP
         llvm_dsp_factory* fDSPfactory;  // pointer to the LLVM Faust factory
-        midi_handler fMidiHandler;      // generic MIDI handler
         SoundUI* fSoundUI;              // generic Soundfile interface
         
         long fSourceCodeSize;           // length of source code string
@@ -223,7 +222,8 @@ class faustgen : public MspCpp5<faustgen> {
         
         faustgen_factory* fDSPfactory;
         map<string, vector<t_object*> > fOutputTable;  // Output UI items (like bargraph) in the patcher to be notified
-        
+    
+        faustgen_midi  fMidiHandler;    // generic MIDI handler
         mspUI* fDSPUI;                  // Control UI
         MidiUI* fMidiUI;                // Midi UI
         OSCUI* fOSCUI;                  // OSC UI
@@ -262,10 +262,7 @@ class faustgen : public MspCpp5<faustgen> {
         void init_controllers();
         
         t_dictionary* json_reader(const char* jsontext);
-        
-        void add_midihandler();
-        void remove_midihandler();
-        
+    
     public:
         
         faustgen()
@@ -315,6 +312,8 @@ class faustgen : public MspCpp5<faustgen> {
         
         // Called when the user double-clicks on the faustgen object inside the Max patcher
         void dblclick(long inlet);
+    
+        void assist(void* b, long msg, long a, char* dst);
         
         // Called when closing the text editor, calls for the creation of a new Faust module with the updated sourcecode
         void edclose(long inlet, char** text, long size);

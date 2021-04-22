@@ -46,7 +46,7 @@
  **********************************************************************/
 
 //--------------------------------------------------
-// qualite des types simples
+// simple types quality
 
 enum { kInt = 0, kReal = 1 };  ///< nature : integer or floating point values
 enum {
@@ -59,8 +59,8 @@ enum {
     kVect     = 0,
     kScal     = 1,
     kTrueScal = 3 /*, kIndex = 4*/
-};  ///< vectorability: when a signal can be vectorized ( actually, only kVect and kScal matter; kTrueScal and kIndex
-    ///< don't denote types but are here to simplify code generation )
+};  ///< vectorability: when a signal can be vectorized (actually, only kVect and kScal matter; kTrueScal and kIndex
+    ///< don't denote types but are here to simplify code generation)
 
 /*---------------------------------------------------------------------
 
@@ -94,11 +94,12 @@ class AudioType : public virtual Garbageable {
     int fBoolean;        ///< when a signal stands for a boolean value
 
     interval fInterval;  ///< Minimal and maximal values the signal can take
+    res      fRes;       ///< Resolution (fixed-point)
     Tree     fCode;      ///< Tree representation (for memoization purposes)
 
    public:
-    AudioType(int n, int v, int c, int vec = kVect, int b = kNum, interval i = interval())
-        : fNature(n), fVariability(v), fComputability(c), fVectorability(vec), fBoolean(b), fInterval(i), fCode(0)
+    AudioType(int n, int v, int c, int vec = kVect, int b = kNum, interval i = interval(), res r = res())
+        : fNature(n), fVariability(v), fComputability(c), fVectorability(vec), fBoolean(b), fInterval(i), fRes(r), fCode(0)
     {
     }                        ///< constructs an abstract audio type
     virtual ~AudioType() {}  ///< not really useful here, but make compiler happier
@@ -116,7 +117,8 @@ class AudioType : public virtual Garbageable {
     int boolean() const { return fBoolean; }              ///< returns when a signal stands for a boolean value
 
     interval getInterval() const { return fInterval; }  ///< returns the interval (min dn max values) of a signal
-
+    res getRes() const { return fRes; } ///< return the resolution of the signal (fixed)
+    
     void setCode(Tree code) { fCode = code; }  ///< returns the interval (min dn max values) of a signal
     Tree getCode() { return fCode; }           ///< returns the interval (min dn max values) of a signal
 
@@ -216,6 +218,8 @@ inline interval mergeinterval(const vector<Type>& v)
 }
 
 AudioType* makeSimpleType(int n, int v, int c, int vec, int b, const interval& i);
+AudioType* makeSimpleType(int n, int v, int c, int vec, int b, const interval& i, const res& lsb);
+//didn't use a default arg, would have created a cyclic dependancy with global.hh
 
 AudioType* makeTableType(const Type& ct);
 AudioType* makeTableType(const Type& ct, int n, int v, int c, int vec);
@@ -232,7 +236,7 @@ AudioType* makeTupletType(const vector<Type>& vt, int n, int v, int c, int vec, 
  */
 class SimpleType : public AudioType {
    public:
-    SimpleType(int n, int v, int c, int vec, int b, const interval& i) : AudioType(n, v, c, vec, b, i)
+    SimpleType(int n, int v, int c, int vec, int b, const interval& i, const res& lsb) : AudioType(n, v, c, vec, b, i, lsb)
     {
         // cerr << "new simple type " << i << " -> " << *this << endl;
     }  ///< constructs a SimpleType from a nature a variability and a computability
@@ -514,15 +518,15 @@ ostream& operator<<(ostream& dst, const TupletType& t);
 //--------------------------------------------------
 // verification de type
 
-Type checkInt(Type t);    ///< verifie que t est entier
-Type checkKonst(Type t);  ///< verifie que t est constant
-Type checkInit(Type t);   ///< verifie que t est connu a l'initialisation
+Type checkInt(Type t);    ///< check that t is an integer
+Type checkKonst(Type t);  ///< check that t is a constant
+Type checkInit(Type t);   ///< check that t is a known at init time
 
-Type checkIntParam(Type t);  ///< verifie que t est connu a l'initialisation, constant et entier
+Type checkIntParam(Type t);  ///< check that t is a known at init time, constant and an integer
 
-Type checkWRTbl(Type tbl, Type wr);  ///< verifie que wr est compatible avec le contenu de tbl
+Type checkWRTbl(Type tbl, Type wr);  ///< check that wr is compatible with tbl content
 
-int checkDelayInterval(Type t);  ///< Check if the interval of t is appropriate for a delay
+int checkDelayInterval(Type t);      ///< check if the interval of t is appropriate for a delay
 
 //--------------------------------------------------
 // Type conversion

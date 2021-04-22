@@ -171,7 +171,7 @@ static Tree real_a2sb(Tree exp)
             return abstr;
 
         } else {
-            evalerror(yyfilename, -1, "a2sb : internal error : not an abstraction inside closure (1)", exp);
+            evalerror(yyfilename, -1, "a2sb : internal error : not an abstraction inside closure (1) : ", exp);
             // Never reached...
             return 0;
         }
@@ -228,7 +228,7 @@ bool getArgName(Tree t, Tree& id)
 }
 
 /**
- * set the value of box in the environment env
+ * Set the value of box in the environment env
  * @param box the block diagram we have evaluated
  * @param env the evaluation environment
  * @param value the evaluated block diagram
@@ -239,7 +239,7 @@ void setEvalProperty(Tree box, Tree env, Tree value)
 }
 
 /**
- * retrieve the value of box in the environment env
+ * Retrieve the value of box in the environment env
  * @param box the expression we want to retrieve the value
  * @param env the lexical environment
  * @param value the returned value if any
@@ -384,7 +384,7 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
             // it is a closure, we have an environment to access
             return eval(closure(var, notused, visited2, lenv2), visited, localValEnv);
         } else {
-            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access", exp);
+            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access : ", exp);
         }
 
         //////////////////////en chantier////////////////////////////
@@ -397,8 +397,8 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
             Tree lenv3 = copyEnvReplaceDefs(lenv2, ldef, visited2, localValEnv);
             return eval(closure(exp2, notused, visited2, lenv3), visited, localValEnv);
         } else {
-            evalerror(getDefFileProp(exp), getDefLineProp(exp), "not a closure", val);
-            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access", exp);
+            evalerror(getDefFileProp(exp), getDefLineProp(exp), "not a closure : ", val);
+            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access : ", exp);
         }
 
         ///////////////////////////////////////////////////////////////////
@@ -547,10 +547,10 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
 
         // static
     } else if (isBoxInputs(exp, body)) {
-        int  ins, outs;
+        int  ins1, outs1;
         Tree b = a2sb(eval(body, visited, localValEnv));
-        if (getBoxType(b, &ins, &outs)) {
-            return boxInt(ins);
+        if (getBoxType(b, &ins1, &outs1)) {
+            return boxInt(ins1);
         } else {
             stringstream error;
             error << "ERROR : can't evaluate ' : " << *exp << endl;
@@ -558,10 +558,10 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
         }
 
     } else if (isBoxOutputs(exp, body)) {
-        int  ins, outs;
+        int  ins1, outs1;
         Tree b = a2sb(eval(body, visited, localValEnv));
-        if (getBoxType(b, &ins, &outs)) {
-            return boxInt(outs);
+        if (getBoxType(b, &ins1, &outs1)) {
+            return boxInt(outs1);
         } else {
             stringstream error;
             error << "ERROR : can't evaluate ' : " << *exp << endl;
@@ -743,7 +743,7 @@ static double eval2double(Tree exp, Tree visited, Tree localValEnv)
     int  numInputs, numOutputs;
     getBoxType(diagram, &numInputs, &numOutputs);
     if ((numInputs > 0) || (numOutputs != 1)) {
-        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1)", exp);
+        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1) : ", exp);
         return 1;
     } else {
         Tree lsignals = boxPropagateSig(gGlobal->nil, diagram, makeSigInputList(numInputs));
@@ -772,7 +772,7 @@ static int eval2int(Tree exp, Tree visited, Tree localValEnv)
     int  numInputs, numOutputs;
     getBoxType(diagram, &numInputs, &numOutputs);
     if ((numInputs > 0) || (numOutputs != 1)) {
-        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1)", exp);
+        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1) : ", exp);
         return 1;
     } else {
         Tree lsignals = boxPropagateSig(gGlobal->nil, diagram, makeSigInputList(numInputs));
@@ -849,47 +849,44 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
     string format;     // current format
 
     while (state != -1) {
-        char c = *src++;
-
         if (state == 0) {
-            if (c == 0) {
+            if (*src == 0) {
                 state = -1;
-            } else if (c == '%') {
+            } else if (*src == '%') {
                 ident  = "";
                 format = "";
                 state  = 1;
+                src++;
             } else {
-                dst += c;
+                dst += *src++;
                 state = 0;
             }
 
         } else if (state == 1) {
-            if (c == 0) {
+            if (*src == 0) {
                 // fin et pas d'indentifiant, abandon
                 dst += '%';
                 dst += format;
                 state = -1;
-            } else if (isDigitChar(c)) {
-                format += c;
+            } else if (isDigitChar(*src)) {
+                format += *src++;
                 state = 1;
-            } else if (isIdentChar(c)) {
-                ident += c;
+            } else if (isIdentChar(*src)) {
+                ident += *src++;
                 state = 2;
             } else {
                 // caractere de ponctuation et pas d'indentifiant, abandon
                 dst += '%';
                 dst += format;
-                src--;
                 state = 0;
             }
 
         } else if (state == 2) {
-            if (isIdentChar(c)) {
-                ident += c;
+            if (isIdentChar(*src)) {
+                ident += *src++;
                 state = 2;
             } else {
                 writeIdentValue(dst, format, ident, visited, localValEnv);
-                src--;
                 state = 0;
             }
 
@@ -919,7 +916,7 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
 static Tree iteratePar(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iteratePar called with 0 iteration", id);
+        evalerror(yyfilename, -1, "iteratePar called with 0 iteration : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
@@ -945,7 +942,7 @@ static Tree iteratePar(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateSeq(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateSeq called with 0 iteration", id);
+        evalerror(yyfilename, -1, "iterateSeq called with 0 iteration : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
@@ -972,7 +969,7 @@ static Tree iterateSeq(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateSum(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateSum called with 0 iterations", id);
+        evalerror(yyfilename, -1, "iterateSum called with 0 iterations : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
@@ -1000,7 +997,7 @@ static Tree iterateSum(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateProd(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateProd called with 0 iterations", id);
+        evalerror(yyfilename, -1, "iterateProd called with 0 iterations : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
@@ -1054,7 +1051,7 @@ static bool boxlistOutputs(Tree boxlist, int* outputs)
 #endif
 
 /**
- * repeat n times a wire
+ * Repeat a wire n times
  */
 static Tree nwires(int n)
 {
@@ -1177,7 +1174,7 @@ static Tree applyList(Tree fun, Tree larg)
     // Here fun is a closure, we can test the content of abstr
 
     if (isBoxEnvironment(abstr)) {
-        evalerrorbox(yyfilename, -1, "an environment can't be used as a function", fun);
+        evalerrorbox(yyfilename, -1, "an environment can't be used as a function : ", fun);
     }
 
     if (isBoxIdent(abstr)) {
@@ -1190,7 +1187,7 @@ static Tree applyList(Tree fun, Tree larg)
     }
 
     if (!isBoxAbstr(abstr, id, body)) {
-        evalerror(yyfilename, -1, "(internal) not an abstraction inside closure (2)", fun);
+        evalerror(yyfilename, -1, "(internal) not an abstraction inside closure (2) : ", fun);
     }
 
     // Here abstr is an abstraction, we can test the content of abstr
@@ -1249,7 +1246,7 @@ static Tree revEvalList(Tree lexp, Tree visited, Tree localValEnv)
 static Tree larg2par(Tree larg)
 {
     if (isNil(larg)) {
-        evalerror(yyfilename, -1, "empty list of arguments", larg);
+        evalerror(yyfilename, -1, "empty list of arguments : ", larg);
     }
     if (isNil(tl(larg))) {
         return hd(larg);
@@ -1285,7 +1282,7 @@ static Tree evalIdDef(Tree id, Tree visited, Tree lenv)
                   << endl;
             throw faustexception(error.str());
         } else {
-            evalerror(getUseFileProp(id), getUseLineProp(id), "undefined symbol", id);
+            evalerror(getUseFileProp(id), getUseLineProp(id), "undefined symbol : ", id);
         }
     }
 
@@ -1415,7 +1412,7 @@ static Tree vec2list(const vector<Tree>& v)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-// further simplification : replace bloc-diagrams that denote constant number by this number
+// Further simplification : replace bloc-diagrams that denote constant number by this number
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static Tree numericBoxSimplification(Tree box);
@@ -1469,16 +1466,16 @@ Tree numericBoxSimplification(Tree box)
             result = box;
         } else {
             // propagate signals to discover if it simplifies to a number
-            int    i;
-            double x;
+            int    i1;
+            double x1;
             Tree   lsignals = boxPropagateSig(gGlobal->nil, box, makeSigInputList(0));
             // cerr << "simplify 1389" << endl;
             Tree s = simplify(hd(lsignals));
 
-            if (isSigReal(s, &x)) {
-                result = boxReal(x);
-            } else if (isSigInt(s, &i)) {
-                result = boxInt(i);
+            if (isSigReal(s, &x1)) {
+                result = boxReal(x1);
+            } else if (isSigInt(s, &i1)) {
+                result = boxInt(i1);
             } else {
                 result = insideBoxSimplification(box);
             }

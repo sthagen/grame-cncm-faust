@@ -3,18 +3,18 @@ echo off
 IF [%1]==[]     GOTO USAGE
 IF NOT EXIST %1 GOTO USAGE
 
-SET (VERSION=2.28.0)
+SET VERSION=2.32.6
 SET BUILD=%1
-SET FAUSTGENVERSION=1.45
+SET FAUSTGENVERSION=1.48
 SET FAUSTLIVE=../../faustlive
 
 echo "Building Faust version %VERSION%"
 echo "Building Faustgen version %FAUSTGENVERSION%"
 echo "Using build folder %BUILD%"
+echo "Make sure that faust submodules are up-to-date"
 set CONT="no"
 set /p CONT=Type Y to continue... 
 if /i NOT %CONT%==Y exit
-
 
 echo "###################### Building Faust package ######################"
 cd %BUILD%
@@ -26,8 +26,11 @@ REM Install faust locally - to be used to build faustgen and faustlive
 cmake --build . --config Release --target install
 cd ..
 
+:FAUSTGEN
 echo "###################### Building faustgen package ######################"
-cd ../embedded/faustgen/build
+cd ../embedded/faustgen
+IF NOT exist build ( mkdir build)
+cd build
 cmake -DFAUST="../../../build/%BUILD%/faust/bin/faust" -DUSE_LLVM_CONFIG=on -DMAXSDK="max-sdk-7.3.3/source/c74support" .. -G "Visual Studio 15 2017 Win64"
 cmake --build . --config Release --  /maxcpucount:4
 cmake --build . --config Release --target install

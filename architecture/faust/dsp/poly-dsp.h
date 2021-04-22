@@ -39,9 +39,11 @@
 
 #include "faust/midi/midi.h"
 #include "faust/dsp/dsp-combiner.h"
+#include "faust/dsp/proxy-dsp.h"
+
+#include "faust/gui/DecoratorUI.h"
 #include "faust/gui/GUI.h"
 #include "faust/gui/MapUI.h"
-#include "faust/dsp/proxy-dsp.h"
 #include "faust/gui/JSONControl.h"
 
 #define kActiveVoice      0
@@ -55,7 +57,6 @@
 /**
  * Allows to control zones in a grouped manner.
  */
-
 class GroupUI : public GUI, public PathBuilder
 {
 
@@ -150,7 +151,6 @@ class GroupUI : public GUI, public PathBuilder
 /**
  * One voice of polyphony.
  */
-
 struct dsp_voice : public MapUI, public decorator_dsp {
     
     typedef std::function<double(int)> TransformFunction;
@@ -180,6 +180,7 @@ struct dsp_voice : public MapUI, public decorator_dsp {
         fNote = kFreeVoice;
         fLevel = FAUSTFLOAT(0);
         fDate = 0;
+        fRelease = 0;
         fMaxRelease = dsp->getSampleRate()/2; // One 1/2 sec used in release mode to detect end of note
         extractPaths(fGatePath, fFreqPath, fGainPath);
     }
@@ -256,7 +257,6 @@ struct dsp_voice : public MapUI, public decorator_dsp {
 /**
  * A group of voices.
  */
-
 struct dsp_voice_group {
 
     GroupUI fGroups;
@@ -322,7 +322,7 @@ struct dsp_voice_group {
             ui_interface->closeBox();
 
             // If not grouped, also add individual voices UI
-            if (!fGroupControl) {
+            if (!fGroupControl || dynamic_cast<SoundUIInterface*>(ui_interface)) {
                 for (size_t i = 0; i < fVoiceTable.size(); i++) {
                     char buffer[32];
                     snprintf(buffer, 32, ((fVoiceTable.size() < 8) ? "Voice%ld" : "V%ld"), long(i+1));
@@ -341,9 +341,8 @@ struct dsp_voice_group {
 };
 
 /**
- * Base class for MIDI controllable DSP.
+ * Base class for MIDI controllable polyphonic DSP.
  */
-
 #ifdef EMCC
 #include "faust/gui/JSONUI.h"
 #include "faust/gui/MidiUI.h"
@@ -450,10 +449,6 @@ class dsp_poly : public decorator_dsp, public midi, public JSONControl {
             midi::progChange(channel, pgm);
         }
     
-        // Group API
-        virtual void setGroup(bool group) {}
-        virtual bool getGroup() { return false; }
-
 };
 
 /**
@@ -462,13 +457,13 @@ class dsp_poly : public decorator_dsp, public midi, public JSONControl {
  * All voices are preallocated by cloning the single DSP voice given at creation time.
  * Dynamic voice allocation is done in 'getFreeVoice'
  */
-
 class mydsp_poly : public dsp_voice_group, public dsp_poly {
 
     private:
 
         FAUSTFLOAT** fMixBuffer;
         FAUSTFLOAT** fOutBuffer;
+        midi_interface* fMidiHandler; // The midi_interface the DSP is connected to
         int fDate;
   
         FAUSTFLOAT mixCheckVoice(int count, FAUSTFLOAT** mixBuffer, FAUSTFLOAT** outBuffer)
@@ -568,13 +563,17 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
             
                 // Then decide which one to steal
                 if (oldest_date_release != INT_MAX) {
-                    std::cout << "Steal release voice : voice_date " << fVoiceTable[voice_release]->fDate;
-                    std::cout << " cur_date = " << fDate << " voice = " << voice_release << std::endl;
+                    fprintf(stderr, "Steal release voice : voice_date = %d cur_date = %d voice = %d \n",
+                            fVoiceTable[voice_release]->fDate,
+                            fDate,
+                            voice_release);
                     voice = voice_release;
                     goto result;
                 } else if (oldest_date_playing != INT_MAX) {
-                    std::cout << "Steal playing voice : voice_date " << fVoiceTable[voice_playing]->fDate;
-                    std::cout << " cur_date = " << fDate << " voice = " << voice_playing << std::endl;
+                    fprintf(stderr, "Steal playing voice : voice_date = %d cur_date = %d voice = %d \n",
+                            fVoiceTable[voice_playing]->fDate,
+                            fDate,
+                            voice_release);
                     voice = voice_playing;
                     goto result;
                 } else {
@@ -601,7 +600,7 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
             if (fVoiceTable.size() > 0) {
                 return true;
             } else {
-                std::cout << "DSP is not polyphonic...\n";
+                fprintf(stderr, "DSP is not polyphonic...\n");
                 return false;
             }
         }
@@ -618,7 +617,6 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
          * @param group - if true, voices are not individually accessible, a global "Voices" tab will automatically dispatch
          *                a given control on all voices, assuming GUI::updateAllGuis() is called.
          *                If false, all voices can be individually controlled.
-         *                setGroup/getGroup methods can be used to set/get the group state.
          *
          */
         mydsp_poly(dsp* dsp,
@@ -628,6 +626,7 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
         : dsp_voice_group(panic, this, control, group), dsp_poly(dsp) // dsp parameter is deallocated by ~dsp_poly
         {
             fDate = 0;
+            fMidiHandler = nullptr;
 
             // Create voices
             assert(nvoices > 0);
@@ -648,18 +647,25 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
 
         virtual ~mydsp_poly()
         {
+            // Remove from fMidiHandler
+            if (fMidiHandler) fMidiHandler->removeMidiIn(this);
             for (int chan = 0; chan < getNumOutputs(); chan++) {
                 delete[] fMixBuffer[chan];
                 delete[] fOutBuffer[chan];
             }
             delete[] fMixBuffer;
             delete[] fOutBuffer;
+            
         }
 
         // DSP API
-    
         void buildUserInterface(UI* ui_interface)
         {
+            // MidiUI ui_interface contains the midi_handler connected to the MIDI driver
+            if (dynamic_cast<midi_interface*>(ui_interface)) {
+                fMidiHandler = dynamic_cast<midi_interface*>(ui_interface);
+                fMidiHandler->addMidiIn(this);
+            }
             dsp_voice_group::buildUserInterface(ui_interface);
         }
 
@@ -783,13 +789,9 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
             if (it != fVoiceTable.end()) {
                 (*it)->keyOff();
             } else {
-                std::cout << "Voice not found\n";
+                fprintf(stderr, "Voice not found\n");
             }
         }
-    
-        // Group API
-        void setGroup(bool group) { fGroupControl = group; }
-        bool getGroup() { return fGroupControl; }
 
         // MIDI API
         MapUI* keyOn(int channel, int pitch, int velocity)
@@ -810,7 +812,7 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
                 if (voice != kNoVoice) {
                     fVoiceTable[voice]->keyOff();
                 } else {
-                    std::cout << "Playing pitch = " << pitch << " not found\n";
+                    fprintf(stderr, "Playing pitch = %d not found\n", pitch);
                 }
             }
         }
@@ -825,18 +827,19 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
 };
 
 /**
- * Polyphonic DSP with an integrated effect. fPolyDSP will respond to MIDI messages.
+ * Polyphonic DSP with an integrated effect.
  */
 class dsp_poly_effect : public dsp_poly {
     
     private:
-        
+    
+        // fPolyDSP will respond to MIDI messages.
         dsp_poly* fPolyDSP;
         
     public:
         
-        dsp_poly_effect(dsp_poly* dsp1, dsp* dsp2)
-        :dsp_poly(dsp2), fPolyDSP(dsp1)
+        dsp_poly_effect(dsp_poly* voice, dsp* combined)
+        :dsp_poly(combined), fPolyDSP(voice)
         {}
         
         virtual ~dsp_poly_effect()
@@ -877,27 +880,33 @@ class dsp_poly_effect : public dsp_poly {
         {
             fPolyDSP->progChange(channel, pgm);
         }
-        
-        // Group API
-        void setGroup(bool group)
-        {
-            fPolyDSP->setGroup(group);
-        }
-        bool getGroup()
-        {
-            return fPolyDSP->getGroup();
-        }
+    
 };
 
 /**
  * Polyphonic DSP factory class. Helper code to support polyphonic DSP source with an integrated effect.
  */
-
 struct dsp_poly_factory : public dsp_factory {
     
     dsp_factory* fProcessFactory;
     dsp_factory* fEffectFactory;
-    
+
+    dsp_poly_factory(dsp_factory* process_factory = nullptr,
+                     dsp_factory* effect_factory = nullptr):
+    fProcessFactory(process_factory)
+    ,fEffectFactory(effect_factory)
+    {}
+
+    virtual ~dsp_poly_factory()
+    {}
+
+    virtual std::string getName() { return fProcessFactory->getName(); }
+    virtual std::string getSHAKey() { return fProcessFactory->getSHAKey(); }
+    virtual std::string getDSPCode() { return fProcessFactory->getDSPCode(); }
+    virtual std::string getCompileOptions() { return fProcessFactory->getCompileOptions(); }
+    virtual std::vector<std::string> getLibraryList() { return fProcessFactory->getLibraryList(); }
+    virtual std::vector<std::string> getIncludePathnames() { return fProcessFactory->getIncludePathnames(); }
+
     std::string getEffectCode(const std::string& dsp_content)
     {
         std::stringstream effect_code;
@@ -907,22 +916,6 @@ struct dsp_poly_factory : public dsp_factory {
         return effect_code.str();
     }
 
-    dsp_poly_factory(dsp_factory* process_factory = NULL,
-                     dsp_factory* effect_factory = NULL):
-    fProcessFactory(process_factory)
-    ,fEffectFactory(effect_factory)
-    {}
-    
-    virtual ~dsp_poly_factory()
-    {}
-    
-    virtual std::string getName() { return fProcessFactory->getName(); }
-    virtual std::string getSHAKey() { return fProcessFactory->getSHAKey(); }
-    virtual std::string getDSPCode() { return fProcessFactory->getDSPCode(); }
-    virtual std::string getCompileOptions() { return fProcessFactory->getCompileOptions(); }
-    virtual std::vector<std::string> getLibraryList() { return fProcessFactory->getLibraryList(); }
-    virtual std::vector<std::string> getIncludePathnames() { return fProcessFactory->getIncludePathnames(); }
-    
     virtual void setMemoryManager(dsp_memory_manager* manager)
     {
         fProcessFactory->setMemoryManager(manager);
@@ -931,7 +924,7 @@ struct dsp_poly_factory : public dsp_factory {
         }
     }
     virtual dsp_memory_manager* getMemoryManager() { return fProcessFactory->getMemoryManager(); }
-    
+
     /* Create a new polyphonic DSP instance with global effect, to be deleted with C++ 'delete'
      *
      * @param nvoices - number of polyphony voices, should be at least 1
@@ -951,14 +944,14 @@ struct dsp_poly_factory : public dsp_factory {
             return new dsp_poly_effect(dsp_poly, dsp_poly);
         }
     }
-    
+
     /* Create a new DSP instance, to be deleted with C++ 'delete' */
     dsp* createDSPInstance()
     {
         return fProcessFactory->createDSPInstance();
     }
-    
+
 };
 
 #endif // __poly_dsp__
-/**************************  END  poly-dsp.h **************************/
+/************************** END poly-dsp.h **************************/

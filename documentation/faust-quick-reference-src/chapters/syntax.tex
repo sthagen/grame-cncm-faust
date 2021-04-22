@@ -1,7 +1,7 @@
 \chapter{\faust syntax}
 
 This section describes the syntax of \faust. Figure \ref{fig:syntax} gives an overview of the various concepts and where they are defined in this section. 
-%% suggestion Carlos : la figure crée une confusion entre la structure de la syntaxe et la structure de la section. Faire un autre schema!
+%% suggestion Carlos: la figure crée une confusion entre la structure de la syntaxe et la structure de la section. Faire un autre schema!
 \begin{figure}[ht!]
 \centering
 \includegraphics[scale=0.45]{illustrations/syntax-chart}
@@ -19,7 +19,7 @@ A \faust program is essentially a list of \textit{statements}. These statements 
 program : (statement)+;
 \end{rail}
 
-Here is a short \faust program that implements of a simple noise generator. It exhibits various kind of statements : two \textit{declarations}, an \textit{import}, a \textit{comment} and a \textit{definition}. We will see later on \textit{documentation} statements (\ref{sec:documentation}).
+Here is a short \faust program that implements of a simple noise generator. It exhibits various kind of statements: two \textit{declarations}, an \textit{import}, a \textit{comment} and a \textit{definition}. We will see later on \textit{documentation} statements (\ref{sec:documentation}).
 
 \begin{lstlisting}
 declare name       "noise";
@@ -35,7 +35,7 @@ The keyword \lstinline'process' is the equivalent of \lstinline'main' in C/C++. 
 
 \section{Statements}
 
-The \textit{statements} of a \faust program are of four kinds : \textit{metadata declarations}, \textit{file imports},  \textit{definitions} and \textit{documentation}. All statements but documentation end with a semicolon (\lstinline';'). 
+The \textit{statements} of a \faust program are of four kinds: \textit{metadata declarations}, \textit{file imports},  \textit{definitions} and \textit{documentation}. All statements but documentation end with a semicolon (\lstinline';'). 
 % 
 % \begin{grammar}
 %   <statement> ::= 
@@ -99,7 +99,7 @@ File imports allow to import definitions from other source files.
 fileimport : "import" '(' filename ')' ';';
 \end{rail}
 
-For example \lstinline{import("math.lib");} imports the definitions of the \lstinline{math.lib} library, a set of additional mathematical functions provided as foreign functions.
+For example \lstinline{import("maths.lib");} imports the definitions of the \lstinline{maths.lib} library, a set of additional mathematical functions provided as foreign functions.
 
 
 \subsection{Documentation}
@@ -862,7 +862,7 @@ foreignexp : 'ffunction' '(' signature ',' includefile ',' library')'
 
 \subsubsection{ffunction} 
 An external C function is declared by indicating its name and signature as well as the required include file.
-The file \lstinline'"math.lib"' of the \faust distribution contains several foreign function definitions, for example the inverse hyperbolic sine function \lstinline'asinh':
+The file \lstinline'"maths.lib"' of the \faust distribution contains several foreign function definitions, for example the inverse hyperbolic sine function \lstinline'asinh':
 
 \begin{lstlisting}
 asinh = ffunction(float asinh (float), <math.h>, "");
@@ -892,7 +892,7 @@ type : 'int'|'float';
 \end{rail}
 
 \subsubsection{variables and constants} 
-External variables and constants can also be declared with a similar syntax. In the same \lstinline'"math.lib"' file, the definition of the sampling rate constant \lstinline'SR' and the definition of the block-size variable \lstinline'BS' can be found :
+External variables and constants can also be declared with a similar syntax. In the same \lstinline'"maths.lib"' file, the definition of the sampling rate constant \lstinline'SR' and the definition of the block-size variable \lstinline'BS' can be found :
 
 \begin{lstlisting}
 SR    = min(192000.0, 
@@ -1081,7 +1081,7 @@ The primitive signal processing operations represent the built-in functionalitie
 \subsection{Numbers}
 %--------------------------------------------------------------------------------------------------------------
 
-\faust considers two types of numbers : \textit{integers} and \textit{floats}. Integers are implemented as 32-bits integers, and floats are implemented either with a simple, double or extended precision depending of the compiler options. Floats are available in decimal or scientific notation. 
+\faust considers two types of numbers: \textit{integers} and \textit{floats}. Integers are implemented as signed 32-bits integers, and floats are implemented either with a simple, double or extended precision depending of the compiler options. Floats are available in decimal or scientific notation. 
 
   \begin{rail}
   int : (|'+'|'-')(digit+) ;
@@ -1093,6 +1093,8 @@ The primitive signal processing operations represent the built-in functionalitie
 \bigskip
 
 Like any other \faust expression, numbers are signal processors. For example the number $0.95$ is a signal processor of type $\mathbb{S}^{0}\rightarrow\mathbb{S}^{1}$ that transforms an empty tuple of signals $()$ into a 1-tuple of signals $(y)$ such that $\forall t\in\mathbb{N}, y(t)=0.95$.
+
+Operations on \textit{integer} numbers follow the standard C semantic for \lstinline'+, -, *' operations and can possibly overflow if the result cannot be represented as a  32-bits integer. The \lstinline'/' operation is treated separately and cast both of its arguments to floats before doing the division, and thus the result takes the float type.
 
 %\begin{tabular}{|l|l|l|}
 %\hline
@@ -1201,7 +1203,7 @@ $n.m$ & $\mathbb{S}^{0}\rightarrow\mathbb{S}^{1}$ & floating point number: $y(t)
 \subsection{\texttt{math.h}-equivalent primitives}
 %--------------------------------------------------------------------------------------------------------------
 
-Most of the C \texttt{math.h} functions are also built-in as primitives (the others are defined as external functions in file \texttt{math.lib}).
+Most of the C \texttt{math.h} functions are also built-in as primitives (the others are defined as external functions in file \texttt{maths.lib}).
 
 \bigskip
 \begin{tabular}{|l|l|l|}
@@ -1339,7 +1341,7 @@ For example \lstinline'"feedback (%%)"' will result in \lstinline'"feedback (%)"
 \paragraph{Pathnames.}
 Thanks to horizontal, vertical and tabs groups, user interfaces have a hierarchical structure analog to a hierarchical file system. Each widget has an associated \textit{pathname} obtained by concatenating the labels of all its surrounding groups with its own label.
 
-In the following example :
+In the following example:
 \begin{lstlisting}
 hgroup("Foo",
 	...
@@ -1355,15 +1357,15 @@ the volume slider has pathname \lstinline'/h:Foo/v:Faa/volume'.
 
 In order to give more flexibility to the design of user interfaces, it is possible to explicitly specify the absolute or relative pathname of a widget directly in its label. 
 
-In our previous example the pathname of :
+In our previous example the pathname of:
 \begin{lstlisting}
 	hslider("../volume",...)
 \end{lstlisting}
-would have been \lstinline'"/h:Foo/volume"', while the pathname of :
+would have been \lstinline'"/h:Foo/volume"', while the pathname of:
 \begin{lstlisting}
 	hslider("t:Fii/volume",...)
 \end{lstlisting}
-would have been : 
+would have been: 
 \lstinline'"/h:Foo/v:Faa/t:Fii/volume"'.
 
 The grammar for labels with pathnames is the following:
@@ -1400,13 +1402,13 @@ The grammar for labels with pathnames is the following:
 
 \paragraph{Metadata}
 Widget labels can contain metadata enclosed in square brackets. These metadata associate a key with a value and are used to provide additional information to the architecture file.  They are typically used to improve the look and feel of the user interface. 
-The \faust code :
+The \faust code:
 \begin{lstlisting}
 process = *(hslider("foo [key1: val 1][key2: val 2]", 
 					0, 0, 1, 0.1));
 \end{lstlisting}
 
-will produce and the corresponding C++ code :
+will produce and the corresponding C++ code:
 
 \begin{lstlisting}
 class mydsp : public dsp {
@@ -1431,7 +1433,7 @@ call that creates the User Interface element. This allows the
 
 It is the role of the architecture file to decide what to do with these 
 metadata. The \lstinline'jack-qt.cpp' architecture file for example implements the 
-following :
+following:
 \begin{enumerate}
 \item \lstinline'"...[style:knob]..."' creates a rotating knob instead of a regular 
 slider or nentry.

@@ -35,7 +35,7 @@ do
     
     if [ ${p:0:1} = "-" ]; then
         OPTIONS="$OPTIONS $p"
-    elif [[ -f "$p" ]]; then
+    elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
         FILES="$FILES $p"
     else
         OPTIONS="$OPTIONS $p"
@@ -52,11 +52,12 @@ done
 for f in $FILES; do
 
 	SRCDIR=$(dirname "$p")
-	LINPUTS=$(faust -uim "$f" | grep FAUST_INPUTS)
+	LINPUTS=$(faust $OPTIONS -uim "$f" | grep FAUST_INPUTS)
 	NINPUTS=${LINPUTS//[^0-9]/}
 	if [ $NINPUTS -gt 0 ]; then
 		echo "Will process an input file to produce an output file"
 		echo "With the compiled program 'foo', you can add [-c samples] for the number of frames to append beyond the input file"
+		echo "With the compiled program 'foo', you can add [-rc 1] to use the foo.rc file"
 		ARCHFILE=$FAUSTARCH/sndfile.cpp
 	else
 		echo "Will generate an output file"
@@ -64,6 +65,7 @@ for f in $FILES; do
 		echo "[-bd 16|24|32] to setup the output file bit-depth (default: 16)"
 		echo "[-sr <num>] to setup the output file sample rate (default: 44100)"
 		echo "[-s <num>] to setup the output file length in frames (default: SR*5)"
+		echo "[-rc 1] to use the foo.rc file"
 		ARCHFILE=$FAUSTARCH/synthfile.cpp
 	fi
 

@@ -32,10 +32,9 @@
 
 class MapUI;
 
-//-------------------------------------------------
-// MIDI input/output handling using RtMidi library
-//-------------------------------------------------
-
+/**
+ *  MIDI input/output handling using RtMidi library: http://www.music.mcgill.ca/~gary/rtmidi/
+ */
 class rt_midi : public midi_handler {
 
     private:
@@ -226,7 +225,7 @@ class rt_midi : public midi_handler {
             message.push_back(pitch);
             message.push_back(velocity);
             sendMessage(message);
-            return 0;
+            return nullptr;
         }
         
         void keyOff(int channel, int pitch, int velocity) 

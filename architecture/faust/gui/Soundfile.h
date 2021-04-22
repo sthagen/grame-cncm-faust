@@ -25,14 +25,15 @@
 #ifndef __Soundfile__
 #define __Soundfile__
 
-#include <iostream>
 #include <string.h>
+#include <string>
+#include <vector>
 
 #ifndef FAUSTFLOAT
 #define FAUSTFLOAT float
 #endif
 
-#define BUFFER_SIZE 16384
+#define BUFFER_SIZE 1024
 #define SAMPLE_RATE 44100
 #define MAX_CHAN 64
 #define MAX_SOUNDFILE_PARTS 256
@@ -64,9 +65,9 @@
 PRE_PACKED_STRUCTURE
 struct Soundfile {
     FAUSTFLOAT** fBuffers;
-    int* fLength;   // length of each part
-    int* fSR;       // sample rate of each part
-    int* fOffset;   // offset of each part in the global buffer
+    int* fLength;   // length of each part (so fLength[P] contains the length in frames of part P)
+    int* fSR;       // sample rate of each part (so fSR[P] contains the SR of part P)
+    int* fOffset;   // offset of each part in the global buffer (so fOffset[P] contains the offset in frames of part P)
     int fChannels;  // max number of channels of all concatenated files
 
     Soundfile()
@@ -77,12 +78,12 @@ struct Soundfile {
         fSR       = new int[MAX_SOUNDFILE_PARTS];
         fOffset   = new int[MAX_SOUNDFILE_PARTS];
     }
-
+ 
     ~Soundfile()
     {
         // Free the real channels only
         for (int chan = 0; chan < fChannels; chan++) {
-            delete fBuffers[chan];
+            delete[] fBuffers[chan];
         }
         delete[] fBuffers;
         delete[] fLength;
@@ -163,12 +164,12 @@ class SoundfileReader {
      * Check the availability of a sound resource.
      *
      * @param buffer - the sound buffer
-     * @param buffer - the sound buffer length
+     * @param size - the sound buffer length
      *
      * @return true if the sound resource is available, false otherwise.
      */
 
-    virtual bool checkFile(unsigned char* buffer, size_t length) { return true; }
+    virtual bool checkFile(unsigned char* buffer, size_t size) { return true; }
 
     /**
      * Get the channels and length values of the given sound resource.
@@ -184,7 +185,7 @@ class SoundfileReader {
      * Get the channels and length values of the given sound resource.
      *
      * @param buffer - the sound buffer
-     * @param buffer - the sound buffer length
+     * @param size - the sound buffer length
      * @param channels - the channels value to be filled with the sound resource number of channels
      * @param length - the length value to be filled with the sound resource length in frames
      *
@@ -194,6 +195,7 @@ class SoundfileReader {
     /**
      * Read one sound resource and fill the 'soundfile' structure accordingly
      *
+     * @param soundfile - the soundfile to be filled
      * @param path_name - the name of the file, or sound resource identified this way
      * @param part - the part number to be filled in the soundfile
      * @param offset - the offset value to be incremented with the actual sound resource length in frames
@@ -205,14 +207,15 @@ class SoundfileReader {
     /**
      * Read one sound resource and fill the 'soundfile' structure accordingly
      *
+     * @param soundfile - the soundfile to be filled
      * @param buffer - the sound buffer
-     * @param buffer - the sound buffer length
+     * @param size - the sound buffer length
      * @param part - the part number to be filled in the soundfile
      * @param offset - the offset value to be incremented with the actual sound resource length in frames
      * @param max_chan - the maximum number of mono channels to fill
      *
      */
-    virtual void readFile(Soundfile* soundfile, unsigned char* buffer, size_t length, int part, int& offset, int max_chan) {}
+    virtual void readFile(Soundfile* soundfile, unsigned char* buffer, size_t size, int part, int& offset, int max_chan) {}
 
   public:
     
@@ -223,7 +226,7 @@ class SoundfileReader {
     Soundfile* createSoundfile(const std::vector<std::string>& path_name_list, int max_chan)
     {
         try {
-            int cur_chan = 1; // At least one buffer
+            int cur_chan = 1; // At least one channel
             int total_length = 0;
             
             // Compute total length and channels max of all files

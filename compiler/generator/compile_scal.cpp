@@ -116,9 +116,13 @@ Tree ScalarCompiler::prepare(Tree LS)
     Tree L2b = SK.mapself(L2);
     endTiming("Constant propagation");
 
+    startTiming("privatise");
     Tree L3 = privatise(L2b);  // Un-share tables with multiple writers
-
+    endTiming("privatise");
+    
+    startTiming("conditionAnnotation");
     conditionAnnotation(L3);
+    endTiming("conditionAnnotation");
     // conditionStatistics(L3);        // count condition occurrences
 
     // dump normal form
@@ -127,19 +131,25 @@ Tree ScalarCompiler::prepare(Tree LS)
         throw faustexception("Dump normal form finished...\n");
     }
 
-    recursivnessAnnotation(L3);  // Annotate L3 with recursivness information
+    startTiming("recursivnessAnnotation");
+    recursivnessAnnotation(L3); // Annotate L3 with recursivness information
+    endTiming("recursivnessAnnotation");
 
     startTiming("typeAnnotation");
-    typeAnnotation(L3, true);  // Annotate L3 with type information
+    typeAnnotation(L3, true);   // Annotate L3 with type information
     endTiming("typeAnnotation");
 
-    sharingAnalysis(L3);  // annotate L3 with sharing count
+    startTiming("sharingAnalysis");
+    sharingAnalysis(L3);        // annotate L3 with sharing count
+    endTiming("sharingAnalysis");
 
+    startTiming("occurrences analysis");
     if (fOccMarkup != 0) {
         delete fOccMarkup;
     }
     fOccMarkup = new old_OccMarkup(fConditionProperty);
     fOccMarkup->mark(L3);  // annotate L3 with occurrences analysis
+    endTiming("occurrences analysis");
 
     endTiming("ScalarCompiler::prepare");
 
@@ -724,12 +734,20 @@ string ScalarCompiler::generateVariableStore(Tree sig, const string& exp)
 {
     string vname, vname_perm, ctype;
     Type   t = getCertifiedSigType(sig);
+    old_Occurences*    o = fOccMarkup->retrieve(sig);
+    faustassert(o);
 
     switch (t->variability()) {
         case kKonst:
             getTypedNames(t, "Const", ctype, vname);
-            fClass->addDeclCode(subst("$0 \t$1;", ctype, vname));
-            fClass->addInitCode(subst("$0 = $1;", vname, exp));
+            // The variable is used in compute (kBlock or kSamp), so define is as a field in the DSP struct
+            if (o->getOccurence(kBlock) || o->getOccurence(kSamp)) {
+                fClass->addDeclCode(subst("$0 \t$1;", ctype, vname));
+                fClass->addInitCode(subst("$0 = $1;", vname, exp));
+            } else {
+                // Otherwise it can stay as a local variable
+                fClass->addInitCode(subst("$0 \t$1 = $2;", ctype, vname, exp));
+            }
             break;
 
         case kBlock:
