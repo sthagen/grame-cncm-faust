@@ -171,7 +171,7 @@ static Tree real_a2sb(Tree exp)
             return abstr;
 
         } else {
-            evalerror(yyfilename, -1, "a2sb : internal error : not an abstraction inside closure (1)", exp);
+            evalerror(yyfilename, -1, "a2sb : internal error : not an abstraction inside closure (1) : ", exp);
             // Never reached...
             return 0;
         }
@@ -384,7 +384,7 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
             // it is a closure, we have an environment to access
             return eval(closure(var, notused, visited2, lenv2), visited, localValEnv);
         } else {
-            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access", exp);
+            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access : ", exp);
         }
 
         //////////////////////en chantier////////////////////////////
@@ -397,8 +397,8 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
             Tree lenv3 = copyEnvReplaceDefs(lenv2, ldef, visited2, localValEnv);
             return eval(closure(exp2, notused, visited2, lenv3), visited, localValEnv);
         } else {
-            evalerror(getDefFileProp(exp), getDefLineProp(exp), "not a closure", val);
-            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access", exp);
+            evalerror(getDefFileProp(exp), getDefLineProp(exp), "not a closure : ", val);
+            evalerror(getDefFileProp(exp), getDefLineProp(exp), "no environment to access : ", exp);
         }
 
         ///////////////////////////////////////////////////////////////////
@@ -743,7 +743,7 @@ static double eval2double(Tree exp, Tree visited, Tree localValEnv)
     int  numInputs, numOutputs;
     getBoxType(diagram, &numInputs, &numOutputs);
     if ((numInputs > 0) || (numOutputs != 1)) {
-        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1)", exp);
+        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1) : ", exp);
         return 1;
     } else {
         Tree lsignals = boxPropagateSig(gGlobal->nil, diagram, makeSigInputList(numInputs));
@@ -772,7 +772,7 @@ static int eval2int(Tree exp, Tree visited, Tree localValEnv)
     int  numInputs, numOutputs;
     getBoxType(diagram, &numInputs, &numOutputs);
     if ((numInputs > 0) || (numOutputs != 1)) {
-        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1)", exp);
+        evalerror(yyfilename, yylineno, "not a constant expression of type : (0->1) : ", exp);
         return 1;
     } else {
         Tree lsignals = boxPropagateSig(gGlobal->nil, diagram, makeSigInputList(numInputs));
@@ -916,7 +916,7 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
 static Tree iteratePar(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iteratePar called with 0 iteration", id);
+        evalerror(yyfilename, -1, "iteratePar called with 0 iteration : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
@@ -942,7 +942,7 @@ static Tree iteratePar(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateSeq(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateSeq called with 0 iteration", id);
+        evalerror(yyfilename, -1, "iterateSeq called with 0 iteration : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
@@ -969,7 +969,7 @@ static Tree iterateSeq(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateSum(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateSum called with 0 iterations", id);
+        evalerror(yyfilename, -1, "iterateSum called with 0 iterations : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
@@ -997,7 +997,7 @@ static Tree iterateSum(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateProd(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateProd called with 0 iterations", id);
+        evalerror(yyfilename, -1, "iterateProd called with 0 iterations : ", id);
     }
 
     Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
@@ -1174,7 +1174,7 @@ static Tree applyList(Tree fun, Tree larg)
     // Here fun is a closure, we can test the content of abstr
 
     if (isBoxEnvironment(abstr)) {
-        evalerrorbox(yyfilename, -1, "an environment can't be used as a function", fun);
+        evalerrorbox(yyfilename, -1, "an environment can't be used as a function : ", fun);
     }
 
     if (isBoxIdent(abstr)) {
@@ -1187,7 +1187,7 @@ static Tree applyList(Tree fun, Tree larg)
     }
 
     if (!isBoxAbstr(abstr, id, body)) {
-        evalerror(yyfilename, -1, "(internal) not an abstraction inside closure (2)", fun);
+        evalerror(yyfilename, -1, "(internal) not an abstraction inside closure (2) : ", fun);
     }
 
     // Here abstr is an abstraction, we can test the content of abstr
@@ -1246,7 +1246,7 @@ static Tree revEvalList(Tree lexp, Tree visited, Tree localValEnv)
 static Tree larg2par(Tree larg)
 {
     if (isNil(larg)) {
-        evalerror(yyfilename, -1, "empty list of arguments", larg);
+        evalerror(yyfilename, -1, "empty list of arguments : ", larg);
     }
     if (isNil(tl(larg))) {
         return hd(larg);
@@ -1282,7 +1282,7 @@ static Tree evalIdDef(Tree id, Tree visited, Tree lenv)
                   << endl;
             throw faustexception(error.str());
         } else {
-            evalerror(getUseFileProp(id), getUseLineProp(id), "undefined symbol", id);
+            evalerror(getUseFileProp(id), getUseLineProp(id), "undefined symbol : ", id);
         }
     }
 
