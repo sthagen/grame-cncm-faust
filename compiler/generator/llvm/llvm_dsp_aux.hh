@@ -57,9 +57,6 @@
 #define llvmcreatePrintModulePass(out) createPrintModulePass(out)
 #define GET_CPU_NAME llvm::sys::getHostCPUName().str()
 
-// We take the largest sample size here, to cover 'float' and 'double' cases
-#define LLVM_FAUSTFLOAT double
-
 #define BUFFER_SIZE 1024
 #define SAMPLE_RATE 44100
 #define MAX_CHAN 64
@@ -77,15 +74,16 @@ __pragma(pack(pop))
 
 PRE_PACKED_STRUCTURE
 struct Soundfile {
-    LLVM_FAUSTFLOAT** fBuffers;
-    int* fLength;   // length of each part
-    int* fSR;       // sample rate of each part
-    int* fOffset;   // offset of each part in the global buffer
-    int fChannels;  // max number of channels of all concatenated files
+    double** fBuffers; // use the largest size to cover 'float' and 'double' cases
+    int* fLength;      // length of each part
+    int* fSR;          // sample rate of each part
+    int* fOffset;      // offset of each part in the global buffer
+    int fChannels;     // max number of channels of all concatenated files
+    bool fIsDouble;
  
     Soundfile(int max_chan)
     {
-        fBuffers = new LLVM_FAUSTFLOAT*[max_chan];
+        fBuffers = new double*[max_chan];
         fLength  = new int[MAX_SOUNDFILE_PARTS];
         fSR      = new int[MAX_SOUNDFILE_PARTS];
         fOffset  = new int[MAX_SOUNDFILE_PARTS];
@@ -98,9 +96,9 @@ struct Soundfile {
         
         // Allocate 1 channel
         fChannels   = 1;
-        fBuffers[0] = new LLVM_FAUSTFLOAT[BUFFER_SIZE];
+        fBuffers[0] = new double[BUFFER_SIZE];
         faustassert(fBuffers[0]);
-        memset(fBuffers[0], 0, BUFFER_SIZE * sizeof(LLVM_FAUSTFLOAT));
+        memset(fBuffers[0], 0, BUFFER_SIZE * sizeof(double));
         
         // Share the same buffer for all other channels so that we have max_chan channels available
         for (int chan = fChannels; chan < max_chan; chan++) {
@@ -138,6 +136,7 @@ class llvm_dsp_factory;
 class EXPORT llvm_dsp : public dsp {
    private:
     llvm_dsp_factory* fFactory;
+    JSONUITemplatedDecoder* fDecoder;
     dsp_imp*          fDSP;
 
    public:
@@ -180,6 +179,8 @@ class EXPORT llvm_dsp : public dsp {
 class FaustObjectCache : public llvm::ObjectCache {
    private:
     std::string fMachineCode;
+    
+    virtual void anchor() {}
 
    public:
     FaustObjectCache(const std::string& machine_code = "") : fMachineCode(machine_code) {}
@@ -208,6 +209,7 @@ typedef const char* (* getJSONFun) ();
 
 class llvm_dsp_factory_aux : public dsp_factory_imp {
     friend class llvm_dsp;
+    friend class llvm_dsp_factory;
 
    protected:
     llvm::ExecutionEngine*  fJIT;

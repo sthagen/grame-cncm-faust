@@ -90,9 +90,6 @@ CodeContainer* WASMCodeContainer::createContainer(const string& name, int numInp
 {
     CodeContainer* container;
 
-    if (gGlobal->gMemoryManager) {
-        throw faustexception("ERROR : -mem not supported for WebAssembly\n");
-    }
     if (gGlobal->gFloatSize == 3) {
         throw faustexception("ERROR : quad format not supported for WebAssembly\n");
     }
@@ -261,6 +258,12 @@ void WASMCodeContainer::produceClass()
     // Functions
     int32_t functions_start = gGlobal->gWASMVisitor->startSection(BinaryConsts::Section::Code);
     fBinaryOut << U32LEB(14);  // num functions
+    
+    // TO REMOVE when 'soundfile' is implemented
+    {
+        // Generate UI: only to trigger exception when using 'soundfile' primitive
+        generateUserInterface(gGlobal->gWASMVisitor);
+    }
 
     // Internal functions in alphabetical order
 

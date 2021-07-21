@@ -35,6 +35,7 @@
 #define LLVM_DSP
 #include "faust/dsp/poly-dsp.h"
 
+// Globals
 int faustgen_factory::gFaustCounter = 0;
 map<string, faustgen_factory*> faustgen_factory::gFactoryMap;
 t_jrgba faustgen::gDefaultColor = {-1., -1., -1., -1.};
@@ -272,13 +273,13 @@ llvm_dsp_factory* faustgen_factory::create_factory_from_bitcode()
     if (factory) {
         // Reset fSoundUI with the new factory getIncludePathnames
         delete fSoundUI;
-        fSoundUI = new SoundUI(factory->getIncludePathnames());
+        fSoundUI = new SoundUI(factory->getIncludePathnames(), -1, nullptr, true);
         /*
          std::vector<std::string> sound_directories = factory->getIncludePathnames();
          for (int i = 0; i < sound_directories.size(); i++) {
-         post("sound_directories %d %s", i, sound_directories[i].c_str());
+            post("sound_directories %d %s", i, sound_directories[i].c_str());
          }
-         */
+        */
     } else {
         post("%s", error_msg.c_str());
     }
@@ -318,13 +319,13 @@ llvm_dsp_factory* faustgen_factory::create_factory_from_sourcecode()
     if (factory) {
         // Reset fSoundUI with the new factory getIncludePathnames
         delete fSoundUI;
-        fSoundUI = new SoundUI(factory->getIncludePathnames());
+        fSoundUI = new SoundUI(factory->getIncludePathnames(), -1, nullptr, true);
         /*
          std::vector<std::string> sound_directories = factory->getIncludePathnames();
-         for (int i= 0; i < sound_directories.size(); i++) {
+         for (int i = 0; i < sound_directories.size(); i++) {
             post("sound_directories %d %s", i, sound_directories[i].c_str());
          }
-         */
+        */
         return factory;
     } else {
         // Update all instances
@@ -615,6 +616,29 @@ void faustgen_factory::appendtodictionary(t_dictionary* d)
     }
 }
 
+void faustgen::assist(void* b, long msg, long a, char* dst)
+{
+    if (msg == ASSIST_INLET) {
+        if (a == 0) {
+            if (fDSP->getNumInputs() == 0) {
+                sprintf(dst, "(messages)");
+            } else {
+                sprintf(dst, "(messages/signal) : Audio Input %ld", (a+1));
+            }
+        } else if (a < fDSP->getNumInputs()) {
+            sprintf(dst, "(signal) : Audio Input %ld", (a+1));
+        }
+    } else if (msg == ASSIST_OUTLET) {
+        if (a < fDSP->getNumOutputs()) {
+            sprintf(dst, "(signal) : Audio Output %ld", (a+1));
+        } else if (a == fDSP->getNumOutputs()) {
+            sprintf(dst, "(list) : [path, cur|init, min, max]*");
+        } else {
+            sprintf(dst, "(int) : raw MIDI bytes*");
+        }
+    }
+}
+
 bool faustgen_factory::try_open_svg()
 {
     // Open the svg diagram file inside a web browser
@@ -695,9 +719,9 @@ void faustgen_factory::display_documentation()
     // Open the Web documentation
     char command[512];
 #ifdef WIN32
-    sprintf(command, "start \"\" \"https://faust.grame.fr/doc/manual/index.html\"");
+    sprintf(command, "start \"\" \"https://faustdoc.grame.fr/manual/introduction\"");
 #else
-    sprintf(command, "open \"https://faust.grame.fr/doc/manual/index.html\"");
+    sprintf(command, "open \"https://faustdoc.grame.fr/manual/introduction\"");
 #endif
     system(command);
 }
@@ -720,6 +744,7 @@ void faustgen_factory::display_libraries()
 #ifdef WIN32
     open_file(FAUST_PDF_LIBRARY);
     open_file("all.lib");
+    open_file("aanl.lib");
     open_file("analyzers.lib");
     open_file("basics.lib");
     open_file("compressors.lib");
@@ -729,7 +754,7 @@ void faustgen_factory::display_libraries()
     open_file("dx7.lib");
     open_file("envelopes.lib");
     open_file("filters.lib");
-    open_file("float.lib");
+    open_file("fds.lib");
     open_file("hoa.lib");
     open_file("instruments.lib");
     open_file("interpolators.lib");
@@ -741,6 +766,8 @@ void faustgen_factory::display_libraries()
     open_file("oscillators.lib");
     open_file("phaflangers.lib");
     open_file("physmodels.lib");
+    open_file("platform.lib");
+    open_file("quantizers.lib");
     open_file("reducemaps.lib");
     open_file("reverbs.lib");
     open_file("routes.lib");
@@ -754,9 +781,12 @@ void faustgen_factory::display_libraries()
     open_file("tonestacks.lib");
     open_file("tubes.lib");
     open_file("vaeffects.lib");
+    open_file("version.lib");
+    open_file("wdmodels.lib");
+    open_file("webaudio.lib");
 #else
-    open_file(FAUST_PDF_LIBRARY);
     display_libraries_aux("all.lib");
+    display_libraries_aux("aanl.lib");
     display_libraries_aux("analyzers.lib");
     display_libraries_aux("basics.lib");
     display_libraries_aux("compressors.lib");
@@ -766,7 +796,7 @@ void faustgen_factory::display_libraries()
     display_libraries_aux("dx7.lib");
     display_libraries_aux("envelopes.lib");
     display_libraries_aux("filters.lib");
-    display_libraries_aux("float.lib");
+    display_libraries_aux("fds.lib");
     display_libraries_aux("hoa.lib");
     display_libraries_aux("instruments.lib");
     display_libraries_aux("interpolators.lib");
@@ -778,6 +808,8 @@ void faustgen_factory::display_libraries()
     display_libraries_aux("oscillators.lib");
     display_libraries_aux("phaflangers.lib");
     display_libraries_aux("physmodels.lib");
+    display_libraries_aux("platform.lib");
+    display_libraries_aux("quantizers.lib");
     display_libraries_aux("reducemaps.lib");
     display_libraries_aux("reverbs.lib");
     display_libraries_aux("routes.lib");
@@ -791,6 +823,9 @@ void faustgen_factory::display_libraries()
     display_libraries_aux("tonestacks.lib");
     display_libraries_aux("tubes.lib");
     display_libraries_aux("vaeffects.lib");
+    display_libraries_aux("version.lib");
+    display_libraries_aux("wdmodels.lib");
+    display_libraries_aux("webaudio.lib");
 #endif
 }
 
@@ -1104,9 +1139,6 @@ void faustgen::free_dsp()
 {
     // Save controller state
     fSavedUI->save();
-    
-    // Has to be done *before* remove_instance that may free fDSPfactory and thus fDSPfactory->fMidiHandler
-    remove_midihandler();
     
     delete fMidiUI;
     fMidiUI = NULL;
@@ -1510,9 +1542,9 @@ inline void faustgen::perform(int vs, t_sample** inputs, long numins, t_sample**
             //update_outputs();
             // Use the right outlet to output messages
             dump_outputs();
+            // Done for fMidiUI and fOSCUI
+            GUI::updateAllGuis();
         }
-        // Done for fMidiUI and fOSCUI
-        GUI::updateAllGuis();
         fDSPfactory->unlock_audio();
     } else {
         // Write null buffers to outs
@@ -1589,24 +1621,6 @@ void faustgen::hilight_error(const string& error)
     object_error_obtrusive((t_object*)&m_ob, (char*)error.c_str());
 }
 
-void faustgen::add_midihandler()
-{
-    // Polyphonic DSP is controlled by MIDI
-    if (fDSPfactory->fPolyphonic) {
-        mydsp_poly* poly = static_cast<mydsp_poly*>(fDSP);
-        fMidiHandler.addMidiIn(poly);
-    }
-}
-
-void faustgen::remove_midihandler()
-{
-    // Polyphonic DSP is controlled by MIDI
-    if (fDSPfactory->fPolyphonic) {
-        mydsp_poly* poly = static_cast<mydsp_poly*>(fDSP);
-        fMidiHandler.removeMidiIn(poly);
-    }
-}
-
 void faustgen::init_controllers()
 {
     // Initialize User Interface (here connnection with controls)
@@ -1618,7 +1632,6 @@ void faustgen::init_controllers()
     // MIDI handling
     if (!fMidiUI) {
         fMidiUI = new MidiUI(&fMidiHandler);
-        add_midihandler();
         fDSP->buildUserInterface(fMidiUI);
     }
     
@@ -1629,15 +1642,7 @@ void faustgen::init_controllers()
     
     // Soundfile handling
     if (fDSPfactory->fSoundUI) {
-        if (fDSPfactory->fPolyphonic) {
-            mydsp_poly* poly = static_cast<mydsp_poly*>(fDSP);
-            // SoundUI has to be dispatched on all internal voices
-            poly->setGroup(false);
-            fDSP->buildUserInterface(fDSPfactory->fSoundUI);
-            poly->setGroup(true);
-        } else {
-            fDSP->buildUserInterface(fDSPfactory->fSoundUI);
-        }
+        fDSP->buildUserInterface(fDSPfactory->fSoundUI);
     }
 }
 
@@ -1817,6 +1822,7 @@ extern "C" void ext_main(void* r)
     REGISTER_METHOD_DEFSYM(faustgen, librarypath);
     REGISTER_METHOD_LONG(faustgen, mute);
     REGISTER_METHOD_CANT(faustgen, dblclick);
+    REGISTER_METHOD_ASSIST(faustgen, assist);
     REGISTER_METHOD_EDCLOSE(faustgen, edclose);
     REGISTER_METHOD_JSAVE(faustgen, appendtodictionary);
 }

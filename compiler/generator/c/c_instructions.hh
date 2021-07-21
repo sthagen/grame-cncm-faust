@@ -288,6 +288,39 @@ class CInstVisitor : public TextInstVisitor {
         *fOut << "&";
         inst->fAddress->accept(this);
     }
+    
+    virtual void visit(BinopInst* inst)
+    {
+        // Special case for 'logical right-shift'
+        if (strcmp(gBinOpTable[inst->fOpcode]->fName, ">>>") == 0) {
+            TypingVisitor typing;
+            inst->fInst1->accept(&typing);
+            if (isInt64Type(typing.fCurType)) {
+                *fOut << "((int64_t)((uint64_t)";
+            } else if (isInt32Type(typing.fCurType)) {
+                *fOut << "((int32_t)(uint32_t)";
+            } else {
+                faustassert(false);
+            }
+            inst->fInst1->accept(this);
+            *fOut << " >> ";
+            inst->fInst2->accept(this);
+            *fOut << "))";
+        } else {
+            TextInstVisitor::visit(inst);
+        }
+    }
+    virtual void visit(FixedPointNumInst* inst) { *fOut << "(fixpoint_t)" << checkFloat(inst->fNum); }
+    
+    virtual void visit(FixedPointArrayNumInst* inst)
+    {
+        char sep = '{';
+        for (size_t i = 0; i < inst->fNumTable.size(); i++) {
+            *fOut << sep << "(fixpoint_t)" << checkFloat(inst->fNumTable[i]);
+            sep = ',';
+        }
+        *fOut << '}';
+    }
 
     virtual void visit(::CastInst* inst)
     {
@@ -305,7 +338,7 @@ class CInstVisitor : public TextInstVisitor {
                 *fOut << ")";
                 break;
             case Typed::kInt64:
-                *fOut << "*((long long*)&";
+                *fOut << "*((int64_t*)&";
                 inst->fInst->accept(this);
                 *fOut << ")";
                 break;

@@ -30,6 +30,7 @@
 #include <sys/time.h>
 #include <iostream>
 #include <fstream>
+#include <cstdint>
 #include <vector>
 #include <algorithm>
 #include <assert.h>
@@ -40,26 +41,11 @@
 
 #include "faust/dsp/dsp.h"
 #include "faust/gui/MapUI.h"
+#include "faust/dsp/dsp-adapter.h"
 
-// Handle 32/64 bits int size issues
-#ifdef __x86_64__
-    #define uint32 unsigned int
-    #define uint64 unsigned long int
-    #define int32 int
-    #define int64 long int
-#else
-    #define uint32 unsigned int
-    #define uint64 unsigned long long int
-    #define int32 int
-    #define int64 long long int
-#endif
-
-#ifdef TARGET_OS_IPHONE
-#include <mach/mach_time.h>
-#endif
-
+// number of vectors in BIG buffer (should exceed cache)
+#define NBV 4096
 #define BENCH_SAMPLE_RATE 44100.0
-#define NBV 4096     // number of vectors in BIG buffer (should exceed cache)
 
 template <typename VAL_TYPE>
 void FAUSTBENCH_LOG(VAL_TYPE val)
@@ -77,25 +63,21 @@ void FAUSTBENCH_LOG(VAL_TYPE val)
 */
 
 template <typename REAL>
-class time_bench {
+class time_bench_real {
     
     protected:
-    
-    #ifdef TARGET_OS_IPHONE
-        mach_timebase_info_data_t fTimeInfo;
-    #endif
     
         int fMeasure;
         int fCount;
         int fSkip;
     
-        // These values are used to determine the number of clocks in a second
-        uint64 fFirstRDTSC;
-        uint64 fLastRDTSC;
+        // These values are used to determine the number of ticks in a second
+        uint64_t fFirstRDTSC;
+        uint64_t fLastRDTSC;
     
-        // These tables contains the last fCount in clocks
-        uint64* fStarts;
-        uint64* fStops;
+        // These tables contains the last fCount in ticks
+        uint64_t* fStarts;
+        uint64_t* fStops;
     
         struct timeval fTv1;
         struct timeval fTv2;
@@ -103,44 +85,44 @@ class time_bench {
         /**
          * Returns the number of clock cycles elapsed since the last reset of the processor
          */
-        uint64 rdtsc(void)
+        uint64_t getTicks()
         {
-        #ifdef TARGET_OS_IPHONE
-            return (uint64)(mach_absolute_time() * (double)fTimeInfo.numer / (double)fTimeInfo.denom);
-        #else  
+        #if defined(__x86_64__)
             union {
-                uint32 i32[2];
-                uint64 i64;
+                uint32_t i32[2];
+                uint64_t i64;
             } count;
             __asm__ __volatile__("rdtsc" : "=a" (count.i32[0]), "=d" (count.i32[1]));
             return count.i64;
+        #else
+            struct timeval tv;
+            gettimeofday(&tv, nullptr);
+            return static_cast<uint64_t>(tv.tv_sec) * 1000000 + static_cast<uint64_t>(tv.tv_usec);
         #endif
         }
 
         /**
-         * return the number of RDTSC clocks per seconds
+         * return the number of RDTSC ticks per seconds
          */
         double rdtscpersec()
         {
-            // If the environment variable CLOCKSPERSEC is defined
-            // we use it instead of our own measurement
+            // If the environment variable CLOCKSPERSEC is defined, we use it instead of our own measurement
             char* str = getenv("CLOCKSPERSEC");
             if (str) {
-                int64 cps = (int64)atoll(str);
+                int64_t cps = int64_t(atoll(str));
                 if (cps > 1000000000) {
                     return cps;
                 }
             }
-            
             return double(fLastRDTSC - fFirstRDTSC)
-                / (((double(fTv2.tv_sec) * 1000000 + double(fTv2.tv_usec)) - (double(fTv1.tv_sec) * 1000000 + double(fTv1.tv_usec)))
-                / 1000000);
+                / (((double(fTv2.tv_sec) * 1000000. + double(fTv2.tv_usec)) - (double(fTv1.tv_sec) * 1000000. + double(fTv1.tv_usec)))
+                / 1000000.);
         }
   
         /**
-         * Converts a duration, expressed in RDTSC clocks, into seconds
+         * Converts a duration, expressed in RDTSC ticks, into seconds
          */
-        double rdtsc2sec(uint64 clk)
+        double rdtsc2sec(uint64_t clk)
         {
             return double(clk) / rdtscpersec();
         }
@@ -151,11 +133,11 @@ class time_bench {
         }
     
         /**
-         * Converts RDTSC clocks into Megabytes/seconds according to the
+         * Converts RDTSC ticks into MBytes/seconds according to the
          * number of frames processed during the period, the number of channels
          * and sizeof(REAL) bytes samples
          */
-        double megapersec(int frames, int chans, uint64 clk)
+        double megapersec(int frames, int chans, uint64_t clk)
         {
             return (double(frames) * double(chans) * double(sizeof(REAL))) / (1024. * 1024. * rdtsc2sec(clk));
         }
@@ -163,9 +145,9 @@ class time_bench {
         /**
          * Compute the mean value of a vector of measures
          */
-        uint64 meanValue(std::vector<uint64>::const_iterator a, std::vector<uint64>::const_iterator b)
+        uint64_t meanValue(std::vector<uint64_t>::const_iterator a, std::vector<uint64_t>::const_iterator b)
         {
-            uint64 r = 0;
+            uint64_t r = 0;
             unsigned int n = 0;
             while (a != b) { r += *a++; n++; }
             return (n > 0) ? r/n : 0;
@@ -173,35 +155,32 @@ class time_bench {
   
     public:
     
-        time_bench(int count, int skip)
+        time_bench_real(int count, int skip)
         {
             fSkip = skip;
             fCount = count;
             fMeasure = 0;
             fFirstRDTSC = 0;
             fLastRDTSC = 0;
-            fStarts = new uint64[fCount];
-            fStops = new uint64[fCount];
-        #ifdef TARGET_OS_IPHONE
-            mach_timebase_info(&fTimeInfo);
-        #endif
+            fStarts = new uint64_t[fCount];
+            fStops = new uint64_t[fCount];
         }
     
-        virtual ~time_bench()
+        virtual ~time_bench_real()
         {
             delete [] fStarts;
             delete [] fStops;
         }
     
-        void startMeasure() { fStarts[fMeasure % fCount] = rdtsc(); }
+        void startMeasure() { fStarts[fMeasure % fCount] = getTicks(); }
     
-        void stopMeasure() { fStops[fMeasure % fCount] = rdtsc(); fMeasure++; }
+        void stopMeasure() { fStops[fMeasure % fCount] = getTicks(); fMeasure++; }
         
         void openMeasure()
         {
             struct timezone tz;
             gettimeofday(&fTv1, &tz);
-            fFirstRDTSC = rdtsc();
+            fFirstRDTSC = getTicks();
             fMeasure = 0;
         }
         
@@ -209,12 +188,12 @@ class time_bench {
         {
             struct timezone tz;
             gettimeofday(&fTv2, &tz);
-            fLastRDTSC = rdtsc();
+            fLastRDTSC = getTicks();
         }
     
         double measureDurationUsec()
         {
-            return ((double(fTv2.tv_sec) * 1000000 + double(fTv2.tv_usec)) - (double(fTv1.tv_sec) * 1000000 + double(fTv1.tv_usec)));
+            return ((double(fTv2.tv_sec) * 1000000. + double(fTv2.tv_usec)) - (double(fTv1.tv_sec) * 1000000. + double(fTv1.tv_usec)));
         }
     
         /**
@@ -223,7 +202,7 @@ class time_bench {
         double getStats(int bsize, int ichans, int ochans)
         {
             assert(fMeasure > fCount);
-            std::vector<uint64> V(fCount);
+            std::vector<uint64_t> V(fCount);
             
             for (int i = 0; i < fCount; i++) {
                 V[i] = fStops[i] - fStarts[i];
@@ -232,7 +211,7 @@ class time_bench {
             sort(V.begin(), V.end());
             
             // Mean of 10 best values (gives relatively stable results)
-            uint64 meavalx = meanValue(V.begin(), V.begin() + 10);
+            uint64_t meavalx = meanValue(V.begin(), V.begin() + 10);
             return megapersec(bsize, ichans + ochans, meavalx);
         }
 
@@ -242,7 +221,7 @@ class time_bench {
         void printStats(const char* applname, int bsize, int ichans, int ochans)
         {
             assert(fMeasure > fCount);
-            std::vector<uint64> V(fCount);
+            std::vector<uint64_t> V(fCount);
             
             for (int i = 0; i < fCount; i++) {
                 V[i] = fStops[i] - fStarts[i];
@@ -251,11 +230,11 @@ class time_bench {
             sort(V.begin(), V.end());
             
             // Mean of 10 best values (gives relatively stable results)
-            uint64 meaval00 = meanValue(V.begin(), V.begin()+ 5);
-            uint64 meaval25 = meanValue(V.begin() + fCount / 4 - 2, V.begin()+fCount / 4 + 3);
-            uint64 meaval50 = meanValue(V.begin() + fCount / 2 - 2, V.begin()+fCount / 2 + 3);
-            uint64 meaval75 = meanValue(V.begin() + 3 * fCount / 4 - 2, V.begin() + 3 * fCount / 4 + 3);
-            uint64 meaval100 = meanValue(V.end() - 5, V.end());
+            uint64_t meaval00 = meanValue(V.begin(), V.begin()+ 5);
+            uint64_t meaval25 = meanValue(V.begin() + fCount / 4 - 2, V.begin()+fCount / 4 + 3);
+            uint64_t meaval50 = meanValue(V.begin() + fCount / 2 - 2, V.begin()+fCount / 2 + 3);
+            uint64_t meaval75 = meanValue(V.begin() + 3 * fCount / 4 - 2, V.begin() + 3 * fCount / 4 + 3);
+            uint64_t meaval100 = meanValue(V.end() - 5, V.end());
             
             // Printing
             std::cout << applname
@@ -329,7 +308,7 @@ struct RandomControlUI : public MapUI {
     
     void update()
     {
-        for (auto& it : fControls) {
+        for (const auto& it : fControls) {
             *it.fZone = it.fMin + (FAUSTFLOAT(rand())/FAUSTFLOAT(RAND_MAX)) * std::abs(it.fMax - it.fMin);
         }
     }
@@ -337,7 +316,7 @@ struct RandomControlUI : public MapUI {
     void display()
     {
         std::cout << "--------- RandomControlUI ---------\n";
-        for (auto& it : fControls) {
+        for (const auto& it : fControls) {
             std::cout << "Path: \"" << getParamAddress(it.fZone) << "\" min: " << it.fMin << " max: " << it.fMax << " cur: " << *it.fZone << std::endl;
         }
     }
@@ -348,7 +327,7 @@ A class to measure DSP CPU use
 */
 
 template <typename REAL>
-class measure_dsp_aux : public decorator_dsp {
+class measure_dsp_real : public decorator_dsp {
     
     protected:
     
@@ -356,7 +335,7 @@ class measure_dsp_aux : public decorator_dsp {
         REAL** fAllInputs;
         REAL** fOutputs;
         REAL** fAllOutputs;
-        time_bench<REAL>* fBench;
+        time_bench_real<REAL>* fBench;
         int fBufferSize;
         int fInputIndex;
         int fOutputIndex;
@@ -427,16 +406,26 @@ class measure_dsp_aux : public decorator_dsp {
          *
          * @param dsp - the dsp to be measured.
          * @param buffer_size - the buffer size used when calling 'computeAll'
-         * @param count - the number of cycles using in 'computeAll'
+         * @param count - the number of audio cycles used in 'computeAll'
          * @param trace - whether to log the trace
          * @param control - whether to activate random changes of all control values at each cycle
+         * @param ds - downsampling factor
+         * @param us - upsampling factor
+         * @param filter - filter type
          *
          */
-        measure_dsp_aux(dsp* dsp, int buffer_size, int count, bool trace = true, bool control = false)
-            :decorator_dsp(dsp), fBufferSize(buffer_size), fCount(count), fControl(control)
+        measure_dsp_real(dsp* dsp,
+                        int buffer_size,
+                        int count,
+                        bool trace = true,
+                        bool control = false,
+                        int ds = 0,
+                        int us = 0,
+                        int filter = 0)
+            :decorator_dsp(createSRAdapter<REAL>(dsp, ds, us, filter)), fBufferSize(buffer_size), fCount(count), fControl(control)
         {
             init();
-            fBench = new time_bench<REAL>(fCount, 10);
+            fBench = new time_bench_real<REAL>(fCount, 10);
         }
     
         /**
@@ -446,16 +435,26 @@ class measure_dsp_aux : public decorator_dsp {
          * @param buffer_size - the buffer size used when calling 'computeAll'
          * @param duration_in_sec - the wanted duration used in 'computeAll'
          * @param trace - whether to log the trace
-         * @param random - whether to activate random changes of all control values at each cycle
+         * @param control - whether to activate random changes of all control values at each cycle
+         * @param ds - downsampling factor
+         * @param us - upsampling factor
+         * @param filter - filter type
          *
          */
-        measure_dsp_aux(dsp* dsp, int buffer_size, double duration_in_sec, bool trace = true, bool control = false)
-            :decorator_dsp(dsp), fBufferSize(buffer_size), fControl(control)
+        measure_dsp_real(dsp* dsp,
+                        int buffer_size,
+                        double duration_in_sec,
+                        bool trace = true,
+                        bool control = false,
+                        int ds = 0,
+                        int us = 0,
+                        int filter = 0)
+            :decorator_dsp(createSRAdapter<REAL>(dsp, ds, us, filter)), fBufferSize(buffer_size), fControl(control)
         {
             init();
             
-            // Creates a first time_bench object to estimate the proper 'count' number of measure to do later
-            fBench = new time_bench<REAL>(1000, 10);
+            // Creates a first time_bench_real object to estimate the proper 'count' number of measure to do later
+            fBench = new time_bench_real<REAL>(1000, 10);
             measure();
             double duration = fBench->measureDurationUsec();
             if (trace) {
@@ -465,11 +464,11 @@ class measure_dsp_aux : public decorator_dsp {
             fCount = int(1000 * (duration_in_sec * 1e6 / duration));
             delete fBench;
             
-            // Then allocate final time_bench object with proper 'count' parameter
-            fBench = new time_bench<REAL>(fCount, 10);
+            // Then allocate final time_bench_real object with proper 'count' parameter
+            fBench = new time_bench_real<REAL>(fCount, 10);
         }
     
-        virtual ~measure_dsp_aux()
+        virtual ~measure_dsp_real()
         {
             for (int i = 0; i < fDSP->getNumInputs(); i++) {
                 delete [] fAllInputs[i];
@@ -569,21 +568,21 @@ class measure_dsp_aux : public decorator_dsp {
     
         float getCPULoad()
         {
-            return (fBench->measureDurationUsec() / 1000.0 * BENCH_SAMPLE_RATE) / (fBench->getCount() * fBufferSize * 1000.0);
+            return (fBench->measureDurationUsec() / 1000.0 * BENCH_SAMPLE_RATE) / (double(fBench->getCount()) * double(fBufferSize) * 1000.0);
         }
     
         int getCount() { return fCount; }
     
 };
 
-struct measure_dsp : measure_dsp_aux<FAUSTFLOAT> {
+struct measure_dsp : measure_dsp_real<FAUSTFLOAT> {
 
     measure_dsp(dsp* dsp,
                 int buffer_size,
                 double duration_in_sec,
                 bool trace = true,
                 bool control = false)
-        :measure_dsp_aux(dsp, buffer_size, duration_in_sec, trace, control)
+        :measure_dsp_real(dsp, buffer_size, duration_in_sec, trace, control)
     {}
     virtual~ measure_dsp()
     {}
@@ -591,4 +590,4 @@ struct measure_dsp : measure_dsp_aux<FAUSTFLOAT> {
 };
 
 #endif
-/**************************  END  dsp-bench.h **************************/
+/************************** END dsp-bench.h **************************/

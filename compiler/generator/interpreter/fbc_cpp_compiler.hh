@@ -67,7 +67,7 @@ struct CPPBlock : public std::vector<std::string> {
             tab(n + 1, out);
             out << ";";
         } else {
-            for (auto& it : *this) {
+            for (const auto& it : *this) {
                 tab(n + 1, out);
                 out << it;
             }
@@ -87,7 +87,7 @@ struct CPPBlockList : public std::vector<CPPBlock> {
 
     void print(int n, std::ostream& out)
     {
-        for (auto& it : *this) {
+        for (const auto& it : *this) {
             it.print(n, out);
         }
     }
@@ -127,7 +127,7 @@ class FBCCPPCompiler {
     }
     std::string genReal(double num) { return (sizeof(T) == sizeof(double)) ? genDouble(num) : genFloat(num); }
     std::string genInt32(int num) { return std::to_string(num); }
-    std::string genInt64(long long num) { return std::to_string(num); }
+    std::string genInt64(int64_t num) { return std::to_string(num); }
 
     void        pushValue(const std::string& val) { fCPPStack[fCPPStackIndex++] = val; }
     std::string popValue() { return fCPPStack[--fCPPStackIndex]; }
@@ -330,7 +330,7 @@ class FBCCPPCompiler {
                     it++;
                     break;
 
-                case FBCInstruction::kRshInt:
+                case FBCInstruction::kARshInt:
                     pushBinopCall(">>");
                     it++;
                     break;
@@ -643,7 +643,7 @@ class FBCCPPCompiler {
         tab(n, out);
         out << "{";
 
-        for (auto& it : block->fInstructions) {
+        for (const auto& it : block->fInstructions) {
             // it->write(&std::cout);
 
             switch (it->fOpcode) {
@@ -752,7 +752,7 @@ class FBCCPPCompiler {
     {
         tab(n, out);
         out << "{";
-        for (auto& it : block->fInstructions) {
+        for (const auto& it : block->fInstructions) {
             tab(n + 1, out);
             out << "m->declare(\"" << it->fKey << "\", \"" << it->fValue << "\");";
         }

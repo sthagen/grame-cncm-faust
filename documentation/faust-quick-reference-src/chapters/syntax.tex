@@ -1,7 +1,7 @@
 \chapter{\faust syntax}
 
 This section describes the syntax of \faust. Figure \ref{fig:syntax} gives an overview of the various concepts and where they are defined in this section. 
-%% suggestion Carlos : la figure crée une confusion entre la structure de la syntaxe et la structure de la section. Faire un autre schema!
+%% suggestion Carlos: la figure crée une confusion entre la structure de la syntaxe et la structure de la section. Faire un autre schema!
 \begin{figure}[ht!]
 \centering
 \includegraphics[scale=0.45]{illustrations/syntax-chart}
@@ -19,7 +19,20 @@ A \faust program is essentially a list of \textit{statements}. These statements 
 program : (statement)+;
 \end{rail}
 
-Here is a short \faust program that implements of a simple noise generator. It exhibits various kind of statements : two \textit{declarations}, an \textit{import}, a \textit{comment} and a \textit{definition}. We will see later on \textit{documentation} statements (\ref{sec:documentation}).
+\subsection{Variants}
+
+Some statements (imports, definitions) can be preceded by a variantlist, composed of variants which can be \textit{singleprecision}, \textit{doubleprecision}, \textit{quadprecision} or \textit{fixedpointprecision} This allows some imports and definitions to be effective only for a (or several) specific float precision option in the compiler (that is either \lstinline'-single', \lstinline'-double', \lstinline'-quad' or \lstinline'-fx' respectively). A typical use-case is the definition of floating point constants in the maths.lib library with the following lines:
+
+\begin{lstlisting}
+
+singleprecision INFINITY = 3.402823466e+38;
+doubleprecision INFINITY = 1.7976931348623158e+308;
+
+\end{lstlisting}
+
+\subsection{A Simple Program}
+
+Here is a short \faust program that implements of a simple noise generator. It exhibits various kind of statements: two \textit{declarations}, an \textit{import}, a \textit{comment} and a \textit{definition}. We will see later on \textit{documentation} statements (\ref{sec:documentation}).
 
 \begin{lstlisting}
 declare name       "noise";
@@ -35,7 +48,7 @@ The keyword \lstinline'process' is the equivalent of \lstinline'main' in C/C++. 
 
 \section{Statements}
 
-The \textit{statements} of a \faust program are of four kinds : \textit{metadata declarations}, \textit{file imports},  \textit{definitions} and \textit{documentation}. All statements but documentation end with a semicolon (\lstinline';'). 
+The \textit{statements} of a \faust program are of four kinds: \textit{metadata declarations}, \textit{file imports},  \textit{definitions} and \textit{documentation}. All statements but documentation end with a semicolon (\lstinline';'). 
 % 
 % \begin{grammar}
 %   <statement> ::= 
@@ -99,7 +112,7 @@ File imports allow to import definitions from other source files.
 fileimport : "import" '(' filename ')' ';';
 \end{rail}
 
-For example \lstinline{import("math.lib");} imports the definitions of the \lstinline{math.lib} library, a set of additional mathematical functions provided as foreign functions.
+For example \lstinline{import("maths.lib");} imports the definitions of the \lstinline{maths.lib} library, a set of additional mathematical functions provided as foreign functions.
 
 
 \subsection{Documentation}
@@ -298,6 +311,8 @@ Please note that the order of pattern matching rules matters. The more specific 
 \end{lstlisting}
 the first rule will always match and the second rule will never be called.
 
+Please note that number arguments in pattern matching rules are typically \textit{constant numerical expressions}, so can be the result of more complex expressions involving computations done at compile-time.
+
 \section{Expressions}
 
 Despite its textual syntax, \faust is conceptually a block-diagram language. \faust expressions represent DSP block-diagrams and are assembled from primitive ones using various \textit{composition} operations. More traditional \textit{numerical} expressions in infix notation are also possible. Additionally \faust provides time based expressions, like delays, expressions related to lexical environments, expressions to interface with foreign function and lambda expressions.
@@ -305,7 +320,11 @@ Despite its textual syntax, \faust is conceptually a block-diagram language. \fa
 \begin{rail}
 expression : diagram | insouts | numerical | time | lexical | foreign | lambda;
 \end{rail}
-  
+
+\subsection{Constant Numerical Expressions}
+
+Some language primitives (like \textit{rdtable}, \textit{rwtable}, \textit{hslider} etc.) take constant numbers as some of their parameters. This is the case also for expressions using pattern matching techniques. Those numbers can be directly given in the code, but can also be computed by more complex expressions which have to produce numbers at compile time. We will refer to them as \textit{constant numerical expressions} in the documentation.
+
 \subsection{Diagram Expressions}
 
 Diagram expressions are assembled from primitive ones using either binary composition operations or high level iterative constructions.
@@ -315,7 +334,7 @@ diagramexp : diagcomposition | diagiteration;
 \end{rail}
 
 \subsubsection{Diagram composition operations} 
-Five binary \emph{composition operations} are available to combine block-diagrams : \textit{recursion}, \textit{parallel}, \textit{sequential}, \textit{split} and \textit{merge} composition. One can think of each  of these composition operations as a particular way to connect two block diagrams. 
+Five binary \emph{composition operations} are available to combine block-diagrams: \textit{recursion}, \textit{parallel}, \textit{sequential}, \textit{split} and \textit{merge} composition. One can think of each of these composition operations as a particular way to connect two block diagrams. 
 
 \begin{rail}
 diagcomposition : expression (recur|','|':'|'<:'|':>') expression;
@@ -862,7 +881,7 @@ foreignexp : 'ffunction' '(' signature ',' includefile ',' library')'
 
 \subsubsection{ffunction} 
 An external C function is declared by indicating its name and signature as well as the required include file.
-The file \lstinline'"math.lib"' of the \faust distribution contains several foreign function definitions, for example the inverse hyperbolic sine function \lstinline'asinh':
+The file \lstinline'"maths.lib"' of the \faust distribution contains several foreign function definitions, for example the inverse hyperbolic sine function \lstinline'asinh':
 
 \begin{lstlisting}
 asinh = ffunction(float asinh (float), <math.h>, "");
@@ -892,7 +911,7 @@ type : 'int'|'float';
 \end{rail}
 
 \subsubsection{variables and constants} 
-External variables and constants can also be declared with a similar syntax. In the same \lstinline'"math.lib"' file, the definition of the sampling rate constant \lstinline'SR' and the definition of the block-size variable \lstinline'BS' can be found :
+External variables and constants can also be declared with a similar syntax. In the same \lstinline'"maths.lib"' file, the definition of the sampling rate constant \lstinline'SR' and the definition of the block-size variable \lstinline'BS' can be found :
 
 \begin{lstlisting}
 SR    = min(192000.0, 
@@ -1081,7 +1100,7 @@ The primitive signal processing operations represent the built-in functionalitie
 \subsection{Numbers}
 %--------------------------------------------------------------------------------------------------------------
 
-\faust considers two types of numbers : \textit{integers} and \textit{floats}. Integers are implemented as 32-bits integers, and floats are implemented either with a simple, double or extended precision depending of the compiler options. Floats are available in decimal or scientific notation. 
+\faust considers two types of numbers: \textit{integers} and \textit{floats}. Integers are implemented as signed 32-bits integers, and floats are implemented either with a simple, double or extended precision depending of the compiler options. Floats are available in decimal or scientific notation. 
 
   \begin{rail}
   int : (|'+'|'-')(digit+) ;
@@ -1093,6 +1112,8 @@ The primitive signal processing operations represent the built-in functionalitie
 \bigskip
 
 Like any other \faust expression, numbers are signal processors. For example the number $0.95$ is a signal processor of type $\mathbb{S}^{0}\rightarrow\mathbb{S}^{1}$ that transforms an empty tuple of signals $()$ into a 1-tuple of signals $(y)$ such that $\forall t\in\mathbb{N}, y(t)=0.95$.
+
+Operations on \textit{integer} numbers follow the standard C semantic for \lstinline'+, -, *' operations and can possibly overflow if the result cannot be represented as a  32-bits integer. The \lstinline'/' operation is treated separately and cast both of its arguments to floats before doing the division, and thus the result takes the float type.
 
 %\begin{tabular}{|l|l|l|}
 %\hline
@@ -1201,7 +1222,7 @@ $n.m$ & $\mathbb{S}^{0}\rightarrow\mathbb{S}^{1}$ & floating point number: $y(t)
 \subsection{\texttt{math.h}-equivalent primitives}
 %--------------------------------------------------------------------------------------------------------------
 
-Most of the C \texttt{math.h} functions are also built-in as primitives (the others are defined as external functions in file \texttt{math.lib}).
+Most of the C \texttt{math.h} functions are also built-in as primitives (the others are defined as external functions in file \texttt{maths.lib}).
 
 \bigskip
 \begin{tabular}{|l|l|l|}
@@ -1250,9 +1271,9 @@ The following primitives allow to define fixed delays, read-only and read-write 
 \textbf{Syntax} & \textbf{Type}  & \textbf{Description} \\
 \hline
 
-\texttt{mem} & $\mathbb{S}^{1}\rightarrow\mathbb{S}^{1}$ 		& 1-sample delay: 	$y(t+1)=x(t),y(0)=0$  \\
+\texttt{mem} & $\mathbb{S}^{1}\rightarrow\mathbb{S}^{1}$ 	& 1-sample delay: 	$y(t+1)=x(t),y(0)=0$  \\
 \texttt{prefix} & $\mathbb{S}^{2}\rightarrow\mathbb{S}^{1}$ 	& 1-sample delay:  	$y(t+1)=x_{2}(t),y(0)=x_{1}(0)$  \\
-\texttt{@} & $\mathbb{S}^{2}\rightarrow\mathbb{S}^{1}$ 			& fixed delay:  	$y(t+x_{2}(t))=x_{1}(t), y(t<x_{2}(t))=0$  \\
+\texttt{@} & $\mathbb{S}^{2}\rightarrow\mathbb{S}^{1}$ 		& fixed delay:  	$y(t+x_{2}(t))=x_{1}(t), y(t<x_{2}(t))=0$  \\
 
 \texttt{rdtable} & $\mathbb{S}^{3}\rightarrow\mathbb{S}^{1}$ 	& read-only table:	$y(t)=T[r(t)]$  \\
 \texttt{rwtable} & $\mathbb{S}^{5}\rightarrow\mathbb{S}^{1}$ 	& read-write table:	$T[w(t)]=c(t); y(t)=T[r(t)]$  \\
@@ -1272,6 +1293,8 @@ The following primitives allow to define fixed delays, read-only and read-write 
 \caption{Delays, tables and selectors primitives }
 \label{fig:delays}
 \end{figure}
+
+The size input of \textit{rdtable} and \textit{rwtable} are \textit{constant numerical expressions}.
 
 %--------------------------------------------------------------------------------------------------------------
 \subsection{User Interface Elements}
@@ -1310,7 +1333,7 @@ All these GUI elements produce signals. A button for example (see figure \ref{fi
 \hline
 \end{tabular}
 
-All numerical parameters (like  {\it cur}, {\it min},  {\it max},  {\it step}) have to be known at compile time.
+All numerical parameters (like {\it cur}, {\it min}, {\it max}, {\it step}) are \textit{constant numerical expressions}.
 
 \bigskip
 \subsubsection{Labels}
@@ -1339,7 +1362,7 @@ For example \lstinline'"feedback (%%)"' will result in \lstinline'"feedback (%)"
 \paragraph{Pathnames.}
 Thanks to horizontal, vertical and tabs groups, user interfaces have a hierarchical structure analog to a hierarchical file system. Each widget has an associated \textit{pathname} obtained by concatenating the labels of all its surrounding groups with its own label.
 
-In the following example :
+In the following example:
 \begin{lstlisting}
 hgroup("Foo",
 	...
@@ -1355,15 +1378,15 @@ the volume slider has pathname \lstinline'/h:Foo/v:Faa/volume'.
 
 In order to give more flexibility to the design of user interfaces, it is possible to explicitly specify the absolute or relative pathname of a widget directly in its label. 
 
-In our previous example the pathname of :
+In our previous example the pathname of:
 \begin{lstlisting}
 	hslider("../volume",...)
 \end{lstlisting}
-would have been \lstinline'"/h:Foo/volume"', while the pathname of :
+would have been \lstinline'"/h:Foo/volume"', while the pathname of:
 \begin{lstlisting}
 	hslider("t:Fii/volume",...)
 \end{lstlisting}
-would have been : 
+would have been: 
 \lstinline'"/h:Foo/v:Faa/t:Fii/volume"'.
 
 The grammar for labels with pathnames is the following:
@@ -1400,13 +1423,13 @@ The grammar for labels with pathnames is the following:
 
 \paragraph{Metadata}
 Widget labels can contain metadata enclosed in square brackets. These metadata associate a key with a value and are used to provide additional information to the architecture file.  They are typically used to improve the look and feel of the user interface. 
-The \faust code :
+The \faust code:
 \begin{lstlisting}
 process = *(hslider("foo [key1: val 1][key2: val 2]", 
 					0, 0, 1, 0.1));
 \end{lstlisting}
 
-will produce and the corresponding C++ code :
+will produce and the corresponding C++ code:
 
 \begin{lstlisting}
 class mydsp : public dsp {
@@ -1431,7 +1454,7 @@ call that creates the User Interface element. This allows the
 
 It is the role of the architecture file to decide what to do with these 
 metadata. The \lstinline'jack-qt.cpp' architecture file for example implements the 
-following :
+following:
 \begin{enumerate}
 \item \lstinline'"...[style:knob]..."' creates a rotating knob instead of a regular 
 slider or nentry.

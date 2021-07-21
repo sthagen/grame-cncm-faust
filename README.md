@@ -2,8 +2,12 @@
 
 ## Grame, Centre National de Creation Musicale: <https://www.grame.fr>
 
+<!-- 
 master : [![Build Status](https://travis-ci.org/grame-cncm/faust.svg?branch=master)](https://travis-ci.org/grame-cncm/faust)
 master-dev : [![Build Status](https://travis-ci.org/grame-cncm/faust.svg?branch=master-dev)](https://travis-ci.org/grame-cncm/faust)![C/C++ CI](https://github.com/grame-cncm/faust/workflows/C/C++%20CI/badge.svg)
+ -->
+
+Build status: [![Ubuntu](https://github.com/grame-cncm/faust/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/grame-cncm/faust/actions/workflows/ubuntu.yml) [![MacOS](https://github.com/grame-cncm/faust/actions/workflows/macos.yml/badge.svg)](https://github.com/grame-cncm/faust/actions/workflows/macos.yml) [![Windows](https://github.com/grame-cncm/faust/actions/workflows/windows.yml/badge.svg)](https://github.com/grame-cncm/faust/actions/workflows/windows.yml)
 
 ## Introduction
 
@@ -21,11 +25,11 @@ In the following subsections, details about the branches of the repository are g
 
 ### `master`
 
-`master` is the main Faust branch. It can compile in different languages: C, C++, JAVA, LLVM IR, WebAssembly etc. It also implements experimental features such as multi-rate capabilities, etc. Thanks to its ability to generate LLVM IR and by using LLVM JIT, Faust is "embeddable" in any C++ program through a library called `libfaust`. Compiling Faust relies on [LLVM](https://llvm.org). Finally, Faust is needed by some sister projects of Faust such as FaustLive, FaucK, faustgen~, etc. This branch also contains the old Faust1 C++ backend.
+`master` is the main Faust branch. It can compile in different languages: C, C++, JAVA, LLVM IR, WebAssembly etc. Thanks to its ability to generate LLVM IR and by using LLVM JIT, Faust is "embeddable" in any C++ program through a library called `libfaust`. Faust is needed by some sister projects of Faust such as FaustLive, FaucK, faustgen~, etc.
 
 ### `master-dev` (Preferred Development Branch)
 
-`master-dev` is the development sub-branch of `master`. It is used by Faust developers to commit their changes and can be considered as "the main development branch." The goal is to make sure that `master` is always functional. Merges between `master-dev` and `master` are carried out multiple times a week by the GRAME team.
+`master-dev` is the development sub-branch of `master`. It is used by Faust developers to commit their changes and can be considered as "the main development branch." The goal is to make sure that `master` is always functional. Merges between `master-dev` and `master` are carried out typically where doing a release.
 
 More experimental branches are also available but are not documented here.
 

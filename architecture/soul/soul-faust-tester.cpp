@@ -47,7 +47,7 @@ static void measureDSP(const string& filename, dsp* DSP)
     // Buffer_size and duration in sec of measure, no trace and activated control 
     measure_dsp mes(DSP, buffer_size, 5., false, is_control);
     mes.measure();
-    cout << filename << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << endl;
+    cout << filename << " : " << mes.getStats() << " MBytes/sec (DSP CPU % : " << (mes.getCPULoad() * 100) << " at 44100 Hz)" << endl;
     FAUSTBENCH_LOG<double>(mes.getStats());
 }
 
@@ -88,7 +88,7 @@ static void testSOUL(const string& filename, int argc1, const char* argv1[])
     }
     
     // Generate "soulpatch" file
-    parser.createSOULPatch(FAUST_PATCH_FILE, FAUST_FILE);
+    parser.createSOULPatch(FAUST_FILE);
     
     testSOULPatch(FAUST_PATCH_FILE, argc1, argv1);
 }

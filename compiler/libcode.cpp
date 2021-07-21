@@ -85,6 +85,10 @@
 #include "java_code_container.hh"
 #endif
 
+#ifdef CSHARP_BUILD
+#include "csharp_code_container.hh"
+#endif
+
 #ifdef LLVM_BUILD
 #include "clang_code_container.hh"
 #include "llvm_code_container.hh"
@@ -143,6 +147,10 @@ static void enumBackends(ostream& out)
     out << dspto << "C++" << endl;
 #endif
 
+#ifdef CSHARP_BUILD
+    out << dspto << "CSharp" << endl;
+#endif
+
 #ifdef DLANG_BUILD
     out << dspto << "DLang" << endl;
 #endif
@@ -182,9 +190,14 @@ static void enumBackends(ostream& out)
 
 static void callFun(compile_fun fun)
 {
-#if defined(EMCC) || defined(_WIN32)
+#if defined(EMCC)
     // No thread support in JS or WIN32
     fun(NULL);
+#elif defined(_WIN32)
+    DWORD id;
+	HANDLE thread = CreateThread(NULL, MAX_STACK_SIZE, LPTHREAD_START_ROUTINE(fun), NULL, 0, &id);
+	faustassert(thread != NULL);
+	WaitForSingleObject(thread, INFINITE);
 #else
     pthread_t      thread;
     pthread_attr_t attr;
@@ -442,10 +455,10 @@ static bool processCmdline(int argc, const char* argv[])
             gTimingSwitch = true;
             i += 1;
 
-            // double float options
+        // 'real' options
         } else if (isCmd(argv[i], "-single", "--single-precision-floats")) {
             if (float_size && gGlobal->gFloatSize != 1) {
-                throw faustexception("ERROR : cannot using -single, -double or -quad at the same time\n");
+                throw faustexception("ERROR : cannot using -single, -double, -quad or -fx at the same time\n");
             } else {
                 float_size = true;
             }
@@ -454,7 +467,7 @@ static bool processCmdline(int argc, const char* argv[])
 
         } else if (isCmd(argv[i], "-double", "--double-precision-floats")) {
             if (float_size && gGlobal->gFloatSize != 2) {
-                throw faustexception("ERROR : cannot using -single, -double or -quad at the same time\n");
+                throw faustexception("ERROR : cannot using -single, -double, -quad or -fx at the same time\n");
             } else {
                 float_size = true;
             }
@@ -463,11 +476,20 @@ static bool processCmdline(int argc, const char* argv[])
 
         } else if (isCmd(argv[i], "-quad", "--quad-precision-floats")) {
             if (float_size && gGlobal->gFloatSize != 3) {
-                throw faustexception("ERROR : cannot using -single, -double or -quad at the same time\n");
+                throw faustexception("ERROR : cannot using -single, -double, -quad or -fx at the same time\n");
             } else {
                 float_size = true;
             }
             gGlobal->gFloatSize = 3;
+            i += 1;
+            
+        } else if (isCmd(argv[i], "-fx", "--fixed-point")) {
+            if (float_size && gGlobal->gFloatSize != 4) {
+                throw faustexception("ERROR : cannot using -single, -double, -quad or -fx at the same time\n");
+            } else {
+                float_size = true;
+            }
+            gGlobal->gFloatSize = 4;
             i += 1;
 
         } else if (isCmd(argv[i], "-mdoc", "--mathdoc")) {
@@ -515,8 +537,12 @@ static bool processCmdline(int argc, const char* argv[])
             gGlobal->gHasExp10 = true;
             i += 1;
 
-        } else if (isCmd(argv[i], "-os", "--one-sample")) {
-            gGlobal->gOneSample = true;
+        } else if (isCmd(argv[i], "-os", "--one-sample") || isCmd(argv[i], "-os0", "--one-sample0")) {
+            gGlobal->gOneSample = 0;
+            i += 1;
+            
+        } else if (isCmd(argv[i], "-os1", "--one-sample1")) {
+            gGlobal->gOneSample = 1;
             i += 1;
             
         } else if (isCmd(argv[i], "-cm", "--compute-mix")) {
@@ -648,7 +674,7 @@ static bool processCmdline(int argc, const char* argv[])
 
     // Check options coherency
     if (gGlobal->gInPlace && gGlobal->gVectorSwitch) {
-        throw faustexception("ERROR : 'in-place' option can only be used in scalar mode\n");
+        throw faustexception("ERROR : '-inpl' option can only be used in scalar mode\n");
     }
     
 #if 0
@@ -656,17 +682,17 @@ static bool processCmdline(int argc, const char* argv[])
         throw faustexception("ERROR : 'ocpp' backend can only be used in scalar mode\n");
     }
 #endif
-    if (gGlobal->gOneSample && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "c" && gGlobal->gOutputLang != "dlang" &&
+    if (gGlobal->gOneSample >= 0 && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "c" && gGlobal->gOutputLang != "dlang" &&
         !startWith(gGlobal->gOutputLang, "soul") && gGlobal->gOutputLang != "fir") {
         throw faustexception("ERROR : '-os' option cannot only be used with 'cpp', 'c', 'fir' or 'soul' backends\n");
     }
 
-    if (gGlobal->gOneSample && gGlobal->gVectorSwitch) {
+    if (gGlobal->gOneSample >= 0 && gGlobal->gVectorSwitch) {
         throw faustexception("ERROR : '-os' option cannot only be used in scalar mode\n");
     }
     
     if (gGlobal->gFTZMode == 2 && gGlobal->gOutputLang == "soul") {
-        throw faustexception("ERROR : '-ftz 2' option cannot only be used in 'soul' backend\n");
+        throw faustexception("ERROR : '-ftz 2' option cannot be used in 'soul' backend\n");
     }
 
     if (gGlobal->gVectorLoopVariant < 0 || gGlobal->gVectorLoopVariant > 1) {
@@ -686,7 +712,7 @@ static bool processCmdline(int argc, const char* argv[])
               || gGlobal->gOutputLang == "cpp"
               || gGlobal->gOutputLang == "llvm"
               || gGlobal->gOutputLang == "fir")) {
-            throw faustexception("ERROR : -fun can only be used with c, cpp, llvm or fir backends\n");
+            throw faustexception("ERROR : -fun can only be used with 'c', 'cpp', 'llvm' or 'fir' backends\n");
         }
     }
 
@@ -696,26 +722,37 @@ static bool processCmdline(int argc, const char* argv[])
               || gGlobal->gOutputLang == "llvm"
               || startWith(gGlobal->gOutputLang, "wast")
               || startWith(gGlobal->gOutputLang, "wasm"))) {
-            throw faustexception("ERROR : -fm can only be used with c, cpp, llvm or wast/wast backends\n");
+            throw faustexception("ERROR : -fm can only be used with 'c', 'cpp', 'llvm' or 'wast/wast' backends\n");
         }
     }
     
     if (gGlobal->gNameSpace != "" && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "dlang") {
-        throw faustexception("ERROR : -ns can only be used with the cpp or dlang backend\n");
+        throw faustexception("ERROR : -ns can only be used with the 'cpp' or 'dlang' backend\n");
     }
     
     if (gGlobal->gMaskDelayLineThreshold < INT_MAX && (gGlobal->gVectorSwitch || (gGlobal->gOutputLang == "ocpp"))) {
-        throw faustexception("ERROR : '-dlt < INT_MAX' option can only be used in scalar mode and not with the -ocpp backend\n");
+        throw faustexception("ERROR : '-dlt < INT_MAX' option can only be used in scalar mode and not with the 'ocpp' backend\n");
     }
     
+    // gComputeMix check
     if (gGlobal->gComputeMix && gGlobal->gOutputLang == "ocpp") {
-        throw faustexception("ERROR : -cm cannot be used with the -ocpp backend\n");
+        throw faustexception("ERROR : -cm cannot be used with the 'ocpp' backend\n");
     }
+    
     if (gGlobal->gComputeMix && gGlobal->gOutputLang == "interp") {
-        throw faustexception("ERROR : -cm cannot be used with the -interp backend\n");
+        throw faustexception("ERROR : -cm cannot be used with the 'interp' backend\n");
     }
+    
     if (gGlobal->gComputeMix && gGlobal->gOutputLang == "soul") {
-        throw faustexception("ERROR : -cm cannot be used with the -soul backend\n");
+        throw faustexception("ERROR : -cm cannot be used with the 'soul' backend\n");
+    }
+    
+    if (gGlobal->gFloatSize == 4 && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "ocpp" && gGlobal->gOutputLang != "c") {
+        throw faustexception("ERROR : -fx can ony be used with 'c', 'cpp' or 'ocpp' backends\n");
+    }
+    
+    if (gGlobal->gMemoryManager && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "ocpp") {
+        throw faustexception("ERROR : -mem can ony be used with 'cpp' or 'ocpp' backends\n");
     }
     
     if (gGlobal->gArchFile != ""
@@ -724,7 +761,7 @@ static bool processCmdline(int argc, const char* argv[])
             || (gGlobal->gOutputLang == "interp")
             || (gGlobal->gOutputLang == "llvm")
             || (gGlobal->gOutputLang == "fir"))) {
-            throw faustexception("ERROR : -a can only be used with c, cpp, ocpp, rust and soul backends\n");
+            throw faustexception("ERROR : -a can only be used with 'c', 'cpp', 'ocpp', 'rust' and 'soul' backends\n");
         }
 
     if (err != 0) {
@@ -825,8 +862,8 @@ static void printHelp()
     cout << endl << "Code generation options:" << line;
     cout << tab << "-lang <lang> --language                 select output language," << endl;
     cout << tab
-         << "                                        'lang' should be c, ocpp, cpp (default), rust, java, "
-            "llvm, fir, wast/wasm, soul, interp or dlang."
+         << "                                        'lang' should be c, cpp (default), csharp, dlang, fir, interp, java, llvm, "
+            "ocpp, rust, soul or wast/wasm."
          << endl;
     cout << tab
          << "-single     --single-precision-floats   use single precision floats for internal computations (default)."
@@ -834,6 +871,8 @@ static void printHelp()
     cout << tab << "-double     --double-precision-floats   use double precision floats for internal computations."
          << endl;
     cout << tab << "-quad       --quad-precision-floats     use quad precision floats for internal computations."
+         << endl;
+    cout << tab << "-fx         --fixed-point               use fixed-point for internal computations."
          << endl;
     cout << tab
          << "-es 1|0     --enable-semantics 1|0      use enable semantics when 1 (default), and simple multiplication "
@@ -846,7 +885,9 @@ static void printHelp()
             "auto-vectorization."
          << endl;
     cout << tab << "-exp10      --generate-exp10            pow(10,x) replaced by possibly faster exp10(x)." << endl;
-    cout << tab << "-os         --one-sample                generate one sample computation." << endl;
+    cout << tab << "-os         --one-sample                generate one sample computation (same as -os0)." << endl;
+    cout << tab << "-os0        --one-sample0               generate one sample computation (0 = separated control)." << endl;
+    cout << tab << "-os1        --one-sample1               generate one sample computation (1 = separated control and DSP struct)." << endl;
     cout << tab << "-cm         --compute-mix               mix in outputs buffers." << endl;
     cout << tab
          << "-cn <name>  --class-name <name>         specify the name of the dsp class to be used instead of mydsp."
@@ -923,7 +964,7 @@ static void printHelp()
          << endl;
     cout << tab
          << "-fc <n>    --fold-complexity <n>        complexity threshold to fold an expression in folding mode "
-            "(default 2)"
+            "(default 2)."
          << endl;
     cout << tab
          << "-mns <n>   --max-name-size <n>          threshold during block-diagram generation (default 40 char)."
@@ -971,7 +1012,7 @@ static void printHelp()
 
 static void printDeclareHeader(ostream& dst)
 {
-    for (auto& i : gGlobal->gMetaDataSet) {
+    for (const auto& i : gGlobal->gMetaDataSet) {
         if (i.first != tree("author")) {
             dst << "declare ";
             stringstream key;
@@ -1008,11 +1049,11 @@ static void printHeader(ostream& dst)
     selectedKeys.insert(tree("version"));
 
     dst << "//----------------------------------------------------------" << endl;
-    for (auto& i : gGlobal->gMetaDataSet) {
+    for (const auto& i : gGlobal->gMetaDataSet) {
         if (selectedKeys.count(i.first)) {
             dst << "// " << *(i.first);
             const char* sep = ": ";
-            for (auto& j : i.second) {
+            for (const auto& j : i.second) {
                 dst << sep << *j;
                 sep = ", ";
             }
@@ -1289,7 +1330,7 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
         container = LLVMCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs);
 
         // libc functions will be found by the LLVM linker, but not user defined ones...
-        gGlobal->gAllowForeignFunction = true;
+        gGlobal->gAllowForeignFunction = false;
         // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
         gGlobal->gFAUSTFLOAT2Internal = true;
 
@@ -1409,6 +1450,14 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
                                                            numOutputs, dst.get());
 #else
             throw faustexception("ERROR : -lang java not supported since JAVA backend is not built\n");
+#endif
+        } else if (gGlobal->gOutputLang == "csharp") {
+#ifdef CSHARP_BUILD
+            gGlobal->gAllowForeignFunction = false;  // No foreign functions
+            container = CSharpCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs,
+                                                           numOutputs, dst.get());
+#else
+            throw faustexception("ERROR : -lang csharp not supported since CSharp backend is not built\n");
 #endif
         } else if (startWith(gGlobal->gOutputLang, "soul")) {
 #ifdef SOUL_BUILD
@@ -1681,12 +1730,12 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
             }
 
             streamCopyUntil(*enrobage.get(), *dst.get(), "<<includeclass>>");
-            printfloatdef(*dst.get(), gGlobal->gFloatSize == 3);
+            printfloatdef(*dst.get());
             old_comp->getClass()->println(0, *dst.get());
             streamCopyUntilEnd(*enrobage.get(), *dst.get());
 
         } else {
-            printfloatdef(*dst.get(), gGlobal->gFloatSize == 3);
+            printfloatdef(*dst.get());
             old_comp->getClass()->println(0, *dst.get());
         }
 
@@ -1846,7 +1895,7 @@ static string expandDSPInternal(int argc, const char* argv[], const char* name, 
 
     // Encode all libraries paths as 'declare'
     vector<string> pathnames = gGlobal->gReader.listSrcFiles();
-    for (auto& it : pathnames) {
+    for (const auto& it : pathnames) {
         out << "declare "
             << "library_path " << '"' << it << "\";" << endl;
     }
@@ -1949,7 +1998,7 @@ static void compileFaustFactoryAux(int argc, const char* argv[], const char* nam
 
         // Encode all libraries paths as 'declare'
         vector<string> pathnames = gGlobal->gReader.listSrcFiles();
-        for (auto& it : pathnames) {
+        for (const auto& it : pathnames) {
             out << "declare "
                  << "library_path " << '"' << it << "\";" << endl;
         }

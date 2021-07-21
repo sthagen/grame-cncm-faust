@@ -32,6 +32,7 @@
 #include "cosprim.hh"
 #include "exp10prim.hh"
 #include "expprim.hh"
+#include "floats.hh"
 #include "floorprim.hh"
 #include "fmodprim.hh"
 #include "ftzprim.hh"
@@ -72,6 +73,10 @@
 
 #ifdef JAVA_BUILD
 #include "java_code_container.hh"
+#endif
+
+#ifdef CSHARP_BUILD
+#include "csharp_code_container.hh"
 #endif
 
 #ifdef RUST_BUILD
@@ -172,7 +177,7 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gMathApprox           = false;
     gNeedManualPow        = true;
     gRemoveVarAddress     = false;
-    gOneSample            = false;
+    gOneSample            = -1;
     gOneSampleControl     = false;
     gComputeMix           = false;
     gFastMathLib          = "default";
@@ -411,16 +416,16 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gOutputLang          = "";
 
 #ifdef WASM_BUILD
-    gWASMVisitor = 0;  // Will be (possibly) allocated in WebAssembly backend
-    gWASTVisitor = 0;  // Will be (possibly) allocated in WebAssembly backend
+    gWASMVisitor = nullptr;  // Will be (possibly) allocated in WebAssembly backend
+    gWASTVisitor = nullptr;  // Will be (possibly) allocated in WebAssembly backend
 #endif
 
 #ifdef INTERP_BUILD
-    gInterpreterVisitor = 0;  // Will be (possibly) allocated in Interp backend
+    gInterpreterVisitor = nullptr;  // Will be (possibly) allocated in Interp backend
 #endif
 
 #ifdef SOUL_BUILD
-    gTableSizeVisitor = 0;  // Will be (possibly) allocated in SOUL backend
+    gTableSizeVisitor = nullptr;  // Will be (possibly) allocated in SOUL backend
 #endif
 
     gHelpSwitch       = false;
@@ -442,8 +447,8 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gTimeout = 120;  // Time out to abort compiler (in seconds)
 
     // Globals to transfer results in thread based evaluation
-    gProcessTree  = 0;
-    gLsignalsTree = 0;
+    gProcessTree  = nullptr;
+    gLsignalsTree = nullptr;
     gNumInputs    = 0;
     gNumOutputs   = 0;
     gErrorMessage = "";
@@ -462,9 +467,9 @@ void global::init()
     gSymListProp           = new property<Tree>();
 
     // Essential predefined types
-    gMemoizedTypes   = new property<AudioType*>();
-    gAllocationCount = 0;
-    gMaskDelayLineThreshold  = INT_MAX;
+    gMemoizedTypes          = new property<AudioType*>();
+    gAllocationCount        = 0;
+    gMaskDelayLineThreshold = INT_MAX;
 
     // True by default but only usable with -lang ocpp backend
     gEnableFlag = true;
@@ -487,6 +492,10 @@ void global::init()
     INT_TGUI = makeSimpleType(kInt, kBlock, kExec, kVect, kNum, interval());
 
     TREC = makeSimpleType(kInt, kSamp, kInit, kScal, kNum, interval());
+
+    // empty Predefined bit depth
+
+    RES = res();
 
     // Predefined symbols CONS and NIL
     CONS = symbol("cons");
@@ -519,7 +528,7 @@ void global::init()
 
     // yyfilename is defined in errormsg.cpp but must be redefined at each compilation.
     yyfilename = "";
-    yyin       = 0;
+    yyin       = nullptr;
 
     gLatexheaderfilename = "latexheader.tex";
     gDocTextsDefaultFile = "mathdoctexts-default.txt";
@@ -573,18 +582,36 @@ void global::init()
     gMathForeignFunctions["tanhf"] = true;
     gMathForeignFunctions["tanh"]  = true;
     gMathForeignFunctions["tanhl"] = true;
-    
+
     gMathForeignFunctions["isnanf"] = true;
-    gMathForeignFunctions["isnan"] = true;
+    gMathForeignFunctions["isnan"]  = true;
     gMathForeignFunctions["isnanl"] = true;
-    
+
     gMathForeignFunctions["isinff"] = true;
-    gMathForeignFunctions["isinf"] = true;
+    gMathForeignFunctions["isinf"]  = true;
     gMathForeignFunctions["isinfl"] = true;
+}
+
+static string printFloat()
+{
+    switch (gGlobal->gFloatSize) {
+        case 1:
+            return "-single ";
+        case 2:
+            return "-double ";
+        case 3:
+            return "-quad ";
+        case 4:
+            return "-fp ";
+        default:
+            faustassert(false);
+            return "";
+    }
 }
 
 void global::printCompilationOptions(stringstream& dst, bool backend)
 {
+    if (gArchFile != "") dst << "-a " << gArchFile << " ";
     if (backend) {
 #ifdef LLVM_BUILD
         if (gOutputLang == "llvm") {
@@ -597,7 +624,7 @@ void global::printCompilationOptions(stringstream& dst, bool backend)
 #endif
     }
     if (gInPlace) dst << "-inpl ";
-    if (gOneSample) dst << "-os ";
+    if (gOneSample >= 0) dst << "-os" << gOneSample << " ";
     if (gLightMode) dst << "-light ";
     if (gMemoryManager) dst << "-mem ";
     if (gComputeMix) dst << "-cm ";
@@ -606,20 +633,17 @@ void global::printCompilationOptions(stringstream& dst, bool backend)
     if (gMaskDelayLineThreshold != INT_MAX) dst << "-dtl " << gMaskDelayLineThreshold << " ";
     dst << "-es " << gEnableFlag << " ";
     if (gHasExp10) dst << "-exp10 ";
-    if (gOneSample) dst << "-os ";
     if (gSchedulerSwitch) dst << "-sch ";
     if (gOpenMPSwitch) dst << "-omp " << ((gOpenMPLoop) ? "-pl " : "");
     if (gVectorSwitch) {
-        dst << "-vec"
-            << " -lv " << gVectorLoopVariant << " -vs " << gVecSize << ((gFunTaskSwitch) ? " -fun" : "")
-            << ((gGroupTaskSwitch) ? " -g" : "") << ((gDeepFirstSwitch) ? " -dfs" : "")
-            << ((gFloatSize == 2) ? " -double" : (gFloatSize == 3) ? " -quad" : "") << " -ftz " << gFTZMode << " -mcd "
-            << gGlobal->gMaxCopyDelay;
+        dst << "-vec "
+            << "-lv " << gVectorLoopVariant << " " << "-vs " << gVecSize << " " << ((gFunTaskSwitch) ? "-fun " : "")
+            << ((gGroupTaskSwitch) ? "-g " : "") << ((gDeepFirstSwitch) ? "-dfs " : "")
+            << printFloat() << "-ftz " << gFTZMode << " " << "-mcd " << gGlobal->gMaxCopyDelay;
     } else {
-        dst << ((gFloatSize == 1) ? "-scal" : ((gFloatSize == 2) ? "-double" : (gFloatSize == 3) ? "-quad" : ""))
-            << " -ftz " << gFTZMode;
+        dst << printFloat() << "-ftz " << gFTZMode;
     }
-    
+
     // Add 'compile_options' metadata
     gGlobal->gMetaDataSet[tree("compile_options")].insert(tree("\"" + dst.str() + "\""));
 }
@@ -672,6 +696,28 @@ int global::audioSampleSize()
     return int(pow(2.f, float(gFloatSize + 1)));
 }
 
+BasicTyped* global::genBasicTyped(Typed::VarType type)
+{
+    // Possibly force FAUSTFLOAT type (= kFloatMacro) to internal real
+    Typed::VarType new_type = ((type == Typed::kFloatMacro) && gFAUSTFLOAT2Internal) ? itfloat() : type;
+
+    // If not defined, add the type in the table
+    if (gTypeTable.find(new_type) == gTypeTable.end()) {
+        gTypeTable[new_type] = new BasicTyped(new_type);
+    }
+    return gTypeTable[new_type];
+}
+
+void global::setVarType(const string& name, Typed::VarType type)
+{
+    gVarTypeTable[name] = genBasicTyped(type);
+}
+
+Typed::VarType global::getVarType(const string& name)
+{
+    return gVarTypeTable[name]->getType();
+}
+
 global::~global()
 {
     Garbageable::cleanup();
@@ -692,6 +738,9 @@ global::~global()
 #endif
 #ifdef JAVA_BUILD
     JAVAInstVisitor::cleanup();
+#endif
+#ifdef CSHARP_BUILD
+    CSharpInstVisitor::cleanup();
 #endif
 #ifdef RUST_BUILD
     RustInstVisitor::cleanup();
@@ -716,7 +765,7 @@ void global::destroy()
     }
 #endif
     delete gGlobal;
-    gGlobal = NULL;
+    gGlobal = nullptr;
 }
 
 string global::makeDrawPath()

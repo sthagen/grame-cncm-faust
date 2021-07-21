@@ -24,6 +24,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #![allow(unused_mut)]
 #![allow(non_upper_case_globals)]
 
+#![recursion_limit="256"]
+
 extern crate libm;
 extern crate num_traits;
 /* extern crate fastfloat; */
@@ -45,6 +47,14 @@ type F64 = Fast<f64>;
 #[derive(Copy, Clone)]
 pub struct ParamIndex(i32);
 
+pub struct Soundfile<'a> {
+    fBuffers: &'a&'a F32,
+    fLength: &'a i32,
+    fSR: &'a i32,
+    fOffset: &'a i32,
+    fChannels: i32
+}
+
 pub trait FaustDsp {
     type T;
 
@@ -53,8 +63,6 @@ pub trait FaustDsp {
     fn get_sample_rate(&self) -> i32;
     fn get_num_inputs(&self) -> i32;
     fn get_num_outputs(&self) -> i32;
-    fn get_input_rate(&self, channel: i32) -> i32;
-    fn get_output_rate(&self, channel: i32) -> i32;
     fn class_init(sample_rate: i32) where Self: Sized;
     fn instance_reset_params(&mut self);
     fn instance_clear(&mut self);

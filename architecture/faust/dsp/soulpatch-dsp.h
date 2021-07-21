@@ -77,7 +77,7 @@ class soulpatch_dsp : public dsp {
         int countTotalBusChannels(soul::patch::Span<soul::patch::Bus> buses)
         {
             int res = 0;
-            for (auto& i : buses) {
+            for (const auto& i : buses) {
                 res += i.numChannels;
             }
             return res;
@@ -132,10 +132,10 @@ class soulpatch_dsp : public dsp {
     
         virtual ~soulpatch_dsp()
         {
-            for (auto& i : fInputsControl) {
+            for (const auto& i : fInputsControl) {
                 delete i;
             }
-            for (auto& i : fOutputsControl) {
+            for (const auto& i : fOutputsControl) {
                 delete i;
             }
             delete fDecoder;
@@ -284,11 +284,11 @@ class soulpatch_dsp : public dsp {
         {
             // Update inputs control
             if (fDecoder) {
-                for (auto& i : fDecoder->getInputControls()) {
+                for (const auto& i : fDecoder->getInputControls()) {
                     i->reflectZone();
                 }
             } else {
-                for (auto& i : fInputsControl) {
+                for (const auto& i : fInputsControl) {
                     i->reflectZone();
                 }
             }
@@ -328,11 +328,11 @@ class soulpatch_dsp : public dsp {
             
             // Update outputs control
             if (fDecoder) {
-                for (auto& i : fDecoder->getOutputControls()) {
+                for (const auto& i : fDecoder->getOutputControls()) {
                     i->modifyZone();
                 }
             } else {
-                for (auto& i : fOutputsControl) {
+                for (const auto& i : fOutputsControl) {
                     i->modifyZone();
                 }
             }
@@ -449,7 +449,7 @@ soulpatch_dsp::soulpatch_dsp(soul_dsp_factory* factory, std::string& error_msg)
         error_msg = "getCompileError";
         for (int i = 0; i < errors.size(); i++) {
             error_msg += " ";
-            error_msg += std::string(errors[i].fullMessage->getCharPointer());
+            error_msg += errors[i].getFullMessage();
         }
         error_msg += "\n";
         throw std::bad_alloc();
@@ -569,7 +569,7 @@ class faust_soul_parser  {
                         brackets++;
                         continue;
                     } else {
-                        faust_block << line;
+                        faust_block << line << "\n";
                     }
                     continue;
                 } else {
@@ -593,7 +593,8 @@ class faust_soul_parser  {
             int argc1 = 0;
             const char* argv1[64];
             argv1[argc1++] = "-lang";
-            argv1[argc1++] = "soul";
+            //argv1[argc1++] = "soul";
+            argv1[argc1++] = "soul-hybrid";
             argv1[argc1++] = "-cn";
             argv1[argc1++] = name.c_str();
             argv1[argc1++] = "-o";
@@ -637,7 +638,7 @@ class faust_soul_parser  {
                 std::map<std::string, std::string> faust_blocks = extractFaustBlocks(reader, soul_file);
                 
                 // Write all Faust blocks translated to SOUL
-                for (auto& it : faust_blocks) {
+                for (const auto& it : faust_blocks) {
                     std::string block = generateSOULBlock(it.first, it.second, argc, argv);
                     if (block == "") return false;
                     output_file << block;
@@ -674,9 +675,10 @@ class faust_soul_parser  {
             return res;
         }
     
-        void createSOULPatch(const std::string& soulpatch_file, const std::string& soul_file)
+        void createSOULPatch(const std::string& soul_file)
         {
             // Generate "soulpatch" file
+            std::string soulpatch_file = soul_file + "patch";
             std::ofstream patch_file(soulpatch_file);
             patch_file << "{" << std::endl;
                 patch_file << "\t\"soulPatchV1\":" << std::endl;
@@ -698,4 +700,4 @@ class faust_soul_parser  {
 };
 
 #endif
-/**************************  END  soulpatch-dsp.h **************************/
+/************************** END soulpatch-dsp.h **************************/

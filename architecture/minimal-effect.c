@@ -5,7 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
+/******************* BEGIN minimal-effect.c ****************/
 
 /************************************************************************
  FAUST Architecture File
@@ -32,12 +32,11 @@
  ************************************************************************
  ************************************************************************/
  
-#include <math.h>
 #include <algorithm>
 
+#include "faust/dsp/dsp.h"
 #include "faust/gui/UI.h"
 #include "faust/gui/meta.h"
-#include "faust/dsp/dsp.h"
 #include "faust/gui/CGlue.h"
 
 #define max(a,b) ((a < b) ? b : a)
@@ -147,4 +146,4 @@ class Cdsp : public dsp {
 // Factory API
 dsp* createmydsp() { return new Cdsp(); }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
+/******************** END minimal-effect.c ****************/

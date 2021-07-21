@@ -36,6 +36,7 @@ using namespace std;
     - see the SOULInstVisitor fIntAsBool variable.
  - the 'fillXXX' function needs to generate the actual size of the table argument type. This is done using the
  TableSizeVisitor class.
+ - bargraphs use 'output event' type and are outputting values at 50 Hz. The code is conditionally generated.
 */
 
 dsp_factory_base* SOULCodeContainer::produceFactory()
@@ -107,7 +108,7 @@ void SOULCodeContainer::produceInternal()
     // Retrieves the table size kept in gTableSizeVisitor to generate the correct table type
     string fun_name = "fill" + fKlassName;
     // We possibly have to generate several versions of the function with a different table size
-    for (auto& it : gGlobal->gTableSizeVisitor->fSizeTable) {
+    for (const auto& it : gGlobal->gTableSizeVisitor->fSizeTable) {
         string fun_name_aux = it.first;
         int    table_size   = it.second;
         if (startWith(fun_name_aux, fun_name)) {
@@ -152,6 +153,10 @@ void SOULCodeContainer::produceInit(int tabs)
     tab(tabs + 1, *fOut);
     *fOut << "let sample_rate = int(processor.frequency);";
     tab(tabs + 1, *fOut);
+    if (fUIVisitor.fHasBargraph) {
+        *fOut << "fControlSlice = int (processor.frequency) / 50;";
+        tab(tabs + 1, *fOut);
+    }
     *fOut << "// classInit is not called here since the tables are actually not shared between instances";
     tab(tabs + 1, *fOut);
     *fOut << "instanceInit (sample_rate);";
@@ -218,14 +223,17 @@ void SOULCodeContainer::produceClass()
         tab(n + 1, *fOut);
     }
     
-    SOULInstUIVisitor ui_visitor(n + 1);
-    generateUserInterface(&ui_visitor);
-    *fOut << ui_visitor.fOut.str();
+    generateUserInterface(&fUIVisitor);
+    *fOut << fUIVisitor.fOut.str();
     generateDeclarations(&fCodeProducer);
   
     // Control
     *fOut << "bool fUpdated;";
     tab(n + 1, *fOut);
+    if (fUIVisitor.fHasBargraph) {
+        *fOut << "int fControlSlice;";
+        tab(n + 1, *fOut);
+    }
  
     // For control computation
     if (fInt32ControlNum > 0) {
@@ -393,8 +401,6 @@ void SOULScalarCodeContainer::generateCompute(int n)
     tab(n + 1, *fOut);
     *fOut << "{";
     tab(n + 2, *fOut);
-
-    tab(n + 2, *fOut);
     *fOut << "if (fUpdated) { fUpdated = false; control(); }";
     tab(n + 2, *fOut);
     tab(n + 2, *fOut);
@@ -410,6 +416,12 @@ void SOULScalarCodeContainer::generateCompute(int n)
     generatePostComputeBlock(&fCodeProducer);
 
     tab(n + 2, *fOut);
+    if (fUIVisitor.fHasBargraph) {
+        *fOut << "// Updates fControlSlice once per sample";
+        tab(n + 2, *fOut);
+        *fOut << "if (fControlSlice-- == 0) { fControlSlice = int (processor.frequency) / 50; }";
+        tab(n + 2, *fOut);
+    }
     *fOut << "// Moves all streams forward by one 'tick'";
     tab(n + 2, *fOut);
     *fOut << "advance();";

@@ -80,7 +80,6 @@ struct interval : public virtual Garbageable {
         }
     }
 
-    // bool isvalid() { return valid; }
     bool isempty() { return hi < lo; }
     bool isconst() { return valid && (lo == hi); }
     bool ispowerof2()
@@ -94,15 +93,31 @@ struct interval : public virtual Garbageable {
         return isconst() && ((n & (-n)) == n);
     }
     bool haszero() { return (lo <= 0) && (0 <= hi); }
+
+    
+    /**
+     * @brief Pretty print an interval (string version)
+     * @details usage of stringsteams seems problematic for old versions of gcc
+     * @return a string representing the interval if valid, ??? otherwise
+     */
+    string toString() const
+    {
+        string sout = ("[");
+        if (valid) {
+            sout += to_string(lo);
+            sout += ", ";
+            sout += to_string(hi);
+        } else {
+            sout += "???";
+        }
+        sout += "]";
+        return sout;
+    }
 };
 
 inline ostream& operator<<(ostream& dst, const interval& i)
 {
-    if (i.valid) {
-        return dst << "interval(" << i.lo << ", " << i.hi << ")";
-    } else {
-        return dst << "interval()";
-    }
+    return dst << i.toString();
 }
 
 inline interval reunion(const interval& x, const interval& y)
@@ -230,8 +245,8 @@ inline interval operator>>(const interval& x, const interval& y)
 }
 
 // ---------------------comparaisons------------------------------
-// note : les comparaisons ne portent pas sur les intervals
-// mais l'interval des comparaisons de signaux
+// Note : the comparisons are not about the intervals
+// but the interval of the signal comparisons
 
 inline interval operator<(const interval&, const interval&)
 {
@@ -313,6 +328,35 @@ inline interval abs(const interval& x)
     } else {
         return x;
     }
+}
+
+/**
+ * @struct res
+ * the fixed-point resolution of the signal
+ * i.e. the index of the least significant bit of the fixed-point representation of the signal.
+ * which is a _relative_ number.
+ */
+
+struct res : public virtual Garbageable {
+    bool valid;  ///< true if a resolution has indeed been compiled
+    int  index;  ///< the index of the lsb, if any
+
+    res() : valid(false), index(0) {}
+    res(int i) : valid(true), index(i) {}
+
+    string toString() const
+    {
+        string sout;
+        sout += "r(";
+        sout += valid ? to_string(index) : "???";
+        sout += ")";
+        return sout;
+    }
+};
+
+inline ostream& operator<<(ostream& dst, const res& r)
+{
+    return dst << r.toString();
 }
 
 #endif

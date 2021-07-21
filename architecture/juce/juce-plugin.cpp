@@ -218,13 +218,93 @@ class FaustSynthesiser : public juce::Synthesiser, public dsp_voice_group {
 
 #endif
 
+// Using the PluginGuiMagic project (https://foleysfinest.com/developer/pluginguimagic/)
+
+#if defined(PLUGIN_MAGIC)
+
+class FaustPlugInAudioProcessor : public foleys::MagicProcessor, private juce::Timer
+{
+    
+public:
+    juce::AudioProcessorValueTreeState treeState{ *this, nullptr };
+    FaustPlugInAudioProcessor();
+    virtual ~FaustPlugInAudioProcessor() {}
+    
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    
+    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override
+    {
+        jassert (! isUsingDoublePrecision());
+        process (buffer, midiMessages);
+    }
+    
+    void processBlock (juce::AudioBuffer<double>& buffer, juce::MidiBuffer& midiMessages) override
+    {
+        jassert (isUsingDoublePrecision());
+        process (buffer, midiMessages);
+    }
+    
+    const juce::String getName() const override;
+    
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    double getTailLengthSeconds() const override;
+    
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram (int index) override;
+    const juce::String getProgramName (int index) override;
+    void changeProgramName (int index, const juce::String& newName) override;
+    
+    void releaseResources() override
+    {}
+    
+    void timerCallback() override;
+    
+    juce::AudioProcessor::BusesProperties getBusesProperties();
+    bool supportsDoublePrecisionProcessing() const override;
+    
+#ifdef JUCE_POLY
+    std::unique_ptr<FaustSynthesiser> fSynth;
+#else
+#if defined(MIDICTRL)
+    std::unique_ptr<juce_midi_handler> fMIDIHandler;
+    std::unique_ptr<MidiUI> fMIDIUI;
+#endif
+    std::unique_ptr<dsp> fDSP;
+#endif
+    
+#if defined(OSCCTRL)
+    std::unique_ptr<JuceOSCUI> fOSCUI;
+#endif
+    
+#if defined(SOUNDFILE)
+    std::unique_ptr<SoundUI> fSoundUI;
+#endif
+    
+    JuceStateUI fStateUI;
+    JuceParameterUI fParameterUI;
+    
+private:
+    
+    template <typename FloatType>
+    void process (juce::AudioBuffer<FloatType>& buffer, juce::MidiBuffer& midiMessages);
+    
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FaustPlugInAudioProcessor)
+    
+};
+
+#else
+
 class FaustPlugInAudioProcessor : public juce::AudioProcessor, private juce::Timer
 {
 
     public:
         
         FaustPlugInAudioProcessor();
-        virtual ~FaustPlugInAudioProcessor();
+        virtual ~FaustPlugInAudioProcessor() {}
         
         void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     
@@ -298,13 +378,15 @@ class FaustPlugInAudioProcessor : public juce::AudioProcessor, private juce::Tim
     
 };
 
+#endif
+
 class FaustPlugInAudioProcessorEditor : public juce::AudioProcessorEditor
 {
     
     public:
         
         FaustPlugInAudioProcessorEditor (FaustPlugInAudioProcessor&);
-        virtual ~FaustPlugInAudioProcessorEditor();
+        virtual ~FaustPlugInAudioProcessorEditor() {}
         
         void paint (juce::Graphics&) override;
         void resized() override;
@@ -342,36 +424,35 @@ FaustPlugInAudioProcessor::FaustPlugInAudioProcessor()
 #else
     
     bool group = true;
-    mydsp_poly* dsp_poly = nullptr;
     
 #ifdef POLY2
     assert(nvoices > 0);
     std::cout << "Started with " << nvoices << " voices\n";
-    dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, group);
+    dsp* dsp = new mydsp_poly(new mydsp(), nvoices, true, group);
     
 #if MIDICTRL
     if (midi_sync) {
-        fDSP = std::make_unique<timed_dsp>(new dsp_sequencer(dsp_poly, new effect()));
+        fDSP = std::make_unique<timed_dsp>(new dsp_sequencer(dsp, new effect()));
     } else {
-        fDSP = std::make_unique<dsp_sequencer>(dsp_poly, new effect());
+        fDSP = std::make_unique<dsp_sequencer>(dsp, new effect());
     }
 #else
-    fDSP = std::make_unique<dsp_sequencer>(dsp_poly, new effects());
+    fDSP = std::make_unique<dsp_sequencer>(dsp, new effects());
 #endif
     
 #else
     if (nvoices > 0) {
         std::cout << "Started with " << nvoices << " voices\n";
-        dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, group);
+        dsp* dsp = new mydsp_poly(new mydsp(), nvoices, true, group);
         
 #if MIDICTRL
         if (midi_sync) {
-            fDSP = std::make_unique<timed_dsp>(dsp_poly);
+            fDSP = std::make_unique<timed_dsp>(dsp);
         } else {
-            fDSP = std::make_unique<decorator_dsp>(dsp_poly);
+            fDSP = std::make_unique<decorator_dsp>(dsp);
         }
 #else
-        fDSP = std::make_unique<decorator_dsp>(dsp_poly);
+        fDSP = std::make_unique<decorator_dsp>(dsp);
 #endif
     } else {
 #if MIDICTRL
@@ -389,7 +470,6 @@ FaustPlugInAudioProcessor::FaustPlugInAudioProcessor()
     
 #if defined(MIDICTRL)
     fMIDIHandler = std::make_unique<juce_midi_handler>();
-    fMIDIHandler->addMidiIn(dsp_poly);
     fMIDIUI = std::make_unique<MidiUI>(fMIDIHandler.get());
     fDSP->buildUserInterface(fMIDIUI.get());
     if (!fMIDIUI->run()) {
@@ -416,10 +496,7 @@ FaustPlugInAudioProcessor::FaustPlugInAudioProcessor()
     auto file = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
         .getParentDirectory().getParentDirectory().getChildFile("Resources");
     fSoundUI = std::make_unique<SoundUI>(file.getFullPathName().toStdString());
-    // SoundUI has to be dispatched on all internal voices
-    if (dsp_poly) dsp_poly->setGroup(false);
     fDSP->buildUserInterface(fSoundUI.get());
-    if (dsp_poly) dsp_poly->setGroup(group);
 #endif
     
 #ifdef JUCE_POLY
@@ -440,9 +517,6 @@ FaustPlugInAudioProcessor::FaustPlugInAudioProcessor()
     
     startTimerHz(25);
 }
-
-FaustPlugInAudioProcessor::~FaustPlugInAudioProcessor()
-{}
 
 juce::AudioProcessor::BusesProperties FaustPlugInAudioProcessor::getBusesProperties()
 {
@@ -647,9 +721,6 @@ FaustPlugInAudioProcessorEditor::FaustPlugInAudioProcessorEditor (FaustPlugInAud
     juce::Rectangle<int> recommendedSize = fJuceGUI.getSize();
     setSize (recommendedSize.getWidth(), recommendedSize.getHeight());
 }
-
-FaustPlugInAudioProcessorEditor::~FaustPlugInAudioProcessorEditor()
-{}
 
 //==============================================================================
 void FaustPlugInAudioProcessorEditor::paint (juce::Graphics& g)

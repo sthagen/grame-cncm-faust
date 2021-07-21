@@ -1,18 +1,18 @@
 /************************************************************************
 ************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2017-2020 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
+FAUST Architecture File
+Copyright (C) 2017-2020 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
 
-    This is sample code. This file is provided as an example of minimal
-    FAUST architecture file. Redistribution and use in source and binary
-    forms, with or without modification, in part or in full are permitted.
-    In particular you can create a derived work of this FAUST architecture
-    and distribute that work under terms of your choice.
+This is sample code. This file is provided as an example of minimal
+FAUST architecture file. Redistribution and use in source and binary
+forms, with or without modification, in part or in full are permitted.
+In particular you can create a derived work of this FAUST architecture
+and distribute that work under terms of your choice.
 
-    This sample code is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+This sample code is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ************************************************************************
 ************************************************************************/
 
@@ -40,6 +40,14 @@ type F64 = f64;
 #[derive(Copy, Clone)]
 pub struct ParamIndex(pub i32);
 
+pub struct Soundfile<'a,T> {
+    fBuffers: &'a&'a T,
+    fLength: &'a i32,
+    fSR: &'a i32,
+    fOffset: &'a i32,
+    fChannels: i32
+}
+
 pub trait FaustDsp {
     type T;
 
@@ -48,8 +56,6 @@ pub trait FaustDsp {
     fn get_sample_rate(&self) -> i32;
     fn get_num_inputs(&self) -> i32;
     fn get_num_outputs(&self) -> i32;
-    fn get_input_rate(&self, channel: i32) -> i32;
-    fn get_output_rate(&self, channel: i32) -> i32;
     fn class_init(sample_rate: i32) where Self: Sized;
     fn instance_reset_params(&mut self);
     fn instance_clear(&mut self);

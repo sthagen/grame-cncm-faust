@@ -1,4 +1,4 @@
-/************************** BEGIN llvm-dsp-multi.h **************************/
+/************************** BEGIN dsp-multi.h **************************/
 /************************************************************************
  ************************************************************************
  Copyright (C) 2020 GRAME, Centre National de Creation Musicale
@@ -20,12 +20,13 @@
  ************************************************************************
  ************************************************************************/
 
-#ifndef LLVM_mydsp_multi_H
-#define LLVM_mydsp_multi_H
+#ifndef dsp_multi_H
+#define dsp_multi_H
 
 #include <string>
 #include <iostream>
 #include <assert.h>
+#include "faust/dsp/dsp-adapter.h"
 
 // CPUs
 
@@ -242,6 +243,18 @@ class mydspmulti : public decorator_dsp {
     
     private:
     
+        struct Meta1 : Meta
+        {
+            std::string fOptions;
+            
+            void declare(const char* key, const char* value)
+            {
+                if (strcmp("compile_options", key) == 0) {
+                    fOptions = value;
+                }
+            }
+        };
+    
         bool is_cpu(const std::string& name) { return llvm::sys::getHostCPUName().str() == name; }
     
     public:
@@ -253,7 +266,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("nocona")) {
                 std::cout << "Allocate for nocona" << std::endl;
                 fDSP = createmydspnocona();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -261,7 +274,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("core2")) {
                 std::cout << "Allocate for core2" << std::endl;
                 fDSP = createmydspcore2();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -269,7 +282,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("penryn")) {
                 std::cout << "Allocate for penryn" << std::endl;
                 fDSP = createmydsppenryn();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -277,7 +290,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("bonnell")) {
                 std::cout << "Allocate for bonnell" << std::endl;
                 fDSP = createmydspbonnell();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -285,7 +298,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("atom")) {
                 std::cout << "Allocate for atom" << std::endl;
                 fDSP = createmydspatom();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -293,7 +306,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("silvermont")) {
                 std::cout << "Allocate for silvermont" << std::endl;
                 fDSP = createmydspsilvermont();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -301,7 +314,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("slm")) {
                 std::cout << "Allocate for slm" << std::endl;
                 fDSP = createmydspslm();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -309,7 +322,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("goldmont")) {
                 std::cout << "Allocate for goldmont" << std::endl;
                 fDSP = createmydspgoldmont();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -317,7 +330,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("goldmont-plus")) {
                 std::cout << "Allocate for goldmont-plus" << std::endl;
                 fDSP = createmydspgoldmont_plus();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -325,7 +338,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("tremont")) {
                 std::cout << "Allocate for tremont" << std::endl;
                 fDSP = createmydsptremont();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -333,7 +346,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("nehalem")) {
                 std::cout << "Allocate for nehalem" << std::endl;
                 fDSP = createmydspnehalem();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -341,7 +354,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("corei7")) {
                 std::cout << "Allocate for corei7" << std::endl;
                 fDSP = createmydspcorei7();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -349,7 +362,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("westmere")) {
                 std::cout << "Allocate for westmere" << std::endl;
                 fDSP = createmydspwestmere();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -357,7 +370,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("sandybridge")) {
                 std::cout << "Allocate for sandybridge" << std::endl;
                 fDSP = createmydspsandybridge();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -365,7 +378,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("corei7-avx")) {
                 std::cout << "Allocate for corei7-avx" << std::endl;
                 fDSP = createmydspcorei7_avx();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -373,7 +386,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("ivybridge")) {
                 std::cout << "Allocate for ivybridge" << std::endl;
                 fDSP = createmydspivybridge();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -381,7 +394,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("core-avx-i")) {
                 std::cout << "Allocate for core-avx-i" << std::endl;
                 fDSP = createmydspcore_avx_i();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -389,7 +402,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("haswell")) {
                 std::cout << "Allocate for haswell" << std::endl;
                 fDSP = createmydsphaswell();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -397,7 +410,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("core-avx2")) {
                 std::cout << "Allocate for core-avx2" << std::endl;
                 fDSP = createmydspcore_avx2();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -405,7 +418,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("broadwell")) {
                 std::cout << "Allocate for broadwell" << std::endl;
                 fDSP = createmydspbroadwell();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -413,7 +426,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("skylake")) {
                 std::cout << "Allocate for skylake" << std::endl;
                 fDSP = createmydspskylake();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -421,7 +434,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("skylake-avx512")) {
                 std::cout << "Allocate for skylake_avx512" << std::endl;
                 fDSP = createmydspskylake_avx512();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -429,7 +442,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("skx")) {
                 std::cout << "Allocate for skx" << std::endl;
                 fDSP = createmydspskx();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -437,7 +450,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("cascadelake")) {
                 std::cout << "Allocate for cascadelake" << std::endl;
                 fDSP = createmydspcascadelake();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -445,7 +458,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("cooperlake")) {
                 std::cout << "Allocate for cooperlake" << std::endl;
                 fDSP = createmydspcooperlake();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -453,7 +466,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("cannonlake")) {
                 std::cout << "Allocate for cannonlake" << std::endl;
                 fDSP = createmydspcannonlake();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -461,7 +474,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("icelake-client")) {
                 std::cout << "Allocate for icelake-client" << std::endl;
                 fDSP = createmydspicelake_client();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -469,7 +482,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("icelake-server")) {
                 std::cout << "Allocate for icelake-server" << std::endl;
                 fDSP = createmydspicelake_server();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -477,7 +490,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("tigerlake")) {
                 std::cout << "Allocate for tigerlake" << std::endl;
                 fDSP = createmydsptigerlake();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -485,7 +498,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("knl")) {
                 std::cout << "Allocate for knl" << std::endl;
                 fDSP = createmydspknl();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -493,7 +506,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("knm")) {
                 std::cout << "Allocate for knm" << std::endl;
                 fDSP = createmydspknm();
-                return;
+                goto adapter;
             }
         #endif
 
@@ -501,7 +514,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("k8")) {
                 std::cout << "Allocate for k8" << std::endl;
                 fDSP = createmydspk8();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -509,7 +522,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("athlon64")) {
                 std::cout << "Allocate for athlon64" << std::endl;
                 fDSP = createmydspathlon64();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -517,7 +530,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("athlon-fx")) {
                 std::cout << "Allocate for athlon-fx" << std::endl;
                 fDSP = createmydspathlon_fx();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -525,7 +538,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("opteron")) {
                 std::cout << "Allocate for opteron" << std::endl;
                 fDSP = createmydspopteron();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -533,7 +546,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("k8-sse3")) {
                 std::cout << "Allocate for k8-sse3" << std::endl;
                 fDSP = createmydspk8_sse3();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -541,7 +554,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("athlon64-sse3")) {
                 std::cout << "Allocate for athlon64-sse3" << std::endl;
                 fDSP = createmydspathlon64_sse3();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -549,7 +562,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("opteron-sse3")) {
                 std::cout << "Allocate for opteron-sse3" << std::endl;
                 fDSP = createmydspopteron_sse3();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -557,7 +570,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("amdfam10")) {
                 std::cout << "Allocate for amdfam10" << std::endl;
                 fDSP = createmydspamdfam10();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -565,7 +578,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("barcelona")) {
                 std::cout << "Allocate for barcelona" << std::endl;
                 fDSP = createmydspbarcelona();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -573,7 +586,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("btver1")) {
                 std::cout << "Allocate for btver1" << std::endl;
                 fDSP = createmydspbtver1();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -581,7 +594,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("btver2")) {
                 std::cout << "Allocate for btver2" << std::endl;
                 fDSP = createmydspbtver2();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -589,7 +602,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("bdver1")) {
                 std::cout << "Allocate for bdver1" << std::endl;
                 fDSP = createmydspbdver1();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -597,7 +610,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("bdver2")) {
                 std::cout << "Allocate for bdver2" << std::endl;
                 fDSP = createmydspbdver2();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -605,7 +618,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("bdver3")) {
                 std::cout << "Allocate for bdver3" << std::endl;
                 fDSP = createmydspbdver3();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -613,7 +626,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("bdver4")) {
                 std::cout << "Allocate for bdver4" << std::endl;
                 fDSP = createmydspbdver4();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -621,7 +634,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("znver1")) {
                 std::cout << "Allocate for znver1" << std::endl;
                 fDSP = createmydspznver1();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -629,7 +642,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("znver2")) {
                 std::cout << "Allocate for znver2" << std::endl;
                 fDSP = createmydspznver2();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -637,7 +650,7 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP && is_cpu("x86-64")) {
                 std::cout << "Allocate for x86-64" << std::endl;
                 fDSP = createmydspx86_64();
-                return;
+                goto adapter;
             }
         #endif
             
@@ -645,13 +658,22 @@ class mydspmulti : public decorator_dsp {
             if (!fDSP) {
                 std::cout << "Allocate for generic" << std::endl;
                 fDSP = createmydspgeneric();
-                return;
+                goto adapter;
             }
+       
+        adapter:
             
             // Finally check fDSP
-            assert(fDSP != nullptr);
+            assert(fDSP);
+            
+            // Create a DS/US + Filter adapted DSP
+            fDSP = createSRAdapter<float>(fDSP, DOWN_SAMPLING, UP_SAMPLING, FILTER_TYPE);
+            
+            Meta1 meta;
+            fDSP->metadata(&meta);
+            std::cout << "Faust compile options : " << meta.fOptions << std::endl;
         }
-        
+    
         virtual ~mydspmulti()
         {}
   
@@ -661,7 +683,6 @@ class mydspmulti : public decorator_dsp {
 dsp* createmydspmulti() { return new mydspmulti(); }
 
 #endif
-/**************************  END  llvm-dsp-multi.h **************************/
 
 #ifdef TEST
 int main()
@@ -671,3 +692,5 @@ int main()
     std::cout << multi.getNumOutputs() << std::endl;
 }
 #endif
+
+/************************** END dsp-multi.h **************************/

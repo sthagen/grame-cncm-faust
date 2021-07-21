@@ -5,8 +5,7 @@
  each section for license and copyright information.
  *************************************************************************/
 
-/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
-
+/******************* BEGIN minimal.cpp ****************/
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
@@ -61,10 +60,12 @@
 
 /*******************BEGIN ARCHITECTURE SECTION (part 2/2)***************/
 
+using namespace std;
+
 int main(int argc, char* argv[])
 {
     mydsp DSP;
-    std::cout << "DSP size: " << sizeof(DSP) << " bytes\n";
+    cout << "DSP size: " << sizeof(DSP) << " bytes\n";
     
     // Activate the UI, here that only print the control paths
     PrintUI ui;
@@ -79,5 +80,5 @@ int main(int argc, char* argv[])
     audio.stop();
 }
 
-/********************END ARCHITECTURE SECTION (part 2/2)****************/
+/******************* END minimal.cpp ****************/
 

@@ -1,4 +1,4 @@
-/************************** BEGIN llvm-dsp-multifun.h **************************/
+/************************** BEGIN dsp-multifun.h **************************/
 /************************************************************************
  ************************************************************************
  Copyright (C) 2020 GRAME, Centre National de Creation Musicale
@@ -20,13 +20,14 @@
  ************************************************************************
  ************************************************************************/
 
-#ifndef LLVM_mydsp_multifun_H
-#define LLVM_mydsp_multifun_H
+#ifndef dsp_multifun_H
+#define dsp_multifun_H
 
 #include <string>
 #include <iostream>
 #include <assert.h>
 
+#include "faust/dsp/dsp-adapter.h"
 #include "mydspgeneric.h"
 
 /*
@@ -38,10 +39,29 @@
  */
 class mydspmulti : public decorator_dsp {
     
+    private:
+    
+        struct Meta1 : Meta
+        {
+            std::string fOptions;
+            
+            void declare(const char* key, const char* value)
+            {
+                if (strcmp("compile_options", key) == 0) {
+                    fOptions = value;
+                }
+            }
+        };
+                
     public:
     
-        mydspmulti():decorator_dsp(createmydspgeneric())
-        {}
+        // Create a DS/US + Filter adapted DSP
+        mydspmulti():decorator_dsp(createSRAdapter<float>(createmydspgeneric(), DOWN_SAMPLING, UP_SAMPLING, FILTER_TYPE))
+        {
+            Meta1 meta;
+            fDSP->metadata(&meta);
+            std::cout << "Faust compile options : " << meta.fOptions << std::endl;
+        }
     
         virtual ~mydspmulti()
         {}
@@ -52,7 +72,6 @@ class mydspmulti : public decorator_dsp {
 dsp* createmydspmulti() { return new mydspmulti(); }
 
 #endif
-/**************************  END  llvm-dsp-multifun.h **************************/
 
 #ifdef TEST
 int main()
@@ -62,3 +81,5 @@ int main()
     std::cout << multi.getNumOutputs() << std::endl;
 }
 #endif
+
+/************************** END dsp-multifun.h **************************/

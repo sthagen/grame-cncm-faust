@@ -49,11 +49,10 @@ class TextInstVisitor : public InstVisitor {
         }
     }
     
-    void visitCond(ValueInst* cond)
+    // To be adapted in subclasses
+    virtual void visitCond(ValueInst* cond)
     {
-        if (dynamic_cast<LoadVarInst*>(cond)) *fOut << "(";
         cond->accept(this);
-        if (dynamic_cast<LoadVarInst*>(cond)) *fOut << ")";
     }
   
    public:
@@ -283,9 +282,9 @@ class TextInstVisitor : public InstVisitor {
 
     virtual void visit(IfInst* inst)
     {
-        *fOut << "if ";
+        *fOut << "if (";
         visitCond(inst->fCond);
-        *fOut << " {";
+        *fOut << ") {";
         fTab++;
         tab(fTab, *fOut);
         inst->fThen->accept(this);
@@ -350,7 +349,7 @@ class TextInstVisitor : public InstVisitor {
             tab(fTab, *fOut);
         }
         RetInst* ret_inst = nullptr;
-        for (auto& it : inst->fCode) {
+        for (const auto& it : inst->fCode) {
             // Special case for "return" as last instruction
             if ((it == *inst->fCode.rbegin()) && (ret_inst = dynamic_cast<RetInst*>(it))) {
                 visitAux(ret_inst, false);
@@ -369,7 +368,7 @@ class TextInstVisitor : public InstVisitor {
     virtual void visit(::SwitchInst* inst)
     {
         *fOut << "switch (";
-        visitCond(inst->fCond);
+        inst->fCond->accept(this);
         *fOut << ") {";
         fTab++;
         tab(fTab, *fOut);

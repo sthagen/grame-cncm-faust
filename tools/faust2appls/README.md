@@ -26,6 +26,8 @@ You can use 'sudo make install' to install them.
 
 * `faust2jaqt <file.dsp>` : create JACK/QT application for each input file
 
+* `faust2juce <file.dsp>` : create JUCE Projucer project for each input file
+
 * `faust2ladspa <file.dsp>` : create a LADSPA plugin for each input file
 
 * `faust2lv2 <file.dsp>` : create an LV2 plugin for each input file
@@ -74,6 +76,8 @@ NOTE: In the latest Faust versions there's also an alternative VST architecture 
 ### The following scripts also integrate a visualization
 
 * `faust2firefox <file1.dsp>` : faust2svg with visualization using firefox
+
+* `faust2feh <file1.dsp>` : faust2svg with visualization using feh
 
 * `faust2octave <file.dsp>` : faust2plot with visualization using octave   
 

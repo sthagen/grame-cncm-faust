@@ -39,7 +39,7 @@ dsp_factory_base* DLangCodeContainer::produceFactory()
 
 CodeContainer* DLangCodeContainer::createScalarContainer(const string& name, int sub_container_type)
 {
-    return (gGlobal->gOneSample)
+    return (gGlobal->gOneSample >= 0)
         ? new DLangScalarOneSampleCodeContainer(name, "", 0, 1, fOut, sub_container_type)
         : new DLangScalarCodeContainer(name, "", 0, 1, fOut, sub_container_type);
 }
@@ -49,9 +49,6 @@ CodeContainer* DLangCodeContainer::createContainer(const string& name, const str
 {
     CodeContainer* container;
 
-    if (gGlobal->gMemoryManager) {
-        throw faustexception("ERROR : -mem not supported for D\n");
-    }
     if (gGlobal->gFloatSize == 3) {
         throw faustexception("ERROR : quad format not supported for D\n");
     }
@@ -69,7 +66,7 @@ CodeContainer* DLangCodeContainer::createContainer(const string& name, const str
     } else if (gGlobal->gVectorSwitch) {
         container = new DLangVectorCodeContainer(name, super, numInputs, numOutputs, dst);
     } else {
-        container = (gGlobal->gOneSample)
+        container = (gGlobal->gOneSample >= 0)
             ? new DLangScalarOneSampleCodeContainer(name, super, numInputs, numOutputs, dst, kInt)
             : new DLangScalarCodeContainer(name, super, numInputs, numOutputs, dst, kInt);
     }
@@ -173,16 +170,11 @@ void DLangCodeContainer::produceInternal()
     *fOut << "struct " << fKlassName << " {\n";
     *fOut << "nothrow:\n";
     *fOut << "@nogc:";
-
     tab(n + 1, *fOut);
 
-    if (gGlobal->gUIMacroSwitch) {
-        tab(n, *fOut);
-        *fOut << "  public:";
-    } else {
-        tab(n, *fOut);
-        *fOut << "  private:";
-    }
+    tab(n, *fOut);
+    *fOut << "  private:";
+    
     tab(n + 1, *fOut);
     tab(n + 1, *fOut);
 
@@ -269,25 +261,17 @@ void DLangCodeContainer::produceClass()
     *fOut << "alias FAUSTCLASS = " << fKlassName << ";" << endl;
   
     // Global declarations
-    tab(n, *fOut);
     fCodeProducer.Tab(n);
     generateGlobalDeclarations(&fCodeProducer);
 
     tab(n, *fOut);
     *fOut << "class " << fKlassName << " : " << fSuperKlassName << "\n{\n";
     *fOut << "nothrow:\n";
-    *fOut << "@nogc:\n";
-
-
+    *fOut << "@nogc:";
     tab(n + 1, *fOut);
 
-    if (gGlobal->gUIMacroSwitch) {
-        tab(n, *fOut);
-        *fOut << " public:";
-    } else {
-        tab(n, *fOut);
-        *fOut << " private:";
-    }
+    tab(n, *fOut);
+    *fOut << " private:";
     tab(n + 1, *fOut);
 
     // Fields
@@ -412,9 +396,6 @@ void DLangCodeContainer::produceClass()
     tab(n, *fOut);
     tab(n, *fOut);
     *fOut << "}" << endl;
-
-    // Generate user interface macros if needed
-    printMacros(*fOut, n);
 }
 
 // Scalar
@@ -492,10 +473,8 @@ void DLangScalarOneSampleCodeContainer::produceClass()
     generateSubContainers();
 
     *fOut << "alias FAUSTCLASS = " << fKlassName << ";" << endl;
-    tab(n, *fOut);
-
+  
     // Global declarations
-    tab(n, *fOut);
     fCodeProducer.Tab(n);
     generateGlobalDeclarations(&fCodeProducer);
 
@@ -503,22 +482,16 @@ void DLangScalarOneSampleCodeContainer::produceClass()
     *fOut << "enum FAUST_OUTPUTS = " << fNumOutputs << ";" << endl;
     *fOut << "enum FAUST_INT_CONTROLS = " << fInt32ControlNum << ";" << endl;
     *fOut << "enum FAUST_REAL_CONTROLS = " << fRealControlNum << ";" << endl;
-    tab(n, *fOut);
     fSuperKlassName = "one_sample_dsp";
 
     tab(n, *fOut);
     *fOut << "class " << fKlassName << " : " << fSuperKlassName << "\n{\n";
     *fOut << "nothrow:\n";
-    *fOut << "@nogc:\n";
+    *fOut << "@nogc:";
     tab(n + 1, *fOut);
 
-    if (gGlobal->gUIMacroSwitch) {
-        tab(n, *fOut);
-        *fOut << " public:";
-    } else {
-        tab(n, *fOut);
-        *fOut << " private:";
-    }
+    tab(n, *fOut);
+    *fOut << " private:";
     tab(n + 1, *fOut);
 
     // Fields
@@ -656,10 +629,7 @@ void DLangScalarOneSampleCodeContainer::produceClass()
     generateCompute(n);
     tab(n, *fOut);
     tab(n, *fOut);
-    *fOut << "};" << endl;
-
-    // Generate user interface macros if needed
-    printMacros(*fOut, n);
+    *fOut << "}" << endl;
 }
 
 // Vector

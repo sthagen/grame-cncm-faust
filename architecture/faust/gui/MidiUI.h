@@ -28,7 +28,6 @@
 #include <vector>
 #include <string>
 #include <utility>
-#include <iostream>
 #include <cstdlib>
 #include <cmath>
 
@@ -39,7 +38,6 @@
 #include "faust/gui/MapUI.h"
 #include "faust/gui/MetaDataUI.h"
 #include "faust/midi/midi.h"
-#include "faust/gui/MetaDataUI.h"
 #include "faust/gui/ValueConverter.h"
 
 #ifdef _MSC_VER
@@ -48,10 +46,9 @@
 #define gsscanf sscanf
 #endif
 
-/*****************************************************************************
-* Helper code for MIDI meta and polyphonic 'nvoices' parsing
-******************************************************************************/
-
+/**
+ * Helper code for MIDI meta and polyphonic 'nvoices' parsing.
+ */
 struct MidiMeta : public Meta, public std::map<std::string, std::string> {
     
     void declare(const char* key, const char* value)
@@ -119,15 +116,14 @@ struct MidiMeta : public Meta, public std::map<std::string, std::string> {
     
 };
 
-/*******************************************************************************
- * MidiUI : Faust User Interface
+/**
+ * uiMidi : Faust User Interface
  * This class decodes MIDI meta data and maps incoming MIDI messages to them.
- * Currently ctrl, keyon/keyoff, keypress, pgm, chanpress, pitchwheel/pitchbend
+ * Currently ctrlChange, keyOn/keyOff, keyPress, progChange, chanPress, pitchWheel/pitchBend
  * start/stop/clock meta data is handled.
  * MIDI channel is numbered in [1..16] in this layer.
  * Channel 0 means "all channels" when receiving or sending.
- ******************************************************************************/
-
+ */
 class uiMidi {
     
     friend class MidiUI;
@@ -149,10 +145,9 @@ class uiMidi {
 
 };
 
-/*****************************************************************************
- * Base class for MIDI aware UI items
- ******************************************************************************/
-
+/**
+ * Base class for MIDI aware UI items.
+ */
 class uiMidiItem : public uiMidi, public uiItem {
     
     public:
@@ -167,10 +162,9 @@ class uiMidiItem : public uiMidi, public uiItem {
     
 };
 
-/*****************************************************************************
- * Base class for MIDI aware UI items with timestamp support
- ******************************************************************************/
-
+/**
+ * Base class for MIDI aware UI items with timestamp support.
+ */
 class uiMidiTimedItem : public uiMidi, public uiTimedItem {
     
     public:
@@ -185,10 +179,9 @@ class uiMidiTimedItem : public uiMidi, public uiTimedItem {
     
 };
 
-//-----------
-// MIDI sync
-//-----------
-
+/**
+ * MIDI sync.
+ */
 class uiMidiStart : public uiMidiTimedItem
 {
   
@@ -275,14 +268,13 @@ class uiMidiClock : public uiMidiTimedItem {
 
 };
 
-//----------------------
-// Standard MIDI events
-//----------------------
+/**
+ * Standard MIDI events.
+ */
 
-//---------------------------------------------
-// uiMidiProgChange uses the [min...max] range
-//---------------------------------------------
-
+/**
+ * uiMidiProgChange uses the [min...max] range.
+ */
 class uiMidiProgChange : public uiMidiTimedItem {
     
     public:
@@ -329,6 +321,9 @@ class uiMidiProgChange : public uiMidiTimedItem {
         
 };
 
+/**
+ * uiMidiChanPress.
+ */
 class uiMidiChanPress : public uiMidiTimedItem, public uiConverter {
     
     public:
@@ -374,10 +369,9 @@ class uiMidiChanPress : public uiMidiTimedItem, public uiConverter {
         
 };
 
-//------------------------------------------------------
-// uiMidiCtrlChange does scale (kLin/kLog/kExp) mapping
-//------------------------------------------------------
-
+/**
+ * uiMidiCtrlChange does scale (kLin/kLog/kExp) mapping.
+ */
 class uiMidiCtrlChange : public uiMidiTimedItem, public uiConverter {
     
     private:
@@ -486,10 +480,9 @@ class uiMidiPitchWheel : public uiMidiTimedItem {
  
 };
 
-//--------------------------------------------------------------
-// uiMidiKeyOn does scale (kLin/kLog/kExp) mapping for velocity
-//--------------------------------------------------------------
-
+/**
+ * uiMidiKeyOn does scale (kLin/kLog/kExp) mapping for velocity.
+ */
 class uiMidiKeyOn : public uiMidiTimedItem, public uiConverter {
 
     private:
@@ -539,10 +532,9 @@ class uiMidiKeyOn : public uiMidiTimedItem, public uiConverter {
     
 };
 
-//---------------------------------------------------------------
-// uiMidiKeyOff does scale (kLin/kLog/kExp) mapping for velocity
-//---------------------------------------------------------------
-
+/**
+ * uiMidiKeyOff does scale (kLin/kLog/kExp) mapping for velocity.
+ */
 class uiMidiKeyOff : public uiMidiTimedItem, public uiConverter {
 
     private:
@@ -592,10 +584,9 @@ class uiMidiKeyOff : public uiMidiTimedItem, public uiConverter {
     
 };
 
-//-----------------------------------------------------------------
-// uiMidiKeyPress does scale (kLin/kLog/kExp) mapping for velocity
-//-----------------------------------------------------------------
-
+/**
+ * uiMidiKeyPress does scale (kLin/kLog/kExp) mapping for velocity.
+ */
 class uiMidiKeyPress : public uiMidiTimedItem, public uiConverter {
 
     private:
@@ -648,7 +639,7 @@ class uiMidiKeyPress : public uiMidiTimedItem, public uiConverter {
 /******************************************************************************************
  * MidiUI : Faust User Interface
  * This class decodes MIDI metadata and maps incoming MIDI messages to them.
- * Currently ctrl, keyon/keyoff, keypress, pgm, chanpress, pitchwheel/pitchbend
+ * Currently ctrlChange, keyOn/keyOff, keyPress, progChange, chanPress, pitchWheel/pitchBend
  * start/stop/clock meta data are handled.
  *
  * Maps associating MIDI event ID (like each ctrl number) with all MIDI aware UI items
@@ -658,7 +649,7 @@ class uiMidiKeyPress : public uiMidiTimedItem, public uiConverter {
  *  - sending their internal state as MIDI output events
  *******************************************************************************************/
 
-class MidiUI : public GUI, public midi, public MetaDataUI {
+class MidiUI : public GUI, public midi, public midi_interface, public MetaDataUI {
 
     // Add uiItem subclasses objects are deallocated by the inherited GUI class
     typedef std::map <int, std::vector<uiMidiCtrlChange*> > TCtrlChangeTable;
@@ -786,13 +777,16 @@ class MidiUI : public GUI, public midi, public MetaDataUI {
         {
             fMidiHandler = midi_handler;
             fMidiHandler->addMidiIn(this);
+            // TODO: use shared_ptr based implementation
             fDelete = delete_handler;
             fTimeStamp = false;
         }
  
         virtual ~MidiUI() 
-        { 
+        {
+            // Remove from fMidiHandler
             fMidiHandler->removeMidiIn(this);
+            // TODO: use shared_ptr based implementation
             if (fDelete) delete fMidiHandler;
         }
     

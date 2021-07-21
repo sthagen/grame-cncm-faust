@@ -60,9 +60,6 @@ CodeContainer* RustCodeContainer::createContainer(const string& name, int numInp
     gGlobal->gDSPStruct = true;
     CodeContainer* container;
 
-    if (gGlobal->gMemoryManager) {
-        throw faustexception("ERROR : -mem not supported for Rust\n");
-    }
     if (gGlobal->gFloatSize == 3) {
         throw faustexception("ERROR : quad format not supported for Rust\n");
     }
@@ -100,7 +97,6 @@ void RustCodeContainer::produceInternal()
 
     tab(n, *fOut);
     *fOut << "pub struct " << fKlassName << " {";
-
     tab(n + 1, *fOut);
 
     // Fields
@@ -355,6 +351,9 @@ void RustCodeContainer::produceClass()
     tab(n, *fOut);
     *fOut << "}" << endl;
     tab(n, *fOut);
+    
+    // Generate user interface macros if needed
+    printMacros(*fOut, n);
 }
 
 void RustCodeContainer::produceMetadata(int n)
@@ -363,7 +362,7 @@ void RustCodeContainer::produceMetadata(int n)
     *fOut << "fn metadata(&self, m: &mut dyn Meta) { ";
 
     // We do not want to accumulate metadata from all hierachical levels, so the upper level only is kept
-    for (auto& i : gGlobal->gMetaDataSet) {
+    for (const auto& i : gGlobal->gMetaDataSet) {
         if (i.first != tree("author")) {
             tab(n + 1, *fOut);
             *fOut << "m.declare(\"" << *(i.first) << "\", " << **(i.second.begin()) << ");";
@@ -394,10 +393,17 @@ void RustCodeContainer::produceInfoFunctions(int tabs, const string& classname, 
     producer->Tab(tabs);
     generateGetInputs(subst("get_num_inputs$0", classname), obj, false, false)->accept(&fCodeProducer);
     generateGetOutputs(subst("get_num_outputs$0", classname), obj, false, false)->accept(&fCodeProducer);
+    
+    /*
+    // 03/04/21: suppressed for now
+    // Input Rates
     producer->Tab(tabs);
     generateGetInputRate(subst("get_input_rate$0", classname), obj, false, false)->accept(&fCodeProducer);
+    
+    // Output Rates
     producer->Tab(tabs);
     generateGetOutputRate(subst("get_output_rate$0", classname), obj, false, false)->accept(&fCodeProducer);
+    */
 }
 
 void RustCodeContainer::produceParameterGetterSetter(int tabs, map<string, int> parameterLookup)
@@ -472,6 +478,9 @@ void RustScalarCodeContainer::generateCompute(int n)
     }
     IteratorForLoopInst* loop = fCurLoop->generateSimpleScalarLoop(iterators);
     loop->accept(&fCodeProducer);
+    
+    // Currently for soundfile management
+    generatePostComputeBlock(&fCodeProducer);
 
     back(1, *fOut);
     *fOut << "}" << endl;

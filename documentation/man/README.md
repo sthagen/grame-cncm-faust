@@ -1,9 +1,9 @@
-% man(1) Version 2.30.5 (06-January-2021) | Faust man page
+% man(1) Version 2.33.1 (10-July-2021) | Faust man page
 
 NAME
 ====
 
-Faust - DSP to C/C++, Rust, LLVM IR, JAVA, WebAssembly (wast/wasm), Interpreter, SOUL and D compiler
+Faust - DSP to C/C++, CSharp, DLang, Interpreter, Java, LLVM IR, Rust, SOUL, and WebAssembly (wast/wasm)
 
 SYNOPSIS
 ========
@@ -54,13 +54,15 @@ Code generation options:
 ---------------------------------------
 
   **-lang** \<lang> **--language**                 select output language,
-                                          'lang' should be c, ocpp, cpp (default), rust, java, llvm, fir, wast/wasm, soul, interp or dlang.
+                                          'lang' should be c, cpp (default), csharp, dlang, fir, interp, java, llvm, ocpp, rust, soul or wast/wasm.
 
   **-single**     **--single-precision-floats**   use single precision floats for internal computations (default).
 
   **-double**     **--double-precision-floats**   use double precision floats for internal computations.
 
   **-quad**       **--quad-precision-floats**     use quad precision floats for internal computations.
+
+  **-fx**         **--fixed-point**               use fixed-point for internal computations.
 
   **-es** 1|0     **--enable-semantics** 1|0      use enable semantics when 1 (default), and simple multiplication otherwise.
 
@@ -72,7 +74,11 @@ Code generation options:
 
   **-exp10**      **--generate-exp10**            pow(10,x) replaced by possibly faster exp10(x).
 
-  **-os**         **--one-sample**                generate one sample computation.
+  **-os**         **--one-sample**                generate one sample computation (same as -os0).
+
+  **-os0**        **--one-sample0**               generate one sample computation (0 = separated control).
+
+  **-os1**        **--one-sample1**               generate one sample computation (1 = separated control and DSP struct).
 
   **-cm**         **--compute-mix**               mix in outputs buffers.
 
@@ -140,7 +146,8 @@ Block diagram options:
 
   **-f** \<n>     **--fold** \<n>                   threshold to activate folding mode during block-diagram generation (default 25 elements).
 
-  **-fc** \<n>    **--fold-complexity** \<n>        complexity threshold to fold an expression in folding mode (default 2)
+  **-fc** \<n>    **--fold-complexity** \<n>        complexity threshold to fold an expression in folding mode (default 2).
+
   **-mns** \<n>   **--max-name-size** \<n>          threshold during block-diagram generation (default 40 char).
 
   **-sn**        **--simple-names**               use simple names (without arguments) during block-diagram generation.

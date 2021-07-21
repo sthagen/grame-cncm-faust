@@ -88,32 +88,32 @@ struct LLVMTypeHelper {
         fTypeMap[Typed::kFloat]         = getFloatTy();
         fTypeMap[Typed::kFloat_ptr]     = getTyPtr(fTypeMap[Typed::kFloat]);
         fTypeMap[Typed::kFloat_ptr_ptr] = getTyPtr(fTypeMap[Typed::kFloat_ptr]);
-    #if !defined(LLVM_120)
+    #if !defined(LLVM_120) && !defined(LLVM_130)
         fTypeMap[Typed::kFloat_vec]     = VectorType::get(fTypeMap[Typed::kFloat], gGlobal->gVecSize);
         fTypeMap[Typed::kFloat_vec_ptr] = getTyPtr(fTypeMap[Typed::kFloat_vec]);
     #endif
         fTypeMap[Typed::kDouble]         = getDoubleTy();
         fTypeMap[Typed::kDouble_ptr]     = getTyPtr(fTypeMap[Typed::kDouble]);
         fTypeMap[Typed::kDouble_ptr_ptr] = getTyPtr(fTypeMap[Typed::kDouble_ptr]);
-    #if !defined(LLVM_120)
+    #if !defined(LLVM_120) && !defined(LLVM_130)
         fTypeMap[Typed::kDouble_vec]     = VectorType::get(fTypeMap[Typed::kDouble], gGlobal->gVecSize);
         fTypeMap[Typed::kDouble_vec_ptr] = getTyPtr(fTypeMap[Typed::kDouble_vec]);
     #endif
         fTypeMap[Typed::kInt32]         = getInt32Ty();
         fTypeMap[Typed::kInt32_ptr]     = getTyPtr(fTypeMap[Typed::kInt32]);
-    #if !defined(LLVM_120)
+    #if !defined(LLVM_120) && !defined(LLVM_130)
         fTypeMap[Typed::kInt32_vec]     = VectorType::get(fTypeMap[Typed::kInt32], gGlobal->gVecSize);
         fTypeMap[Typed::kInt32_vec_ptr] = getTyPtr(fTypeMap[Typed::kInt32_vec]);
     #endif
         fTypeMap[Typed::kInt64]         = getInt64Ty();
         fTypeMap[Typed::kInt64_ptr]     = getTyPtr(fTypeMap[Typed::kInt64]);
-    #if !defined(LLVM_120)
+    #if !defined(LLVM_120) && !defined(LLVM_130)
         fTypeMap[Typed::kInt64_vec]     = VectorType::get(fTypeMap[Typed::kInt64], gGlobal->gVecSize);
         fTypeMap[Typed::kInt64_vec_ptr] = getTyPtr(fTypeMap[Typed::kInt64_vec]);
     #endif
         fTypeMap[Typed::kBool]         = getInt1Ty();
         fTypeMap[Typed::kBool_ptr]     = getTyPtr(fTypeMap[Typed::kBool]);
-    #if !defined(LLVM_120)
+    #if !defined(LLVM_120) && !defined(LLVM_130)
         fTypeMap[Typed::kBool_vec]     = VectorType::get(fTypeMap[Typed::kBool], gGlobal->gVecSize);
         fTypeMap[Typed::kBool_vec_ptr] = getTyPtr(fTypeMap[Typed::kBool_vec]);
     #endif
@@ -129,7 +129,7 @@ struct LLVMTypeHelper {
         fTypeMap[Typed::kVoid_ptr_ptr] = getTyPtr(fTypeMap[Typed::kVoid_ptr]);
 
         // External structured type definition
-        for (auto& it : gGlobal->gExternalStructTypes) {
+        for (const auto& it : gGlobal->gExternalStructTypes) {
             LLVMType new_type                         = convertFIRType((it.second)->fType);
             fTypeMap[it.first]                        = new_type;
             fTypeMap[Typed::getPtrFromType(it.first)] = getTyPtr(new_type);
@@ -141,7 +141,7 @@ struct LLVMTypeHelper {
     // Value generation
     LLVMValue genInt1(int num) { return ConstantInt::get(llvm::Type::getInt1Ty(fModule->getContext()), num); }
     LLVMValue genInt32(int num) { return ConstantInt::get(llvm::Type::getInt32Ty(fModule->getContext()), num); }
-    LLVMValue genInt64(long long num) { return ConstantInt::get(llvm::Type::getInt64Ty(fModule->getContext()), num); }
+    LLVMValue genInt64(int64_t num) { return ConstantInt::get(llvm::Type::getInt64Ty(fModule->getContext()), num); }
     LLVMValue genFloat(float num) { return ConstantFP::get(fModule->getContext(), APFloat(num)); }
     LLVMValue genDouble(double num) { return ConstantFP::get(fModule->getContext(), APFloat(num)); }
    
@@ -170,7 +170,11 @@ struct LLVMTypeHelper {
     LLVMType getStructType(const string& name, const LLVMVecTypes& types)
     {
         // We want to have a unique creation for struct types, so check if the given type has already been created
+    #if defined(LLVM_120) || defined(LLVM_130)
+        StructType* struct_type = StructType::getTypeByName(fModule->getContext(), name);
+    #else
         StructType* struct_type = fModule->getTypeByName(name);
+    #endif
         if (!struct_type) {
             struct_type = StructType::create(fModule->getContext(), name);
             // Create "packed" struct type to match the size of C++ "packed" defined ones
@@ -191,7 +195,11 @@ struct LLVMTypeHelper {
         if (basic_typed) {
             return fTypeMap[basic_typed->fType];
         } else if (named_typed) {
+        #if defined(LLVM_120) || defined(LLVM_130)
+            LLVMType type = StructType::getTypeByName(fModule->getContext(), "struct.dsp" + named_typed->fName);
+        #else
             LLVMType type = fModule->getTypeByName("struct.dsp" + named_typed->fName);
+        #endif
             // Subcontainer type (RWTable...)
             return (type) ? getTyPtr(type) : convertFIRType(named_typed->fType);
         } else if (array_typed) {
@@ -200,7 +208,7 @@ struct LLVMTypeHelper {
                        ? fTypeMap[array_typed->getType()]
                        : ArrayType::get(fTypeMap[Typed::getTypeFromPtr(array_typed->getType())], array_typed->fSize);
         } else if (vector_typed) {
-        #if !defined(LLVM_120)
+        #if !defined(LLVM_120) && !defined(LLVM_130)
             return VectorType::get(fTypeMap[vector_typed->fType->fType], vector_typed->fSize);
         #else
             faustassert(false);
@@ -208,7 +216,7 @@ struct LLVMTypeHelper {
         #endif
         } else if (struct_typed) {
             LLVMVecTypes llvm_types;
-            for (auto& it : struct_typed->fFields) {
+            for (const auto& it : struct_typed->fFields) {
                 llvm_types.push_back(convertFIRType(it));
             }
             return getStructType("struct.dsp" + struct_typed->fName, llvm_types);
@@ -238,13 +246,13 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
     list<string> fMathLibTable;                 // All standard math functions
 
-#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120)
+#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
     map<string, Intrinsic::ID> fUnaryIntrinsicTable;    // LLVM unary intrinsic
     map<string, Intrinsic::ID> fBinaryIntrinsicTable;   // LLVM binary intrinsic
 #endif
     void printVarTable()
     {
-        for (auto& it : fStackVars) {
+        for (const auto& it : fStackVars) {
             cout << "Stack var = " << it.first << endl;
         }
     }
@@ -312,7 +320,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         fTypeMap[Typed::kObj_ptr] = dsp_ptr;
         fAllocaBuilder            = new IRBuilder<>(fModule->getContext());
  
-    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120)
+    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
         
         /* This does not work in visit(FunCallInst* inst) for intrinsic, which are deactivated for now
         call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::Builtin);
@@ -486,7 +494,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
             // Prepare vector of LLVM types for args
             LLVMVecTypes fun_args_type;
-            for (auto& it : inst->fType->fArgsTypes) {
+            for (const auto& it : inst->fType->fArgsTypes) {
                 fun_args_type.push_back(fTypeMap[it->getType()]);
             }
 
@@ -506,7 +514,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
             // Set name for function arguments
             Function::arg_iterator args = function->arg_begin();
-            for (auto& it : inst->fType->fArgsTypes) {
+            for (const auto& it : inst->fType->fArgsTypes) {
                 LLVMValue arg = GetIterator(args++);
                 arg->setName(it->fName);
             }
@@ -735,8 +743,24 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     void visitCastAux(Typed::VarType type)
     {
         switch (type) {
-            case Typed::kFloat:
+                
+            case Typed::kInt32:
                 if (getCurType() == getInt32Ty()) {
+                    // Nothing to do
+                } else if (getCurType() == getFloatTy() || getCurType() == getDoubleTy()) {
+                    fCurValue = fBuilder->CreateFPToSI(fCurValue, getInt32Ty());
+                } else if (getCurType() == getInt64Ty()) {
+                    fCurValue = fBuilder->CreateTrunc(fCurValue, getInt32Ty());
+                } else if (getCurType()->isPointerTy()) {
+                    // Use BitCast for pointer to kInt32
+                    fCurValue = fBuilder->CreateBitCast(fCurValue, getInt32Ty());
+                } else {
+                    faustassert(false);
+                }
+                break;
+     
+            case Typed::kFloat:
+                if (getCurType() == getInt32Ty() || getCurType() == getInt64Ty()) {
                     fCurValue = fBuilder->CreateSIToFP(fCurValue, getFloatTy());
                 } else if (getCurType() == getFloatTy()) {
                     // Nothing to do
@@ -747,21 +771,8 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
                 }
                 break;
 
-            case Typed::kInt32:
-                if (getCurType() == getInt32Ty()) {
-                    // Nothing to do
-                } else if (getCurType() == getFloatTy() || getCurType() == getDoubleTy()) {
-                    fCurValue = fBuilder->CreateFPToSI(fCurValue, getInt32Ty());
-                } else if (getCurType()->isPointerTy()) {
-                    // Use BitCast for pointer to kInt32
-                    fCurValue = fBuilder->CreateBitCast(fCurValue, getInt32Ty());
-                } else {
-                    faustassert(false);
-                }
-                break;
-
             case Typed::kDouble:
-                if (getCurType() == getInt32Ty()) {
+                if (getCurType() == getInt32Ty() || getCurType() == getInt64Ty()) {
                     fCurValue = fBuilder->CreateSIToFP(fCurValue, getDoubleTy());
                 } else if (getCurType() == getFloatTy()) {
                     fCurValue = fBuilder->CreateFPExt(fCurValue, getDoubleTy());
@@ -772,19 +783,24 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
                 }
                 break;
 
+            case Typed::kFloat_ptr:
+            case Typed::kFloat_ptr_ptr:
+            case Typed::kDouble_ptr:
+            case Typed::kDouble_ptr_ptr:
+            case Typed::kInt32_ptr:
+            case Typed::kFloatMacro_ptr:
+            case Typed::kFloatMacro_ptr_ptr:
             case Typed::kObj_ptr:
-                fCurValue = fBuilder->CreateBitCast(fCurValue, fTypeMap[Typed::kObj_ptr]);
-                break;
-
             case Typed::kVoid_ptr:
-                fCurValue = fBuilder->CreateBitCast(fCurValue, fTypeMap[Typed::kVoid_ptr]);
+                fCurValue = fBuilder->CreateBitCast(fCurValue, fTypeMap[type]);
                 break;
-
+                
             case Typed::kUint_ptr:
                 fCurValue = fBuilder->CreatePtrToInt(fCurValue, MakeIntPtrType());
                 break;
 
             case Typed::kQuad:
+            case Typed::kInt64:
             default:
                 faustassert(false);
                 break;
@@ -828,7 +844,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     {
         // Compile function arguments
         vector<LLVMValue> fun_args;
-        for (auto& it : inst->fArgs) {
+        for (const auto& it : inst->fArgs) {
             // Each argument is compiled and result is in fCurValue
             it->accept(this);
             fun_args.push_back(fCurValue);
@@ -839,7 +855,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
             fCurValue = generateFunPolymorphicMinMax(fun_args[0], fun_args[1], kLT);
         } else if (checkMax(inst->fName) && fun_args.size() == 2) {
             fCurValue = generateFunPolymorphicMinMax(fun_args[0], fun_args[1], kGT);
-    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120)
+    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
         // LLVM unary intrinsic
         } else if (fUnaryIntrinsicTable.find(inst->fName) != fUnaryIntrinsicTable.end()) {
             
@@ -1177,7 +1193,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         }
 
         // Generates block internal code
-        for (auto& it : inst->fCode) {
+        for (const auto& it : inst->fCode) {
             it->accept(this);
         }
 

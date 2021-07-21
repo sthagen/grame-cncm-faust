@@ -378,7 +378,7 @@ class RustInstVisitor : public TextInstVisitor {
         }
         *fOut << ']';
     }
-
+  
     virtual void visit(DoubleArrayNumInst* inst)
     {
         char sep = '[';
@@ -387,6 +387,36 @@ class RustInstVisitor : public TextInstVisitor {
             sep = ',';
         }
         *fOut << ']';
+    }
+    
+    virtual void visit(BinopInst* inst)
+    {
+        // Special case for 'logical right-shift'
+        if (strcmp(gBinOpTable[inst->fOpcode]->fName, ">>>") == 0) {
+            TypingVisitor typing;
+            inst->fInst1->accept(&typing);
+            *fOut << "(((";
+            inst->fInst1->accept(this);
+            if (isInt64Type(typing.fCurType)) {
+                *fOut << " as u64)";
+            } else if (isInt32Type(typing.fCurType)) {
+                *fOut << " as u32)";
+            } else {
+                faustassert(false);
+            }
+            *fOut << " >> ";
+            inst->fInst2->accept(this);
+            *fOut << ")";
+            if (isInt64Type(typing.fCurType)) {
+                *fOut << " as i64)";
+            } else if (isInt32Type(typing.fCurType)) {
+                *fOut << " as i32)";
+            } else {
+                faustassert(false);
+            }
+        } else {
+            TextInstVisitor::visit(inst);
+        }
     }
 
     virtual void visit(::CastInst* inst)
@@ -459,14 +489,14 @@ class RustInstVisitor : public TextInstVisitor {
         tab(fTab, *fOut);
         inst->fThen->accept(this);
         fTab--;
-        tab(fTab, *fOut);
+        back(1, *fOut);
         if (inst->fElse->fCode.size() > 0) {
             *fOut << "} else {";
             fTab++;
             tab(fTab, *fOut);
             inst->fElse->accept(this);
             fTab--;
-            tab(fTab, *fOut);
+            back(1, *fOut);
             *fOut << "}";
         } else {
             *fOut << "}";
@@ -564,7 +594,7 @@ class RustInstVisitor : public TextInstVisitor {
         *fOut << ") {";
         fTab++;
         tab(fTab, *fOut);
-        for (auto& it : inst->fCode) {
+        for (const auto& it : inst->fCode) {
             if (it.first == -1) {  // -1 used to code "default" case
                 *fOut << "_ => {";
             } else {
@@ -612,7 +642,7 @@ class UserInterfaceParameterMapping : public InstVisitor {
     {
         // BlockInst visitor is unimplemented in base class, so we need a trivial implementation
         // to actually visit the user interface statements in the BlockInst.
-        for (auto& it : inst->fCode) {
+        for (const auto& it : inst->fCode) {
             it->accept(this);
         }
     }
@@ -758,6 +788,12 @@ class RustUIInstVisitor : public TextInstVisitor {
         *fOut << name << "(" << quote(inst->fLabel) << ", ParamIndex(" << getParameterIndex(inst->fZone) << "), " << checkReal(inst->fMin)
               << ", " << checkReal(inst->fMax) << ")";
         EndLine();
+    }
+    
+    virtual void visit(AddSoundfileInst* inst)
+    {
+        // Not supported for now
+        throw faustexception("ERROR : 'soundfile' primitive not yet supported for Rust\n");
     }
 };
 

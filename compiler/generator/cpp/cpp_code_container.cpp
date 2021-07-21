@@ -40,7 +40,7 @@ dsp_factory_base* CPPCodeContainer::produceFactory()
 
 CodeContainer* CPPCodeContainer::createScalarContainer(const string& name, int sub_container_type)
 {
-    return (gGlobal->gOneSample)
+    return (gGlobal->gOneSample >= 0)
         ? new CPPScalarOneSampleCodeContainer(name, "", 0, 1, fOut, sub_container_type)
         : new CPPScalarCodeContainer(name, "", 0, 1, fOut, sub_container_type);
 }
@@ -75,7 +75,7 @@ CodeContainer* CPPCodeContainer::createContainer(const string& name, const strin
     } else if (gGlobal->gVectorSwitch) {
         container = new CPPVectorCodeContainer(name, super, numInputs, numOutputs, dst);
     } else {
-        container = (gGlobal->gOneSample)
+        container = (gGlobal->gOneSample >= 0)
             ? new CPPScalarOneSampleCodeContainer(name, super, numInputs, numOutputs, dst, kInt)
             : new CPPScalarCodeContainer(name, super, numInputs, numOutputs, dst, kInt);
     }
@@ -89,7 +89,7 @@ void CPPCodeContainer::produceMetadata(int tabs)
     *fOut << "void metadata(Meta* m) { ";
 
     // We do not want to accumulate metadata from all hierachical levels, so the upper level only is kept
-    for (auto& i : gGlobal->gMetaDataSet) {
+    for (const auto& i : gGlobal->gMetaDataSet) {
         if (i.first != tree("author")) {
             tab(tabs + 1, *fOut);
             *fOut << "m->declare(\"" << *(i.first) << "\", " << **(i.second.begin()) << ");";
@@ -609,8 +609,6 @@ void CPPScalarOneSampleCodeContainer::produceClass()
     *fOut << "#endif" << endl;
     tab(n, *fOut);
     
-    *fOut << "#define FAUST_INPUTS " << fNumInputs << endl;
-    *fOut << "#define FAUST_OUTPUTS  " << fNumOutputs << endl;
     *fOut << "#define FAUST_INT_CONTROLS " << fInt32ControlNum  << endl;
     *fOut << "#define FAUST_REAL_CONTROLS " << fRealControlNum;
     tab(n, *fOut);
