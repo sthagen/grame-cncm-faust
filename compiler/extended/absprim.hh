@@ -43,8 +43,6 @@ class AbsPrim : public xtended {
         return t;
     }
 
-    virtual void sigVisit(Tree sig, sigvisitor* visitor) {}
-
     virtual int infereSigOrder(const vector<int>& args)
     {
         faustassert(args.size() == arity());
@@ -55,11 +53,10 @@ class AbsPrim : public xtended {
     {
         double f;
         int    i;
-
         faustassert(args.size() == arity());
-        xtended* xt = (xtended*)getUserData(args[0]);
-        
+    
         // abs(abs(sig)) ==> abs(sig)
+        xtended* xt = (xtended*)getUserData(args[0]);
         if (xt == gGlobal->gAbsPrim) {
             return args[0];
             

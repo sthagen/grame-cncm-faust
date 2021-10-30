@@ -61,25 +61,24 @@ struct interval : public virtual Garbageable {
     interval(double n) : valid(true), lo(n), hi(n)
     {
         if (std::isnan(n)) {
-            cerr << "ERROR1 : n is NAN in an Interval" << endl;
-            faustassert(false);
+            throw faustexception("ERROR1 : n is NaN in an Interval\n");
         }
     }
     interval(bool v, double n, double m) : valid(v), lo(n), hi(m)
     {
         if (std::isnan(n) || std::isnan(m)) {
-            cerr << "ERROR2 : n or m is NAN in an Interval" << endl;
-            faustassert(false);
+            throw faustexception("ERROR2 : n is NaN in an Interval\n");
         }
     }
     interval(double n, double m) : valid(true), lo(min(n, m)), hi(max(n, m))
     {
         if (std::isnan(n) || std::isnan(m)) {
-            cerr << "ERROR3 : n or m is NAN in an Interval" << endl;
-            faustassert(false);
+            throw faustexception("ERROR3 : n is NaN in an Interval\n");
         }
     }
 
+    bool isvalid() { return valid; }
+    bool isbounded() { return !(std::isinf(lo) || std::isinf(hi)); }
     bool isempty() { return hi < lo; }
     bool isconst() { return valid && (lo == hi); }
     bool ispowerof2()
@@ -94,6 +93,11 @@ struct interval : public virtual Garbageable {
     }
     bool haszero() { return (lo <= 0) && (0 <= hi); }
 
+    // convention, the invalid interval contains everyone 
+    bool contains(interval j)
+    {
+        return !valid || (lo <= j.lo && hi >= j.hi);
+    }
     
     /**
      * @brief Pretty print an interval (string version)
@@ -104,9 +108,9 @@ struct interval : public virtual Garbageable {
     {
         string sout = ("[");
         if (valid) {
-            sout += to_string(lo);
+            sout += (lo > -HUGE_VAL)?to_string(lo):"-inf";
             sout += ", ";
-            sout += to_string(hi);
+            sout += (hi < HUGE_VAL)?to_string(hi):"inf";
         } else {
             sout += "???";
         }

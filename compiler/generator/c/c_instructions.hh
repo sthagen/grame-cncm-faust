@@ -40,6 +40,8 @@ class CInstVisitor : public TextInstVisitor {
     // Polymorphic math functions
     map<string, string> gPolyMathLibTable;
     
+    string cast2FAUSTFLOAT(const string& str) { return "(FAUSTFLOAT)" + str; }
+    
    public:
     using TextInstVisitor::visit;
 
@@ -49,8 +51,8 @@ class CInstVisitor : public TextInstVisitor {
         // Mark all math.h functions as generated...
         gFunctionSymbolTable["abs"] = true;
 
-        gFunctionSymbolTable["min"] = true;
-        gFunctionSymbolTable["max"] = true;
+        gFunctionSymbolTable["min_i"] = true;
+        gFunctionSymbolTable["max_i"] = true;
     
         // Float version
         gFunctionSymbolTable["fabsf"]      = true;
@@ -201,8 +203,10 @@ class CInstVisitor : public TextInstVisitor {
                 break;
         }
         *fOut << name << "ui_interface->uiInterface, " << quote(inst->fLabel) << ", &dsp->" << inst->fZone << ", "
-              << checkReal(inst->fInit) << ", " << checkReal(inst->fMin) << ", " << checkReal(inst->fMax) << ", "
-              << checkReal(inst->fStep) << ")";
+              << cast2FAUSTFLOAT(checkReal(inst->fInit)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMin)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMax)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fStep)) << ")";
         EndLine();
     }
 
@@ -218,7 +222,8 @@ class CInstVisitor : public TextInstVisitor {
                 break;
         }
         *fOut << name << "ui_interface->uiInterface, " << quote(inst->fLabel) << ", &dsp->" << inst->fZone << ", "
-              << checkReal(inst->fMin) << ", " << checkReal(inst->fMax) << ")";
+              << cast2FAUSTFLOAT(checkReal(inst->fMin)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMax)) << ")";
         EndLine();
     }
 
@@ -476,9 +481,9 @@ class CInstVisitor1 : public CInstVisitor {
                 // Zone address zone[id][index] are rewritten as zone[id+index]
                 fZoneAddress = true;
                 if (type == Typed::kInt32) {
-                    *fOut << "iZone" << "[" << fStructVisitor.getFieldIntOffset(named->fName)/sizeof(int);
+                    *fOut << "iZone[" << fStructVisitor.getFieldIntOffset(named->fName)/sizeof(int);
                 } else {
-                    *fOut << "fZone" << "[" << fStructVisitor.getFieldRealOffset(named->fName)/ifloatsize();
+                    *fOut << "fZone[" << fStructVisitor.getFieldRealOffset(named->fName)/ifloatsize();
                 }
                 if (!fIndexedAddress) { *fOut << "]"; }
             } else {

@@ -112,12 +112,7 @@ void OccMarkup::mark(Tree root)
 
 Occurences* OccMarkup::retrieve(Tree t)
 {
-    Occurences* p = getOcc(t);
-    if (p == 0) {
-        // cerr << "No Occurences info attached to : " << *t << endl;
-        // exit(1);
-    }
-    return p;
+    return getOcc(t);
 }
 
 //------------------------------------------------------------------------------
@@ -139,8 +134,8 @@ void OccMarkup::incOcc(Tree env, int v, int r, int d, Tree t)
         setOcc(t, occ);
 
         // We mark the subtrees of t
-        Tree c, x, y, z;
-        if (isSigFixDelay(t, x, y)) {
+        Tree x, y;
+        if (isSigDelay(t, x, y)) {
             Type g2 = getCertifiedSigType(y);
             int  d2 = checkDelayInterval(g2);
             faustassert(d2 >= 0);
@@ -149,15 +144,6 @@ void OccMarkup::incOcc(Tree env, int v, int r, int d, Tree t)
         } else if (isSigPrefix(t, y, x)) {
             incOcc(env, v0, r0, 1, x);
             incOcc(env, v0, r0, 0, y);
-        } else if (isSigSelect3(t, c, y, x, z)) {
-            // make a special case for select3 implemented with real if
-            // because the c expression will be used twice in the C++
-            // translation
-            incOcc(env, v0, r0, 0, c);
-            incOcc(env, v0, r0, 0, c);
-            incOcc(env, v0, r0, 0, x);
-            incOcc(env, v0, r0, 0, y);
-            incOcc(env, v0, r0, 0, z);
         } else {
             vector<Tree> br;
             int          n = getSubSignals(t, br);

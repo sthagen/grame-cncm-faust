@@ -37,6 +37,8 @@ class DLangInstVisitor : public TextInstVisitor {
 
     // Polymorphic math functions
     map<string, string> gPolyMathLibTable;
+    
+    string cast2FAUSTFLOAT(const string& str) { return "cast(FAUSTFLOAT)" + str; }
 
    public:
     using TextInstVisitor::visit;
@@ -78,7 +80,19 @@ class DLangInstVisitor : public TextInstVisitor {
         gPolyMathLibTable["sqrtf"]  = "sqrt";
         gPolyMathLibTable["tanf"]   = "tan";
         gPolyMathLibTable["tanhf"]  = "tanh";
-
+    
+        // Hyperbolic
+        gPolyMathLibTable["acoshf"]     = "acosh";
+        gPolyMathLibTable["asinhf"]     = "asinh";
+        gPolyMathLibTable["atanhf"]     = "atanh";
+        gPolyMathLibTable["coshf"]      = "cosh";
+        gPolyMathLibTable["sinhf"]      = "sinh";
+        gPolyMathLibTable["tanhf"]      = "tanh";
+        
+        gPolyMathLibTable["isnanf"]     = "isNaN";
+        gPolyMathLibTable["isinff"]     = "isInfinity";
+        gPolyMathLibTable["copysignf"]  = "copysign";
+   
         // Double version
         gPolyMathLibTable["fabs"]  = "fabs";
         gPolyMathLibTable["acos"]  = "acos";
@@ -103,6 +117,18 @@ class DLangInstVisitor : public TextInstVisitor {
         gPolyMathLibTable["sqrt"]  = "sqrt";
         gPolyMathLibTable["tan"]   = "tan";
         gPolyMathLibTable["tanh"]  = "tanh";
+    
+        // Hyperbolic
+        gPolyMathLibTable["acosh"]     = "acosh";
+        gPolyMathLibTable["asinh"]     = "asinh";
+        gPolyMathLibTable["atanh"]     = "atanh";
+        gPolyMathLibTable["cosh"]      = "cosh";
+        gPolyMathLibTable["sinh"]      = "sinh";
+        gPolyMathLibTable["tanh"]      = "tanh";
+        
+        gPolyMathLibTable["isnan"]     = "isNaN";
+        gPolyMathLibTable["isinf"]     = "isInfinity";
+        gPolyMathLibTable["copysign"]  = "copysign";
     }
 
     virtual ~DLangInstVisitor() {}
@@ -168,9 +194,11 @@ class DLangInstVisitor : public TextInstVisitor {
                 name = "uiInterface.addNumEntry";
                 break;
         }
-        *fOut << name << "(" << quote(inst->fLabel) << ", "
-              << "&" << inst->fZone << ", " << checkReal(inst->fInit) << ", " << checkReal(inst->fMin) << ", "
-              << checkReal(inst->fMax) << ", " << checkReal(inst->fStep) << ")";
+        *fOut << name << "(" << quote(inst->fLabel) << ", " << "&" << inst->fZone << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fInit)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMin)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMax)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fStep)) << ")";
         EndLine();
     }
 
@@ -185,8 +213,9 @@ class DLangInstVisitor : public TextInstVisitor {
                 name = "uiInterface.addVerticalBargraph";
                 break;
         }
-        *fOut << name << "(" << quote(inst->fLabel) << ", &" << inst->fZone << ", " << checkReal(inst->fMin) << ", "
-              << checkReal(inst->fMax) << ")";
+        *fOut << name << "(" << quote(inst->fLabel) << ", &" << inst->fZone << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMin)) << ", "
+              << cast2FAUSTFLOAT(checkReal(inst->fMax)) << ")";
         EndLine();
     }
 

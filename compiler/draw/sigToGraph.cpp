@@ -36,7 +36,7 @@
 
 using namespace std;
 
-static void   recdraw(Tree sig, set<Tree>& drawn, ofstream& fout);
+static void   recdraw(Tree sig, set<Tree>& drawn, ostream& fout);
 static string nodeattr(Type t);
 static string edgeattr(Type t);
 static string sigLabel(Tree sig);
@@ -44,7 +44,7 @@ static string sigLabel(Tree sig);
 /**
  * Draw a list of signals as a directed graph using graphviz's dot language
  */
-void sigToGraph(Tree L, ofstream& fout)
+void sigToGraph(Tree L, ostream& fout)
 {
     set<Tree> alreadyDrawn;
 
@@ -68,7 +68,7 @@ void sigToGraph(Tree L, ofstream& fout)
 /**
  * Draw recursively a signal
  */
-static void recdraw(Tree sig, set<Tree>& drawn, ofstream& fout)
+static void recdraw(Tree sig, set<Tree>& drawn, ostream& fout)
 {
     // cerr << ++gGlobal->TABBER << "ENTER REC DRAW OF " << sig << "$" << *sig << endl;
     vector<Tree> subsig;
@@ -201,7 +201,7 @@ static string sigLabel(Tree sig)
 
     else if (isSigDelay1(sig, x)) {
         fout << "mem";
-    } else if (isSigFixDelay(sig, x, y)) {
+    } else if (isSigDelay(sig, x, y)) {
         fout << "@";
     } else if (isSigPrefix(sig, x, y)) {
         fout << "prefix";
@@ -227,10 +227,8 @@ static string sigLabel(Tree sig)
 
     else if (isSigSelect2(sig, sel, x, y)) {
         fout << "select2";
-    } else if (isSigSelect3(sig, sel, x, y, z)) {
-        fout << "select3";
     }
-
+    
     else if (isSigGen(sig, x)) {
         fout << "generator";
     }
@@ -278,9 +276,21 @@ static string sigLabel(Tree sig)
         fout << "attach";
     }
 
+    else if (isSigAssertBounds(sig, x, y, z)){
+        fout << "assertbounds";
+    }
+
+    else if (isSigLowest(sig, x)){
+        fout << "lowest";
+    }
+    
+    else if (isSigHighest(sig, x)){
+        fout << "highest";
+    }
+
     else {
         stringstream error;
-        error << "ERROR : unrecognized signal : " << *sig << endl;
+        error << "ERROR : sigToGraph.cpp, unrecognized signal : " << *sig << endl;
         throw faustexception(error.str());
     }
 

@@ -31,6 +31,7 @@
 #include "sigtype.hh"
 #include "sigvisitor.hh"
 #include "tlib.hh"
+#include "ppsig.hh"
 
 class CodeContainer;
 
@@ -48,7 +49,7 @@ class xtended : public virtual Garbageable {
     Tree box()
     {
         Tree b = tree(fSymbol);
-        faustassert(getUserData(b) != 0);
+        faustassert(getUserData(b) != nullptr);
         return b;
     }
 

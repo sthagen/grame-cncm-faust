@@ -1,4 +1,4 @@
-% man(1) Version 2.33.1 (10-July-2021) | Faust man page
+% man(1) Version 2.37.3 (22-October-2021) | Faust man page
 
 NAME
 ====
@@ -54,7 +54,7 @@ Code generation options:
 ---------------------------------------
 
   **-lang** \<lang> **--language**                 select output language,
-                                          'lang' should be c, cpp (default), csharp, dlang, fir, interp, java, llvm, ocpp, rust, soul or wast/wasm.
+                                          'lang' should be c, cpp (default), csharp, dlang, fir, interp, java, julia, llvm, ocpp, rust, soul or wast/wasm.
 
   **-single**     **--single-precision-floats**   use single precision floats for internal computations (default).
 
@@ -132,6 +132,12 @@ Code generation options:
 
   **-ns** \<name> **--namespace** \<name>           generate C++ or D code in a namespace \<name>.
 
+  **-vhdl**      **--vhdl**                       output vhdl file.
+
+  **-wi** \<n>    **--widening-iterations** \<n>    number of iterations before widening in signal bounding.
+
+  **-ni** \<n>    **--narrowing-iterations** \<n>   number of iterations before stopping narrowing in signal bounding.
+
 
 Block diagram options:
 ---------------------------------------
@@ -183,6 +189,8 @@ Debug options:
   **-ct**         **--check-table**               check table index range and exit at first failure.
 
   **-cat**        **--check-all-table**           check all table index range.
+
+  **-me**         **--math-exceptions**           check / for 0 as denominator and remainder, fmod, sqrt, log10, log, acos, asin functions domain.
 
 
 Information options:

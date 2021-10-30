@@ -56,13 +56,14 @@ class Garbageable;
 struct DispatchVisitor;
 class WASTInstVisitor;
 class WASMInstVisitor;
+class JuliaInstVisitor;
 struct TableSizeVisitor;
 struct DeclareStructTypeInst;
 
 struct Typed;
 struct BasicTyped;
 
-class dsp_factory_base;
+struct dsp_factory_base;
 
 typedef long double quad;
 
@@ -134,18 +135,20 @@ struct global {
     bool gUIMacroSwitch;
     bool gDumpNorm;
     int  gFTZMode;
-    bool gRangeUI;      // whether to generate code to limit vslider/hslider/nentry values in [min..max] range
-    
+    bool gRangeUI;  // whether to generate code to limit vslider/hslider/nentry values in [min..max] range
+
     int gFloatSize;
 
     bool gPrintFileListSwitch;
     bool gInlineArchSwitch;
 
     bool gDSPStruct;
-    bool gLightMode;    // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
-                        // for JavaScript)
-    bool gClang;        // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
-    string gCheckTable; // whether to check RDTable and RWTable index range
+    bool gLightMode;  // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
+                      // for JavaScript)
+    bool   gClang;    // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
+    string gCheckTable;  // whether to check RDTable and RWTable index range
+    
+    bool   gMathExceptions;  // whether to check math functions domains
 
     string gClassName;       // name of the generated dsp class, by default 'mydsp'
     string gSuperClassName;  // name of the root class the generated dsp class inherits from, by default 'dsp'
@@ -173,6 +176,9 @@ struct global {
     bool   gComputeMix;            // Mix in outputs buffers
     string gFastMathLib;           // The fastmath code mapping file
     string gNameSpace;             // Wrapping namespace used with the C++ backend
+
+    int gWideningLimit;     // Max number of iterations before interval widening
+    int gNarrowingLimit;    // Max number of iterations to compute interval widener
 
     map<string, string> gFastMathLibTable;      // Mapping table for fastmath functions
     map<string, bool>   gMathForeignFunctions;  // Map of math foreign functions
@@ -352,9 +358,10 @@ struct global {
     property<Tree>* gSymListProp;
 
     Sym SIGINPUT;
+    int gMaxInputs;  // Max input allocated with sigInput API
     Sym SIGOUTPUT;
     Sym SIGDELAY1;
-    Sym SIGFIXDELAY;
+    Sym SIGDELAY;
     Sym SIGPREFIX;
     Sym SIGIOTA;
     Sym SIGRDTBL;
@@ -365,7 +372,9 @@ struct global {
     Sym SIGDOCWRITETBL;
     Sym SIGDOCACCESSTBL;
     Sym SIGSELECT2;
-    Sym SIGSELECT3;
+    Sym SIGASSERTBOUNDS;
+    Sym SIGHIGHEST;
+    Sym SIGLOWEST;
     Sym SIGBINOP;
     Sym SIGFFUN;
     Sym SIGFCONST;
@@ -421,9 +430,10 @@ struct global {
 
     // Trying to accelerate type convergence
     Type TREC;  // kVect ou kScal ?
+    Type TRECMAX;
 
     res RES;
-    
+
     Sym  CONS;
     Sym  NIL;
     Tree nil;
@@ -486,8 +496,8 @@ struct global {
     char* gCurrentLocal;
 
     int gAllocationCount;  // Internal signal types counter
-    
-    int gMaskDelayLineThreshold;   // Power-of-two and mask delay-lines treshold
+
+    int gMaskDelayLineThreshold;  // Power-of-two and mask delay-lines treshold
 
     bool gEnableFlag;
 
@@ -500,6 +510,11 @@ struct global {
 #ifdef INTERP_BUILD
     // One single global visitor Interpreter backend, so that sub-containers and the global container use the same heap
     DispatchVisitor* gInterpreterVisitor;
+#endif
+    
+#ifdef JULIA_BUILD
+    // One single global visitor Julia backend, so that sub-containers and the global container use the same heap
+    JuliaInstVisitor* gJuliaVisitor;
 #endif
 
 #ifdef SOUL_BUILD
@@ -517,6 +532,9 @@ struct global {
     bool   gGraphSwitch;
     bool   gDrawPSSwitch;
     bool   gDrawSVGSwitch;
+    bool   gVHDLSwitch;
+    bool   gVHDLTrace;
+    bool   gElementarySwitch;
     bool   gPrintXMLSwitch;
     bool   gPrintJSONSwitch;
     bool   gPrintDocSwitch;
@@ -563,17 +581,14 @@ struct global {
     }
 
     bool hasVarType(const string& name) { return gVarTypeTable.find(name) != gVarTypeTable.end(); }
-    
+
     BasicTyped* genBasicTyped(Typed::VarType type);
 
     Typed::VarType getVarType(const string& name);
-    
+
     void setVarType(const string& name, Typed::VarType type);
-    
-    inline bool startWith(const string& str, const string& prefix)
-    {
-        return (str.substr(0, prefix.size()) == prefix);
-    }
+
+    inline bool startWith(const string& str, const string& prefix) { return (str.substr(0, prefix.size()) == prefix); }
 
     // Some backends have an internal implementation of foreign functions like acos, asinh...
     bool hasMathForeignFunction(const string& name)
@@ -585,7 +600,8 @@ struct global {
                                      || startWith(gOutputLang, "soul")
                                      || (gOutputLang == "dlang")
                                      || (gOutputLang == "csharp")
-                                     || (gOutputLang == "rust"));
+                                     || (gOutputLang == "rust")
+                                     || (gOutputLang == "julia"));
         return has_internal_math_ff && (gMathForeignFunctions.find(name) != gMathForeignFunctions.end());
     }
 

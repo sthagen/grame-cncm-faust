@@ -271,10 +271,11 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
     }
     
     // For Rust backend
-    virtual void visit(DeclareBufferIteratorsRust* inst)
+    virtual void visit(DeclareBufferIterators* inst)
     {
-        *fOut << "DeclareBufferIteratorsRust(";
-        *fOut << inst->fBufferName << " ";
+        *fOut << "DeclareBufferIterators(";
+        *fOut << inst->fBufferName1 << " ";
+        *fOut << inst->fBufferName2 << " ";
         *fOut << inst->fNumChannels << " ";
         *fOut << inst->fMutable << ")";
         EndLine();
@@ -524,7 +525,7 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
             fTab--;
         }
         back(1, *fOut);
-        *fOut << "EndIf";
+        *fOut << "EndIfInst";
         tab(fTab, *fOut);
     }
     
@@ -558,11 +559,27 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
         inst->fCode->accept(this);
         fTab--;
         back(1, *fOut);
-        *fOut << "EndForLoop";
+        *fOut << "EndForLoopInst";
         tab(fTab, *fOut);
     }
     
     // For Rust backend
+    virtual void visit(SimpleForLoopInst* inst)
+    {
+        *fOut << "SimpleForLoopInst ";
+        fTab++;
+        tab(fTab, *fOut);
+        inst->fLowerBound->accept(this);
+        tab(fTab, *fOut);
+        inst->fUpperBound->accept(this);
+        tab(fTab, *fOut);
+        inst->fCode->accept(this);
+        fTab--;
+        back(1, *fOut);
+        *fOut << "EndSimpleForLoopInst";
+        tab(fTab, *fOut);
+    }
+    
     virtual void visit(IteratorForLoopInst* inst)
     {
         *fOut << "IteratorForLoopInst ";
@@ -575,7 +592,7 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
         inst->fCode->accept(this);
         fTab--;
         back(1, *fOut);
-        *fOut << "EndIteratorForLoop";
+        *fOut << "EndIteratorForLoopInst";
         tab(fTab, *fOut);
     }
 
@@ -588,7 +605,7 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
         inst->fCode->accept(this);
         fTab--;
         back(1, *fOut);
-        *fOut << "EndWhileLoop";
+        *fOut << "EndWhileLoopInst";
         tab(fTab, *fOut);
     }
 
@@ -606,7 +623,7 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
         } else {
            tab(fTab, *fOut);
         }
-        *fOut << "EndBlock";
+        *fOut << "EndBlockInst";
         tab(fTab, *fOut);
     }
 
@@ -634,7 +651,7 @@ class FIRInstVisitor : public InstVisitor, public CStringTypeManager {
             fTab--;
             back(1, *fOut);
         }
-        *fOut << "EndSWitch";
+        *fOut << "EndSwitchInst";
         tab(fTab, *fOut);
     }
 };

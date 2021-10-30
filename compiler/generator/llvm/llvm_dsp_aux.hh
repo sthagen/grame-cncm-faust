@@ -52,7 +52,7 @@
 #define MovePTR(ptr) std::move(ptr)
 #define PASS_MANAGER legacy::PassManager
 #define FUNCTION_PASS_MANAGER legacy::FunctionPassManager
-#define sysfs_binary_flag sys::fs::F_None
+#define sysfs_binary_flag sys::fs::OF_None
 #define OwningPtr std::unique_ptr
 #define llvmcreatePrintModulePass(out) createPrintModulePass(out)
 #define GET_CPU_NAME llvm::sys::getHostCPUName().str()
@@ -136,7 +136,7 @@ class llvm_dsp_factory;
 class EXPORT llvm_dsp : public dsp {
    private:
     llvm_dsp_factory* fFactory;
-    JSONUITemplatedDecoder* fDecoder;
+    JSONUIDecoderBase* fDecoder;
     dsp_imp*          fDSP;
 
    public:
@@ -216,7 +216,7 @@ class llvm_dsp_factory_aux : public dsp_factory_imp {
     FaustObjectCache*       fObjectCache;
     llvm::Module*           fModule;
     llvm::LLVMContext*      fContext;
-    JSONUITemplatedDecoder* fDecoder;
+    JSONUIDecoderBase*      fDecoder;
 
     int         fOptLevel;
     std::string fTarget;
@@ -262,7 +262,7 @@ class llvm_dsp_factory_aux : public dsp_factory_imp {
     std::vector<std::string> getIncludePathnames();
 
     virtual bool initJIT(std::string& error_msg);
-    bool         initJITAux(std::string& error_msg);
+    bool         initJITAux();
 
     static llvm_dsp_factory* readDSPFactoryFromMachineAux(MEMORY_BUFFER buffer, const std::string& target,
                                                           std::string& error_msg);

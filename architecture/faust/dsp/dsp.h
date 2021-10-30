@@ -202,21 +202,66 @@ class dsp_factory {
     
 };
 
-/**
- * On Intel set FZ (Flush to Zero) and DAZ (Denormals Are Zero)
- * flags to avoid costly denormals.
- */
+// Denormal handling
 
-#ifdef __SSE__
-    #include <xmmintrin.h>
-    #ifdef __SSE2__
-        #define AVOIDDENORMALS _mm_setcsr(_mm_getcsr() | 0x8040)
-    #else
-        #define AVOIDDENORMALS _mm_setcsr(_mm_getcsr() | 0x8000)
-    #endif
-#else
-    #define AVOIDDENORMALS
+#if defined (__SSE__)
+#include <xmmintrin.h>
 #endif
 
+class ScopedNoDenormals
+{
+    private:
+    
+        intptr_t fpsr;
+        
+        void setFpStatusRegister(intptr_t fpsr_aux) noexcept
+        {
+        #if defined (__arm64__) || defined (__aarch64__)
+           asm volatile("msr fpcr, %0" : : "ri" (fpsr_aux));
+        #elif defined (__SSE__)
+            _mm_setcsr(static_cast<uint32_t>(fpsr_aux));
+        #endif
+        }
+        
+        void getFpStatusRegister() noexcept
+        {
+        #if defined (__arm64__) || defined (__aarch64__)
+            asm volatile("mrs %0, fpcr" : "=r" (fpsr));
+        #elif defined ( __SSE__)
+            fpsr = static_cast<intptr_t>(_mm_getcsr());
+        #endif
+        }
+    
+    public:
+    
+        ScopedNoDenormals() noexcept
+        {
+        #if defined (__arm64__) || defined (__aarch64__)
+            intptr_t mask = (1 << 24 /* FZ */);
+        #else
+            #if defined(__SSE__)
+            #if defined(__SSE2__)
+                intptr_t mask = 0x8040;
+            #else
+                intptr_t mask = 0x8000;
+            #endif
+            #else
+                intptr_t mask = 0x0000;
+            #endif
+        #endif
+            getFpStatusRegister();
+            setFpStatusRegister(fpsr | mask);
+        }
+        
+        ~ScopedNoDenormals() noexcept
+        {
+            setFpStatusRegister(fpsr);
+        }
+
+};
+
+#define AVOIDDENORMALS ScopedNoDenormals();
+
 #endif
+
 /************************** END dsp.h **************************/

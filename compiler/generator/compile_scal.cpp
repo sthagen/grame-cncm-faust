@@ -42,6 +42,7 @@
 #include "sigConstantPropagation.hh"
 #include "sigPromotion.hh"
 #include "sigToGraph.hh"
+#include "signal2vhdlVisitor.hh"
 #include "sigprint.hh"
 #include "sigtype.hh"
 #include "sigtyperules.hh"
@@ -97,6 +98,7 @@ Tree ScalarCompiler::prepare(Tree LS)
     endTiming("deBruijn2Sym");
 
     startTiming("L1 typeAnnotation");
+    // Annotate L1 with type information (needed by castAndPromotion(), but don't check causality)
     typeAnnotation(L1, gGlobal->gLocalCausalityCheck);
     endTiming("L1 typeAnnotation");
 
@@ -107,7 +109,7 @@ Tree ScalarCompiler::prepare(Tree LS)
     endTiming("Cast and Promotion");
 
     startTiming("second simplification");
-    Tree L2 = simplify(L1b);  // simplify by executing every computable operation
+    Tree L2 = simplify(L1b);  // Simplify by executing every computable operation
     endTiming("second simplification");
 
     startTiming("Constant propagation");
@@ -119,11 +121,11 @@ Tree ScalarCompiler::prepare(Tree LS)
     startTiming("privatise");
     Tree L3 = privatise(L2b);  // Un-share tables with multiple writers
     endTiming("privatise");
-    
+
     startTiming("conditionAnnotation");
     conditionAnnotation(L3);
     endTiming("conditionAnnotation");
-    // conditionStatistics(L3);        // count condition occurrences
+    // conditionStatistics(L3); // Count condition occurrences
 
     // dump normal form
     if (gGlobal->gDumpNorm) {
@@ -132,31 +134,37 @@ Tree ScalarCompiler::prepare(Tree LS)
     }
 
     startTiming("recursivnessAnnotation");
-    recursivnessAnnotation(L3); // Annotate L3 with recursivness information
+    recursivnessAnnotation(L3);  // Annotate L3 with recursivness information
     endTiming("recursivnessAnnotation");
 
     startTiming("typeAnnotation");
-    typeAnnotation(L3, true);   // Annotate L3 with type information
+    typeAnnotation(L3, true);    // Annotate L3 with type information
     endTiming("typeAnnotation");
 
     startTiming("sharingAnalysis");
-    sharingAnalysis(L3);        // annotate L3 with sharing count
+    sharingAnalysis(L3);         // Annotate L3 with sharing count
     endTiming("sharingAnalysis");
 
     startTiming("occurrences analysis");
-    if (fOccMarkup != 0) {
-        delete fOccMarkup;
-    }
+    delete fOccMarkup;
     fOccMarkup = new old_OccMarkup(fConditionProperty);
-    fOccMarkup->mark(L3);  // annotate L3 with occurrences analysis
+    fOccMarkup->mark(L3);  // Annotate L3 with occurrences analysis
     endTiming("occurrences analysis");
 
     endTiming("ScalarCompiler::prepare");
 
     if (gGlobal->gDrawSignals) {
         ofstream dotfile(subst("$0-sig.dot", gGlobal->makeDrawPath()).c_str());
-        // SL : 28/09/17 : deactivated for now
-        // sigToGraph(L3, dotfile);
+        sigToGraph(L3, dotfile);
+    }
+
+    // Generate VHDL if --vhdl option is set
+    if (gGlobal->gVHDLSwitch) {
+        Signal2VHDLVisitor V(fOccMarkup);
+        ofstream dotfile(subst("faust.vhd", gGlobal->makeDrawPath()).c_str());
+        V.sigToVHDL(L3, dotfile);
+        V.trace(gGlobal->gVHDLTrace, "VHDL");  // activate with --trace option
+        V.mapself(L3);
     }
 
     return L3;
@@ -430,8 +438,8 @@ string ScalarCompiler::generateCode(Tree sig)
         return generateOutput(sig, T(i), CS(x));
     }
 
-    else if (isSigFixDelay(sig, x, y)) {
-        return generateFixDelay(sig, x, y);
+    else if (isSigDelay(sig, x, y)) {
+        return generateDelay(sig, x, y);
     } else if (isSigPrefix(sig, x, y)) {
         return generatePrefix(sig, x, y);
     } else if (isSigIota(sig, x)) {
@@ -458,10 +466,8 @@ string ScalarCompiler::generateCode(Tree sig)
 
     else if (isSigSelect2(sig, sel, x, y)) {
         return generateSelect2(sig, sel, x, y);
-    } else if (isSigSelect3(sig, sel, x, y, z)) {
-        return generateSelect3(sig, sel, x, y, z);
     }
-
+    
     else if (isSigGen(sig, x)) {
         return generateSigGen(sig, x);
     }
@@ -469,7 +475,7 @@ string ScalarCompiler::generateCode(Tree sig)
     else if (isProj(sig, &i, x)) {
         return generateRecProj(sig, x, i);
     }
-
+    
     else if (isSigIntCast(sig, x)) {
         return generateIntCast(sig, x);
     } else if (isSigFloatCast(sig, x)) {
@@ -501,8 +507,8 @@ string ScalarCompiler::generateCode(Tree sig)
     } else if (isSigSoundfileRate(sig, sf, x)) {
         return generateCacheCode(sig, subst("$0cache->fSR[$1]", CS(sf), CS(x)));
     } else if (isSigSoundfileBuffer(sig, sf, x, y, z)) {
-        return generateCacheCode(sig,
-                                 subst("(($1)$0cache->fBuffers)[$2][$0cache->fOffset[$3]+$4]", CS(sf), ifloatptrptr(), CS(x), CS(y), CS(z)));
+        return generateCacheCode(sig, subst("(($1)$0cache->fBuffers)[$2][$0cache->fOffset[$3]+$4]", CS(sf),
+                                            ifloatptrptr(), CS(x), CS(y), CS(z)));
     }
 
     else if (isSigAttach(sig, x, y)) {
@@ -513,11 +519,18 @@ string ScalarCompiler::generateCode(Tree sig)
             throw faustexception("ERROR : 'control/enable' can only be used in scalar mode\n");
         }
         return generateControl(sig, x, y);
+	
+    } else if (isSigAssertBounds(sig, x, y, z)) {
+        /* no debug option for the moment */
+        return generateCode(z);
+    } else if (isSigLowest(sig, x) || isSigHighest(sig, x)) {
+        throw faustexception("ERROR : annotations should have been deleted in Simplification process\n");
     }
+    
     /* we should not have any control at this stage*/
     else {
         stringstream error;
-        error << "ERROR when compiling, unrecognized signal : " << ppsig(sig) << endl;
+        error << "ERROR when compiling, ScalarCompiler::generateCode unrecognized signal : " << ppsig(sig) << endl;
         throw faustexception(error.str());
     }
     return "error in generated code";
@@ -731,9 +744,9 @@ string ScalarCompiler::forceCacheCode(Tree sig, const string& exp)
 
 string ScalarCompiler::generateVariableStore(Tree sig, const string& exp)
 {
-    string vname, vname_perm, ctype;
-    Type   t = getCertifiedSigType(sig);
-    old_Occurences*    o = fOccMarkup->retrieve(sig);
+    string          vname, vname_perm, ctype;
+    Type            t = getCertifiedSigType(sig);
+    old_Occurences* o = fOccMarkup->retrieve(sig);
     faustassert(o);
 
     switch (t->variability()) {
@@ -988,6 +1001,7 @@ string ScalarCompiler::generateTable(Tree sig, Tree tsize, Tree content)
     // definition du nom et du type de la table
     // A REVOIR !!!!!!!!!
     Type t = getCertifiedSigType(content);  //, tEnv);
+    
     if (t->nature() == kInt) {
         vname = getFreshID("itbl");
         ctype = "int";
@@ -1039,6 +1053,7 @@ string ScalarCompiler::generateStaticTable(Tree sig, Tree tsize, Tree content)
     // definition du nom et du type de la table
     // A REVOIR !!!!!!!!!
     Type t = getCertifiedSigType(content);  //, tEnv);
+    
     if (t->nature() == kInt) {
         vname = getFreshID("itbl");
         ctype = "int";
@@ -1193,7 +1208,7 @@ string ScalarCompiler::generatePrefix(Tree sig, Tree x, Tree e)
     string vperm = getFreshID("M");
     string vtemp = getFreshID("T");
 
-    string type = old_cType(te);
+    string type = (te->nature() == kInt) ? "int" : ifloat();
 
     fClass->addDeclCode(subst("$0 \t$1;", type, vperm));
     fClass->addInitCode(subst("$0 = $1;", vperm, CS(x)));
@@ -1241,87 +1256,6 @@ string ScalarCompiler::generateSelect2(Tree sig, Tree sel, Tree s1, Tree s2)
 {
     return generateCacheCode(sig, subst("(($0)?$1:$2)", CS(sel), CS(s2), CS(s1)));
 }
-
-/**
- * Generate a select3 code (using if-then-else)
- * ((int n = sel==0)? s0 : ((sel==1)? s1 : s2))
- * int nn; ((nn=sel) ? ((nn==1)? s1 : s2) : s0);
- */
-string ScalarCompiler::generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3)
-{
-    return generateCacheCode(sig, subst("(($0==0)? $1 : (($0==1)?$2:$3) )", CS(sel), CS(s1), CS(s2), CS(s3)));
-}
-
-#if 0
-string ScalarCompiler::generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3)
-{
-    Type t = getCertifiedSigType(sig);
-    Type t1 = getCertifiedSigType(s1);
-    Type t2 = getCertifiedSigType(s2);
-    Type t3 = getCertifiedSigType(s3);
-    Type w = min(t1,min(t2,t3));
-
-    string type = old_cType(t);
-    string var = getFreshID("S");
-
-    switch (w->variability())
-    {
-        case kKonst:
-            fClass->addDeclCode(subst("$0 \t$1[3];", type, var));
-            break;
-        case kBlock:
-            //fClass->addLocalDecl(type, subst("$0[3]", var));
-            //fClass->addLocalVecDecl(type, var, 3);
-            fClass->addSharedDecl(var);
-            fClass->addZone1(subst("$0 \t$1[3];", type, var));
-            break;
-        case kSamp:
-            fClass->addExecCode(subst("$0 \t$1[3];", type, var));
-            break;
-    }
-
-    switch (t1->variability())
-    {
-        case kKonst:
-            fClass->addClearCode(subst("$0[0] = $1;", var, CS(s1)));
-            break;
-        case kBlock:
-            fClass->addZone2b(subst("$0[0] = $1;", var, CS(s1)));
-            break;
-        case kSamp:
-            fClass->addExecCode(subst("$0[0] = $1;", var, CS(s1)));
-            break;
-    }
-
-    switch (t2->variability())
-    {
-        case kKonst:
-            fClass->addClearCode(subst("$0[1] = $1;", var, CS(s2)));
-            break;
-        case kBlock:
-            fClass->addZone2b(subst("$0[1] = $1;", var, CS(s2)));
-            break;
-        case kSamp:
-            fClass->addExecCode(subst("$0[1] = $1;", var, CS(s2)));
-            break;
-    }
-
-    switch (t3->variability())
-    {
-        case kKonst:
-            fClass->addClearCode(subst("$0[2] = $1;", var, CS(s3)));
-            break;
-        case kBlock:
-            fClass->addZone2b(subst("$0[2] = $1;", var, CS(s3)));
-            break;
-        case kSamp:
-            fClass->addExecCode(subst("$0[2] = $1;", var, CS(s3)));
-            break;
-    }
-
-    return generateCacheCode(sig, subst("$0[$1]", var, CS(sel)));
-}
-#endif
 
 /*****************************************************************************
  EXTENDED
@@ -1381,11 +1315,11 @@ int ScalarCompiler::pow2limit(int x)
  * the maximum delay attached to exp.
  */
 
-string ScalarCompiler::generateFixDelay(Tree sig, Tree exp, Tree delay)
+string ScalarCompiler::generateDelay(Tree sig, Tree exp, Tree delay)
 {
-    // cerr << "ScalarCompiler::generateFixDelay sig = " << *sig << endl;
-    // cerr << "ScalarCompiler::generateFixDelay exp = " << *exp << endl;
-    // cerr << "ScalarCompiler::generateFixDelay del = " << *delay << endl;
+    // cerr << "ScalarCompiler::generateDelay sig = " << *sig << endl;
+    // cerr << "ScalarCompiler::generateDelay exp = " << *exp << endl;
+    // cerr << "ScalarCompiler::generateDelay del = " << *delay << endl;
 
     string code = CS(exp);  // ensure exp is compiled to have a vector name
     int    mxd  = fOccMarkup->retrieve(exp)->getMaxDelay();
@@ -1519,14 +1453,14 @@ void ScalarCompiler::generateDelayLine(const string& ctype, const string& vname,
     } else {
         // generate code for a long delay : we use a ring buffer of size N = 2**x > mxd
         int N = pow2limit(mxd + 1);
-        
+
         // we need an iota index
         fMaxIota = 0;
-        
+
         // declare and init
         fClass->addDeclCode(subst("$0 \t$1[$2];", ctype, vname, T(N)));
         fClass->addClearCode(subst("for (int i=0; i<$1; i++) $0[i] = 0;", vname, T(N)));
-        
+
         // execute
         fClass->addExecCode(Statement(ccs, subst("$0[IOTA&$1] = $2;", vname, T(N - 1), exp)));
     }

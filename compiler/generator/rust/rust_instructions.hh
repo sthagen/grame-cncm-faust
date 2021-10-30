@@ -127,6 +127,10 @@ class RustInstVisitor : public TextInstVisitor {
         fMathLibTable["coshf"]      = "F32::cosh";
         fMathLibTable["sinhf"]      = "F32::sinh";
         fMathLibTable["tanhf"]      = "F32::tanh";
+    
+        fMathLibTable["isnanf"]     = "F32::is_nan";
+        fMathLibTable["isinff"]     = "F32::is_infinite";
+        fMathLibTable["copysignf"]  = "F32::copysign";
 
         // Double version
         fMathLibTable["fabs"]      = "F64::abs";
@@ -159,6 +163,10 @@ class RustInstVisitor : public TextInstVisitor {
         fMathLibTable["cosh"]      = "F64::cosh";
         fMathLibTable["sinh"]      = "F64::sinh";
         fMathLibTable["tanh"]      = "F64::tanh";
+    
+        fMathLibTable["isnan"]     = "F64::is_nan";
+        fMathLibTable["isinf"]     = "F64::is_infinite";
+        fMathLibTable["copysign"]  = "F64::copysign";
     }
 
     virtual ~RustInstVisitor() {}
@@ -191,7 +199,7 @@ class RustInstVisitor : public TextInstVisitor {
         EndLine((inst->fAddress->getAccess() & Address::kStruct) ? ',' : ';');
     }
 
-    virtual void visit(DeclareBufferIteratorsRust* inst)
+    virtual void visit(DeclareBufferIterators* inst)
     {
         /* Generates an expression like:
         let (outputs0, outputs1) = if let [outputs0, outputs1, ..] = outputs {
@@ -206,7 +214,7 @@ class RustInstVisitor : public TextInstVisitor {
         // Don't generate if no channels
         if (inst->fNumChannels == 0) return;
         
-        std::string name = inst->fBufferName;
+        std::string name = inst->fBufferName2;
 
         // Build pattern matching + if let line
         *fOut << "let (";

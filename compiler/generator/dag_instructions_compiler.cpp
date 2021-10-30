@@ -87,10 +87,6 @@ void DAGInstructionsCompiler::compileMultiSignal(Tree L)
             Tree   sig  = hd(L);
             string name = subst("output$0", T(index));
 
-            // 09/12/11 : HACK
-            // int rate = getSigRate(sig);
-            int rate = 1;
-            fContainer->setOutputRate(index, rate);
             fContainer->openLoop("i");
 
             // Cast to external float
@@ -106,10 +102,6 @@ void DAGInstructionsCompiler::compileMultiSignal(Tree L)
             Tree   sig  = hd(L);
             string name = subst("output$0", T(index));
 
-            // 09/12/11 : HACK
-            // int rate = getSigRate(sig);
-            int rate = 1;
-            fContainer->setOutputRate(index, rate);
             fContainer->openLoop("i");
 
             // Cast to external float
@@ -173,11 +165,11 @@ ValueInst* DAGInstructionsCompiler::CS(Tree sig)
             // cerr << "CASE SH : fBackwardLoopDependencies.insert : " << tl << " --depend(A)son--> " << ls << endl;
             tl->addBackwardDependency(ls);
 
-        } else if (isSigFixDelay(sig, x, d) && fContainer->getLoopProperty(x, ls)) {
+        } else if (isSigDelay(sig, x, d) && fContainer->getLoopProperty(x, ls)) {
             // cerr << "CASE DL : fBackwardLoopDependencies.insert : " << tl << " --depend(B)son--> " << ls << endl;
             tl->addBackwardDependency(ls);
 
-        } else if (isSigFixDelay(sig, x, d) && isProj(x, &i, r) && fContainer->getLoopProperty(r, ls)) {
+        } else if (isSigDelay(sig, x, d) && isProj(x, &i, r) && fContainer->getLoopProperty(r, ls)) {
             // cerr << "CASE DR : fBackwardLoopDependencies.insert : " << tl << " --depend(B)son--> " << ls << endl;
             tl->addBackwardDependency(ls);
         }
@@ -348,7 +340,7 @@ ValueInst* DAGInstructionsCompiler::generateCacheCode(Tree sig, ValueInst* exp)
         } else {
             // not delayed
             Tree x, y;
-            if (sharing > 1 && isSigFixDelay(sig, x, y) && verySimple(y)) {
+            if (sharing > 1 && isSigDelay(sig, x, y) && verySimple(y)) {
                 // cerr << "SPECIAL CASE NO CACHE NEEDED : " << ppsig(sig) << endl;
                 return exp;
             } else if (sharing > 1 && !verySimple(sig)) {
@@ -389,7 +381,7 @@ bool DAGInstructionsCompiler::needSeparateLoop(Tree sig)
         b = true;
     } else if (verySimple(sig) || t->variability() < kSamp) {
         b = false;  // non sample computation never require a loop
-    } else if (isSigFixDelay(sig, x, y)) {
+    } else if (isSigDelay(sig, x, y)) {
         b = false;
     } else if (isProj(sig, &i, x)) {
         b = true;
@@ -440,7 +432,7 @@ ValueInst* DAGInstructionsCompiler::generateInput(Tree sig, int idx)
     }
 }
 
-ValueInst* DAGInstructionsCompiler::generateFixDelay(Tree sig, Tree exp, Tree delay)
+ValueInst* DAGInstructionsCompiler::generateDelay(Tree sig, Tree exp, Tree delay)
 {
     string     vname;
     ValueInst* code = CS(exp);  // ensure exp is compiled to have a vector name

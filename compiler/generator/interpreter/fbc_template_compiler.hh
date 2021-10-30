@@ -81,7 +81,7 @@ class FBCTemplateCompiler : public FBCExecuteFun<REAL> {
                     break;
              
                 case FBCInstruction::kLoadIndexedInt:
-         
+                    it++;
                     break;
              
                 case FBCInstruction::kStoreIndexedReal:
@@ -322,6 +322,18 @@ class FBCTemplateCompiler : public FBCExecuteFun<REAL> {
                     break;
 
                 case FBCInstruction::kTanhf:
+                    it++;
+                    break;
+                    
+                case FBCInstruction::kIsnanf:
+                    it++;
+                    break;
+                    
+                case FBCInstruction::kIsinff:
+                    it++;
+                    break;
+                    
+                case FBCInstruction::kCopysignf:
                     it++;
                     break;
 

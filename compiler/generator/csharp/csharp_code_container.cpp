@@ -160,7 +160,15 @@ void CSharpCodeContainer::produceClass()
 
     // Libraries
     printLibrary(*fOut);
-
+    tab(n, *fOut);
+    
+    if (gGlobal->gFloatSize == 1) {
+        *fOut << "public static bool IsInfinity(float d) { return Float.IsNegativeInfinity(float d) || Float.IsPositiveInfinity(float d); }";
+    } else if (gGlobal->gFloatSize == 2) {
+        *fOut << "public static bool IsInfinity(double d) { return Double.IsNegativeInfinity(double d) || Double.IsPositiveInfinity(double d); }";
+    }
+    tab(n, *fOut);
+    
     tab(n, *fOut);
     *fOut << "public class " << fKlassName << " : " << fSuperKlassName << ", " << "IFaustDSP";
     tab(n, *fOut);
@@ -171,7 +179,7 @@ void CSharpCodeContainer::produceClass()
     fCodeProducer.Tab(n + 1);
     generateGlobalDeclarations(&fCodeProducer);
 
-    // Sub containers
+    // Generate gub containers
     generateSubContainers();
 
     // Fields
@@ -353,17 +361,6 @@ void CSharpCodeContainer::produceInfoFunctions(int tabs, const string& classname
     producer->Tab(tabs);
     generateGetInputs(subst("GetNumInputs$0", classname), obj, ismethod, isvirtual)->accept(producer);
     generateGetOutputs(subst("GetNumOutputs$0", classname), obj, ismethod, isvirtual)->accept(producer);
-
-    /*
-    // 03/04/21: suppressed fo now
-    // Input Rates
-    producer->Tab(tabs);
-    generateGetInputRate(subst("GetInputRate$0", classname), obj, ismethod, isvirtual)->accept(producer);
-
-    // Output Rates
-    producer->Tab(tabs);
-    generateGetOutputRate(subst("GetOutputRate$0", classname), obj, ismethod, isvirtual)->accept(producer);
-    */
 }
 
 void CSharpScalarCodeContainer::generateCompute(int n)

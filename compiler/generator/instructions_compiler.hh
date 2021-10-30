@@ -179,7 +179,7 @@ class InstructionsCompiler : public virtual Garbageable {
     virtual ValueInst* generateCode(Tree sig);
 
     virtual ValueInst* generateXtended(Tree sig);
-    virtual ValueInst* generateFixDelay(Tree sig, Tree arg, Tree size);
+    virtual ValueInst* generateDelay(Tree sig, Tree arg, Tree size);
     virtual ValueInst* generatePrefix(Tree sig, Tree x, Tree e);
     virtual ValueInst* generateIota(Tree sig, Tree arg);
     virtual ValueInst* generateBinOp(Tree sig, int opcode, Tree arg1, Tree arg2);
@@ -197,7 +197,6 @@ class InstructionsCompiler : public virtual Garbageable {
     virtual ValueInst* generateStaticSigGen(Tree sig, Tree content);
 
     virtual ValueInst* generateSelect2(Tree sig, Tree sel, Tree s1, Tree s2);
-    virtual ValueInst* generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3);
 
     virtual ValueInst* generateRecProj(Tree sig, Tree exp, int i);
     virtual ValueInst* generateRec(Tree sig, Tree var, Tree le, int index = -1);

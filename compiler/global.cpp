@@ -108,9 +108,9 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     EVALPROPERTY   = symbol("EvalProperty");
     PMPROPERTYNODE = symbol("PMPROPERTY");
 
-    gResult          = 0;
-    gResult2         = 0;
-    gExpandedDefList = 0;
+    gResult          = nullptr;
+    gResult2         = nullptr;
+    gExpandedDefList = nullptr;
 
     gDetailsSwitch    = false;
     gDrawSignals      = false;
@@ -152,14 +152,16 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gLightMode  = false;
     gClang      = false;
     gCheckTable = "";
+    
+    gMathExceptions = false;
 
     gClassName      = "mydsp";
     gSuperClassName = "dsp";
     gProcessName    = "process";
 
-    gDSPFactory = 0;
+    gDSPFactory = nullptr;
 
-    gInputString = 0;
+    gInputString = nullptr;
 
     // Backend configuration : default values
     gAllowForeignFunction = true;
@@ -182,6 +184,9 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gComputeMix           = false;
     gFastMathLib          = "default";
     gNameSpace            = "";
+
+    gNarrowingLimit = 0;
+    gWideningLimit = 0;
 
     // Fastmath mapping float version
     gFastMathLibTable["fabsf"]      = "fast_fabsf";
@@ -252,9 +257,9 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gLocalCausalityCheck = false;
     gCausality           = false;
 
-    gOccurrences = 0;
+    gOccurrences = nullptr;
     gFoldingFlag = false;
-    gDevSuffix   = 0;
+    gDevSuffix   = nullptr;
 
     gAbsPrim       = new AbsPrim();
     gAcosPrim      = new AcosPrim();
@@ -348,9 +353,10 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     FFUN        = symbol("ForeignFunction");
 
     SIGINPUT           = symbol("SigInput");
+    gMaxInputs         = 0;
     SIGOUTPUT          = symbol("SigOutput");
     SIGDELAY1          = symbol("SigDelay1");
-    SIGFIXDELAY        = symbol("SigFixDelay");
+    SIGDELAY           = symbol("SigDelay");
     SIGPREFIX          = symbol("SigPrefix");
     SIGIOTA            = symbol("SigIota");
     SIGRDTBL           = symbol("SigRDTbl");
@@ -361,7 +367,9 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     SIGDOCWRITETBL     = symbol("SigDocWriteTbl");
     SIGDOCACCESSTBL    = symbol("SigDocAccessTbl");
     SIGSELECT2         = symbol("SigSelect2");
-    SIGSELECT3         = symbol("SigSelect3");
+    SIGASSERTBOUNDS    = symbol("sigAssertBounds");
+    SIGHIGHEST         = symbol("sigHighest");
+    SIGLOWEST          = symbol("sigLowest");
     SIGBINOP           = symbol("SigBinOp");
     SIGFFUN            = symbol("SigFFun");
     SIGFCONST          = symbol("SigFConst");
@@ -424,6 +432,10 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gInterpreterVisitor = nullptr;  // Will be (possibly) allocated in Interp backend
 #endif
 
+#ifdef JULIA_BUILD
+    gJuliaVisitor = nullptr;  // Will be (possibly) allocated in Julia backend
+#endif
+
 #ifdef SOUL_BUILD
     gTableSizeVisitor = nullptr;  // Will be (possibly) allocated in SOUL backend
 #endif
@@ -438,6 +450,9 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gGraphSwitch      = false;
     gDrawPSSwitch     = false;
     gDrawSVGSwitch    = false;
+    gVHDLSwitch       = false;
+    gVHDLTrace        = false;
+    gElementarySwitch = false;
     gPrintXMLSwitch   = false;
     gPrintJSONSwitch  = false;
     gPrintDocSwitch   = false;
@@ -486,15 +501,16 @@ void global::init()
     TEXEC = makeSimpleType(kInt, kKonst, kExec, kVect, kNum, interval());
 
     // More predefined types
-    TINPUT   = makeSimpleType(kReal, kSamp, kExec, kVect, kNum, interval());
+    TINPUT   = makeSimpleType(kReal, kSamp, kExec, kVect, kNum, interval(-1, 1));
     TGUI     = makeSimpleType(kReal, kBlock, kExec, kVect, kNum, interval());
     TGUI01   = makeSimpleType(kReal, kBlock, kExec, kVect, kNum, interval(0, 1));
     INT_TGUI = makeSimpleType(kInt, kBlock, kExec, kVect, kNum, interval());
 
-    TREC = makeSimpleType(kInt, kSamp, kInit, kScal, kNum, interval());
+    TREC = makeSimpleType(kInt, kSamp, kInit, kScal, kNum, interval(0, 0));
+    // !!! TRECMAX Maximal only in the last component of the type lattice
+    TRECMAX = makeSimpleType(kInt, kSamp, kInit, kScal, kNum, interval(-HUGE_VAL,HUGE_VAL));
 
     // empty Predefined bit depth
-
     RES = res();
 
     // Predefined symbols CONS and NIL
@@ -590,6 +606,10 @@ void global::init()
     gMathForeignFunctions["isinff"] = true;
     gMathForeignFunctions["isinf"]  = true;
     gMathForeignFunctions["isinfl"] = true;
+    
+    gMathForeignFunctions["copysignf"] = true;
+    gMathForeignFunctions["copysign"]  = true;
+    gMathForeignFunctions["copysignl"] = true;
 }
 
 static string printFloat()
@@ -637,9 +657,10 @@ void global::printCompilationOptions(stringstream& dst, bool backend)
     if (gOpenMPSwitch) dst << "-omp " << ((gOpenMPLoop) ? "-pl " : "");
     if (gVectorSwitch) {
         dst << "-vec "
-            << "-lv " << gVectorLoopVariant << " " << "-vs " << gVecSize << " " << ((gFunTaskSwitch) ? "-fun " : "")
-            << ((gGroupTaskSwitch) ? "-g " : "") << ((gDeepFirstSwitch) ? "-dfs " : "")
-            << printFloat() << "-ftz " << gFTZMode << " " << "-mcd " << gGlobal->gMaxCopyDelay;
+            << "-lv " << gVectorLoopVariant << " "
+            << "-vs " << gVecSize << " " << ((gFunTaskSwitch) ? "-fun " : "") << ((gGroupTaskSwitch) ? "-g " : "")
+            << ((gDeepFirstSwitch) ? "-dfs " : "") << printFloat() << "-ftz " << gFTZMode << " "
+            << "-mcd " << gGlobal->gMaxCopyDelay;
     } else {
         dst << printFloat() << "-ftz " << gFTZMode;
     }
@@ -733,20 +754,23 @@ global::~global()
 #ifdef CPP_BUILD
     CPPInstVisitor::cleanup();
 #endif
+#ifdef CSHARP_BUILD
+    CSharpInstVisitor::cleanup();
+#endif
+#ifdef DLANG_BUILD
+    DLangInstVisitor::cleanup();
+#endif
 #ifdef FIR_BUILD
     FIRInstVisitor::cleanup();
 #endif
 #ifdef JAVA_BUILD
     JAVAInstVisitor::cleanup();
 #endif
-#ifdef CSHARP_BUILD
-    CSharpInstVisitor::cleanup();
+#ifdef JULIS_BUILD
+    JuliaInstVisitor::cleanup();
 #endif
 #ifdef RUST_BUILD
     RustInstVisitor::cleanup();
-#endif
-#ifdef DLANG_BUILD
-    DLangInstVisitor::cleanup();
 #endif
 }
 

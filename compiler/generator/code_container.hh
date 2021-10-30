@@ -64,9 +64,6 @@ class CodeContainer : public virtual Garbageable {
 
     string fKlassName;
 
-    vector<int> fInputRates;
-    vector<int> fOutputRates;
-
     // Declaration part
     BlockInst* fExtGlobalDeclarationInstructions;
     BlockInst* fGlobalDeclarationInstructions;
@@ -212,12 +209,6 @@ class CodeContainer : public virtual Garbageable {
     void setInputs(int inputs) { fNumInputs = inputs; }
     void setOutputs(int outputs) { fNumOutputs = outputs; }
 
-    void setInputRate(int channel, int rate) { fInputRates[channel] = rate; }
-    void setOutputRate(int channel, int rate) { fOutputRates[channel] = rate; }
-
-    int getInputRate(int channel) { return fInputRates[channel]; }
-    int getOutputRate(int channel) { return fOutputRates[channel]; }
-
     void addSubContainer(CodeContainer* container) { fSubContainers.push_back(container); }
 
     void addIncludeFile(const string& str) { fIncludeFileSet.insert(str); }
@@ -249,9 +240,7 @@ class CodeContainer : public virtual Garbageable {
 
     DeclareFunInst* generateGetIORate(const string& name, const string& obj, vector<int>& io, bool ismethod,
                                       bool isvirtual);
-    DeclareFunInst* generateGetInputRate(const string& name, const string& obj, bool ismethod, bool isvirtual);
-    DeclareFunInst* generateGetOutputRate(const string& name, const string& obj, bool ismethod, bool isvirtual);
-
+  
     virtual DeclareFunInst* generateClassInit(const string& name)
     {
         faustassert(false);
@@ -285,6 +274,12 @@ class CodeContainer : public virtual Garbageable {
     DeclareFunInst* generateInit(const string& name, const string& obj, bool ismethod, bool isvirtual);
     DeclareFunInst* generateInstanceInit(const string& name, const string& obj, bool ismethod, bool isvirtual);
     DeclareFunInst* generateGetSampleRate(const string& name, const string& obj, bool ismethod, bool isvirtual);
+    
+    DeclareFunInst* generateCalloc();
+    DeclareFunInst* generateFree();
+    
+    DeclareFunInst* generateNewDsp(const string& name, int size);
+    DeclareFunInst* generateDeleteDsp(const string& name, const string& obj);
 
     void produceInfoFunctions(int tabs, const string& classname, const string& obj, bool ismethod, bool isvirtual,
                               TextInstVisitor* producer);
@@ -351,25 +346,9 @@ class CodeContainer : public virtual Garbageable {
     string generateJSON()
     {
         JSONInstVisitor<REAL> visitor;
-     
-        // Prepare compilation options
-        stringstream compile_options;
-        gGlobal->printCompilationOptions(compile_options);
-      
-        // "name", "filename" found in medata
-        visitor.init("", "", fNumInputs, fNumOutputs, -1, "", "", FAUSTVERSION, compile_options.str(),
-                     gGlobal->gReader.listLibraryFiles(), gGlobal->gImportDirList, -1, std::map<std::string, int>());
-     
-        generateUserInterface(&visitor);
-        generateMetaData(&visitor);
+        generateJSON(&visitor);
         return visitor.JSON(true);
     }
-
-    DeclareFunInst* generateCalloc();
-    DeclareFunInst* generateFree();
-
-    DeclareFunInst* generateNewDsp(const string& name, int size);
-    DeclareFunInst* generateDeleteDsp(const string& name, const string& obj);
 
     /* Can be overridden by subclasses to transform the FIR before the actual code generation */
     virtual void processFIR(void);

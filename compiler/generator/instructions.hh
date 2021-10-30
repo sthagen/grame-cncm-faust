@@ -53,7 +53,7 @@ struct Printable;
 struct NullValueInst;
 struct NullStatementInst;
 struct DeclareVarInst;
-struct DeclareBufferIteratorsRust;
+struct DeclareBufferIterators;
 struct DeclareFunInst;
 struct DeclareStructTypeInst;
 struct LoadVarInst;
@@ -174,10 +174,12 @@ inline bool isBoolType(Typed::VarType type)
 
 inline bool isIntOrPtrType(Typed::VarType type)
 {
-    return (type == Typed::kInt32 || type == Typed::kInt64 || type == Typed::kInt32_ptr || type == Typed::kInt64_ptr ||
-            type == Typed::kFloat_ptr || type == Typed::kFloat_ptr_ptr || type == Typed::kFloatMacro_ptr ||
-            type == Typed::kFloatMacro_ptr_ptr || type == Typed::kDouble_ptr || type == Typed::kObj_ptr ||
-            type == Typed::kVoid_ptr || type == Typed::kSound_ptr);
+    return (isIntType(type)
+            || isIntPtrType(type)
+            || isRealPtrType(type)
+            || type == Typed::kVoid_ptr
+            || type == Typed::kObj_ptr
+            || type == Typed::kSound_ptr);
 }
 
 DeclareStructTypeInst* isStructType(const string& name);
@@ -209,7 +211,7 @@ struct InstVisitor : public virtual Garbageable {
     virtual void visit(DeclareVarInst* inst) {}
     virtual void visit(DeclareFunInst* inst) {}
     virtual void visit(DeclareStructTypeInst* inst) {}
-    virtual void visit(DeclareBufferIteratorsRust* inst) {}
+    virtual void visit(DeclareBufferIterators* inst) {}
 
     // Memory
     virtual void visit(LoadVarInst* inst) {}
@@ -283,7 +285,7 @@ struct CloneVisitor : public virtual Garbageable {
     virtual StatementInst* visit(DeclareVarInst* inst)        = 0;
     virtual StatementInst* visit(DeclareFunInst* inst)        = 0;
     virtual StatementInst* visit(DeclareStructTypeInst* inst) = 0;
-    virtual StatementInst* visit(DeclareBufferIteratorsRust* inst) = 0;
+    virtual StatementInst* visit(DeclareBufferIterators* inst) = 0;
 
     // Memory
     virtual ValueInst*     visit(LoadVarInst* inst)        = 0;
@@ -798,16 +800,17 @@ struct DeclareVarInst : public StatementInst {
     struct LoadVarInst*  load();
 };
 
-struct DeclareBufferIteratorsRust : public StatementInst {
-    std::string fBufferName;
+struct DeclareBufferIterators : public StatementInst {
+    std::string fBufferName1;
+    std::string fBufferName2;
     int         fNumChannels;
     bool        fMutable;
 
-    DeclareBufferIteratorsRust(const std::string& buffer_name, int num_channels, bool mut) :
-        fBufferName(buffer_name), fNumChannels(num_channels), fMutable(mut)
+    DeclareBufferIterators(const std::string& name1, const std::string& name2, int num_channels, bool mut) :
+        fBufferName1(name1), fBufferName2(name2), fNumChannels(num_channels), fMutable(mut)
         {};
 
-    virtual ~DeclareBufferIteratorsRust() {}
+    virtual ~DeclareBufferIterators() {}
 
     void accept(InstVisitor* visitor) { visitor->visit(this); }
 
@@ -844,7 +847,8 @@ struct LoadVarInst : public ValueInst {
 
     ValueInst* clone(CloneVisitor* cloner) { return cloner->visit(this); }
 
-    virtual bool isSimpleValue() const { return dynamic_cast<NamedAddress*>(fAddress); }
+    virtual bool isSimpleValue() const;
+
 };
 
 struct LoadVarAddressInst : public ValueInst {
@@ -1304,8 +1308,8 @@ struct SimpleForLoopInst : public StatementInst {
     const bool   fReverse;
     BlockInst* fCode;
 
-    SimpleForLoopInst(const string& index, ValueInst* upperBound, ValueInst* lowerBound, bool reverse, BlockInst* code)
-        : fUpperBound(upperBound), fLowerBound(lowerBound), fName(index), fReverse(reverse), fCode(code)
+    SimpleForLoopInst(const string& name, ValueInst* upperBound, ValueInst* lowerBound, bool reverse, BlockInst* code)
+        : fUpperBound(upperBound), fLowerBound(lowerBound), fName(name), fReverse(reverse), fCode(code)
     {
     }
 
@@ -1386,9 +1390,9 @@ class BasicCloneVisitor : public CloneVisitor {
     {
         return new DeclareStructTypeInst(static_cast<StructTyped*>(inst->fType->clone(this)));
     }
-    virtual StatementInst* visit(DeclareBufferIteratorsRust* inst)
+    virtual StatementInst* visit(DeclareBufferIterators* inst)
     {
-        return new DeclareBufferIteratorsRust(inst->fBufferName, inst->fNumChannels, inst->fMutable);
+        return new DeclareBufferIterators(inst->fBufferName1, inst->fBufferName2, inst->fNumChannels, inst->fMutable);
     }
 
     // Memory
@@ -1689,11 +1693,15 @@ struct DispatchVisitor : public InstVisitor {
     virtual void visit(SimpleForLoopInst* inst)
     {
         inst->fUpperBound->accept(this);
+        inst->fLowerBound->accept(this);
         inst->fCode->accept(this);
     }
 
     virtual void visit(IteratorForLoopInst* inst)
     {
+        for (const auto& it : inst->fIterators) {
+            it->accept(this);
+        }
         inst->fCode->accept(this);
     }
 
@@ -1955,9 +1963,9 @@ struct InstBuilder {
         return new DeclareStructTypeInst(type);
     }
 
-    static DeclareBufferIteratorsRust* genDeclareBufferIteratorsRust(const std::string& buffer_name, int num_channels, bool mut)
+    static DeclareBufferIterators* genDeclareBufferIterators(const std::string& name1, const std::string& name2, int num_channels, bool mut)
     {
-        return new DeclareBufferIteratorsRust(buffer_name, num_channels, mut);
+        return new DeclareBufferIterators(name1, name2, num_channels, mut);
     }
 
     // Memory
@@ -2155,13 +2163,13 @@ struct InstBuilder {
     }
 
     // Used for Rust backend
-    static SimpleForLoopInst* genSimpleForLoopInst(const string& index, ValueInst* upperBound,
+    static SimpleForLoopInst* genSimpleForLoopInst(const string& name, ValueInst* upperBound,
                                                    ValueInst* lowerBound = new Int32NumInst(0), bool reverse = false,
                                                    BlockInst* code = new BlockInst())
     {
         faustassert(dynamic_cast<Int32NumInst*>(upperBound) || dynamic_cast<LoadVarInst*>(upperBound));
         faustassert(dynamic_cast<Int32NumInst*>(lowerBound) || dynamic_cast<LoadVarInst*>(lowerBound));
-        return new SimpleForLoopInst(index, upperBound, lowerBound, reverse, code);
+        return new SimpleForLoopInst(name, upperBound, lowerBound, reverse, code);
     }
     static IteratorForLoopInst* genIteratorForLoopInst(const std::vector<NamedAddress*>& iterators, bool reverse = false,
                                                        BlockInst* code = new BlockInst())

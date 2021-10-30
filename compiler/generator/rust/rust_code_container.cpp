@@ -71,10 +71,8 @@ CodeContainer* RustCodeContainer::createContainer(const string& name, int numInp
     }
 
     if (gGlobal->gOpenMPSwitch) {
-        // container = new RustOpenMPCodeContainer(name, numInputs, numOutputs, dst);
         throw faustexception("ERROR : OpenMP not supported for Rust\n");
     } else if (gGlobal->gSchedulerSwitch) {
-        // container = new RustWorkStealingCodeContainer(name, numInputs, numOutputs, dst);
         throw faustexception("ERROR : Scheduler not supported for Rust\n");
     } else if (gGlobal->gVectorSwitch) {
         // container = new RustVectorCodeContainer(name, numInputs, numOutputs, dst);
@@ -167,7 +165,7 @@ void RustCodeContainer::produceClass()
 {
     int n = 0;
 
-    // Sub containers
+    // Generate gub containers
     generateSubContainers();
 
     // Functions
@@ -393,17 +391,6 @@ void RustCodeContainer::produceInfoFunctions(int tabs, const string& classname, 
     producer->Tab(tabs);
     generateGetInputs(subst("get_num_inputs$0", classname), obj, false, false)->accept(&fCodeProducer);
     generateGetOutputs(subst("get_num_outputs$0", classname), obj, false, false)->accept(&fCodeProducer);
-    
-    /*
-    // 03/04/21: suppressed for now
-    // Input Rates
-    producer->Tab(tabs);
-    generateGetInputRate(subst("get_input_rate$0", classname), obj, false, false)->accept(&fCodeProducer);
-    
-    // Output Rates
-    producer->Tab(tabs);
-    generateGetOutputRate(subst("get_output_rate$0", classname), obj, false, false)->accept(&fCodeProducer);
-    */
 }
 
 void RustCodeContainer::produceParameterGetterSetter(int tabs, map<string, int> parameterLookup)
@@ -474,7 +461,7 @@ void RustScalarCodeContainer::generateCompute(int n)
         iterators.push_back("inputs" + std::to_string(i));
     }
     for (int i = 0; i < fNumOutputs; ++i) {
-        iterators.push_back("outputs"+ std::to_string(i));
+        iterators.push_back("outputs" + std::to_string(i));
     }
     IteratorForLoopInst* loop = fCurLoop->generateSimpleScalarLoop(iterators);
     loop->accept(&fCodeProducer);

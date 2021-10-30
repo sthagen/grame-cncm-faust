@@ -836,7 +836,7 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
 
         } else if (state == 1) {
             if (*src == 0) {
-                // fin et pas d'indentifiant, abandon
+                // end and no identifier, stops
                 dst += '%';
                 dst += format;
                 state = -1;
@@ -847,7 +847,7 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
                 ident += *src++;
                 state = 2;
             } else {
-                // caractere de ponctuation et pas d'indentifiant, abandon
+                // punctuation character and no identifier, stops
                 dst += '%';
                 dst += format;
                 state = 0;
@@ -1183,8 +1183,6 @@ static Tree applyList(Tree fun, Tree larg)
 }
 
 /**
- * Eval a list of expression in reverse order
- *
  * Eval a list of expressions returning the list of results in reverse order.
  *
  * @param lexp list of expressions to evaluate
@@ -1403,7 +1401,7 @@ static Tree boxSimplification(Tree box)
     } else {
         simplified = numericBoxSimplification(box);
 
-        // transferts name property if any
+        // transfers name property if any
         Tree name;
         if (getDefNameProperty(box, name)) setDefNameProperty(simplified, name);
 
@@ -1586,7 +1584,6 @@ static Tree insideBoxSimplification(Tree box)
 
     else if (isBoxSlot(box)) {
         return box;
-        ;
     }
 
     else if (isBoxSymbolic(box, slot, body)) {
@@ -1631,5 +1628,5 @@ static Tree insideBoxSimplification(Tree box)
     stringstream error;
     error << "ERROR in file " << __FILE__ << ':' << __LINE__ << ", unrecognised box expression : " << *box << endl;
     throw faustexception(error.str());
-    return 0;
+    return nullptr;
 }

@@ -168,7 +168,7 @@ static Tree makeDefinition(Tree symbol, list<Tree>& variants)
 	}
 }
 
-// add function metadata (using a boxMetadata construction) to a list of definitions
+// Add function metadata (using a boxMetadata construction) to a list of definitions
 static Tree addFunctionMetadata(Tree ldef, FunMDSet& M)
 {
     Tree lresult = gGlobal->nil; // the transformed list of definitions
@@ -383,7 +383,7 @@ vector<string> SourceReader::listSrcFiles()
 vector<string> SourceReader::listLibraryFiles()
 {
     vector<string> tmp = fFilePathnames;
-    tmp.erase(tmp.begin());
+    if (tmp.size() > 0) tmp.erase(tmp.begin());
     return tmp;
 }
 

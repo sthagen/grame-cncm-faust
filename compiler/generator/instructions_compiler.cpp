@@ -29,6 +29,7 @@
 #include "global.hh"
 #include "instructions.hh"
 #include "instructions_compiler.hh"
+#include "instructions_compiler1.hh"
 #include "ppsig.hh"
 #include "prim2.hh"
 #include "privatise.hh"
@@ -36,6 +37,8 @@
 #include "sigConstantPropagation.hh"
 #include "sigPromotion.hh"
 #include "sigToGraph.hh"
+#include "signal2vhdlVisitor.hh"
+#include "signal2Elementary.hh"
 #include "sigprint.hh"
 #include "sigtyperules.hh"
 #include "simplify.hh"
@@ -55,7 +58,7 @@ InstructionsCompiler::InstructionsCompiler(CodeContainer* container)
     : fContainer(container),
       fSharingKey(nullptr),
       fOccMarkup(nullptr),
-      fUIRoot(uiFolder(cons(tree(0), tree(subst("$0", ""))), gGlobal->nil)),
+      fUIRoot(uiFolder(cons(tree(0), tree("")))),
       fDescription(0),
       fHasIota(false)
 {
@@ -93,8 +96,6 @@ void InstructionsCompiler::sharingAnalysis(Tree t)
 
 void InstructionsCompiler::sharingAnnotation(int vctxt, Tree sig)
 {
-    Tree c, x, y, z;
-
     // cerr << "START sharing annotation of " << *sig << endl;
     int count = getSharingCount(sig);
 
@@ -113,22 +114,11 @@ void InstructionsCompiler::sharingAnnotation(int vctxt, Tree sig)
             setSharingCount(sig, 1);  // regular occurence
         }
 
-        if (isSigSelect3(sig, c, y, x, z)) {
-            // make a special case for select3 implemented with real if
-            // because the c expression will be used twice in the C++
-            // translation
-            sharingAnnotation(v, c);
-            sharingAnnotation(v, c);
-            sharingAnnotation(v, x);
-            sharingAnnotation(v, y);
-            sharingAnnotation(v, z);
-        } else {
-            // Annotate the sub signals
-            vector<Tree> subsig;
-            int          n = getSubSignals(sig, subsig);
-            if (n > 0 && !isSigGen(sig)) {
-                for (int i = 0; i < n; i++) sharingAnnotation(v, subsig[i]);
-            }
+        // Annotate the sub signals
+        vector<Tree> subsig;
+        int          n = getSubSignals(sig, subsig);
+        if (n > 0 && !isSigGen(sig)) {
+            for (int i = 0; i < n; i++) sharingAnnotation(v, subsig[i]);
         }
     }
     // cerr << "END sharing annotation of " << *sig << endl;
@@ -237,8 +227,8 @@ Tree InstructionsCompiler::prepare(Tree LS)
     endTiming("deBruijn2Sym");
 
     startTiming("L1 typeAnnotation");
-    typeAnnotation(L1, gGlobal->gLocalCausalityCheck);  // Annotate L1 with type information (needed by
-                                                        // castAndPromotion(), but don't check causality)
+    // Annotate L1 with type information (needed by castAndPromotion(), but don't check causality)
+    typeAnnotation(L1, gGlobal->gLocalCausalityCheck);
     endTiming("L1 typeAnnotation");
 
     startTiming("Cast and Promotion");
@@ -260,7 +250,7 @@ Tree InstructionsCompiler::prepare(Tree LS)
     startTiming("privatise");
     Tree L5 = privatise(L4);  // Un-share tables with multiple writers
     endTiming("privatise");
-    
+
     startTiming("conditionAnnotation");
     conditionAnnotation(L5);
     endTiming("conditionAnnotation");
@@ -282,7 +272,7 @@ Tree InstructionsCompiler::prepare(Tree LS)
     startTiming("sharingAnalysis");
     sharingAnalysis(L5);         // Annotate L5 with sharing count
     endTiming("sharingAnalysis");
-    
+
     startTiming("occurrences analysis");
     delete fOccMarkup;
     fOccMarkup = new old_OccMarkup(fConditionProperty);
@@ -295,6 +285,24 @@ Tree InstructionsCompiler::prepare(Tree LS)
         ofstream dotfile(subst("$0-sig.dot", gGlobal->makeDrawPath()).c_str());
         sigToGraph(L5, dotfile);
     }
+
+    // Generate VHDL if -vhdl option is set
+    if (gGlobal->gVHDLSwitch) {
+        Signal2VHDLVisitor V(fOccMarkup);
+        ofstream vhdl_file(subst("faust.vhd", gGlobal->makeDrawPath()).c_str());
+        V.sigToVHDL(L5, vhdl_file);
+        V.trace(gGlobal->gVHDLTrace, "VHDL");  // activate with --trace option
+        V.mapself(L5);
+    }
+
+    // Experimental : generate Elementary code if -elm option is set
+    if (gGlobal->gElementarySwitch) {
+        Signal2Elementary V;
+        ofstream js_file(subst("$0-el.js", gGlobal->makeDrawPath()).c_str());
+        V.sig2Elementary(L5, js_file);
+        V.mapself(L5);
+    }
+    
     return L5;
 }
 
@@ -405,9 +413,15 @@ CodeContainer* InstructionsCompiler::signal2Container(const string& name, Tree s
 {
     ::Type t = getCertifiedSigType(sig);
 
-    CodeContainer*       container = fContainer->createScalarContainer(name, t->nature());
-    InstructionsCompiler C(container);
-    C.compileSingleSignal(sig);
+    CodeContainer* container = fContainer->createScalarContainer(name, t->nature());
+    
+    if (gGlobal->gOutputLang == "rust" || gGlobal->gOutputLang == "julia") {
+        InstructionsCompiler1 C(container);
+        C.compileSingleSignal(sig);
+    } else {
+        InstructionsCompiler C(container);
+        C.compileSingleSignal(sig);
+    }
     return container;
 }
 
@@ -502,9 +516,9 @@ void InstructionsCompiler::compileMultiSignal(Tree L)
     if (!gGlobal->gOpenCLSwitch && !gGlobal->gCUDASwitch) {  // HACK
 
         // Input declarations
-        if (gGlobal->gOutputLang == "rust") {
-            // special handling for Rust backend
-            pushComputeBlockMethod(InstBuilder::genDeclareBufferIteratorsRust("inputs", fContainer->inputs(), false));
+        if (gGlobal->gOutputLang == "rust" || gGlobal->gOutputLang == "julia") {
+            // special handling for Rust and Julia backends
+            pushComputeBlockMethod(InstBuilder::genDeclareBufferIterators("input", "inputs", fContainer->inputs(), false));
         } else {
             // "input" and "inputs" used as a name convention
             if (gGlobal->gOneSampleControl) {
@@ -516,7 +530,7 @@ void InstructionsCompiler::compileMultiSignal(Tree L)
                     }
                 }
             } else if (gGlobal->gOneSample >= 0) {
-                // Nothing...
+            // Nothing...
             } else {
                 for (int index = 0; index < fContainer->inputs(); index++) {
                     string name = subst("input$0", T(index));
@@ -531,9 +545,9 @@ void InstructionsCompiler::compileMultiSignal(Tree L)
         }
 
         // Output declarations
-        if (gGlobal->gOutputLang == "rust") {
-            // special handling for Rust backend
-            pushComputeBlockMethod(InstBuilder::genDeclareBufferIteratorsRust("outputs", fContainer->outputs(), true));
+        if (gGlobal->gOutputLang == "rust" || gGlobal->gOutputLang == "julia") {
+            // special handling for Rust and Julia backends
+            pushComputeBlockMethod(InstBuilder::genDeclareBufferIterators("output", "outputs", fContainer->outputs(), true));
         } else {
             // "output" and "outputs" used as a name convention
             if (gGlobal->gOneSampleControl) {
@@ -542,7 +556,7 @@ void InstructionsCompiler::compileMultiSignal(Tree L)
                     pushDeclare(InstBuilder::genDecStructVar(name, InstBuilder::genArrayTyped(type, 0)));
                 }
             } else if (gGlobal->gOneSample >= 0) {
-                // Nothing...
+            // Nothing...
             } else {
                 for (int index = 0; index < fContainer->outputs(); index++) {
                     string name = subst("output$0", T(index));
@@ -590,17 +604,13 @@ void InstructionsCompiler::compileMultiSignal(Tree L)
                 pushComputeDSPMethod(InstBuilder::genStoreArrayStackVar(name, getCurrentLoopIndex(), res));
             }
         }
-
-        // 09/12/11 : HACK
-        // int rate = getSigRate(sig);
-        int rate = 1;
-        fContainer->setOutputRate(index, rate);
     }
 
-    generateUserInterfaceTree(prepareUserInterfaceTree(fUIRoot), true);
-    generateMacroInterfaceTree("", prepareUserInterfaceTree(fUIRoot));
+    Tree ui = InstructionsCompiler::prepareUserInterfaceTree(fUIRoot);
+    generateUserInterfaceTree(ui, true);
+    generateMacroInterfaceTree("", ui);
     if (fDescription) {
-        fDescription->ui(prepareUserInterfaceTree(fUIRoot));
+        fDescription->ui(ui);
     }
 
     // Apply FIR to FIR transformations
@@ -633,10 +643,11 @@ void InstructionsCompiler::compileSingleSignal(Tree sig)
 
     pushComputeDSPMethod(InstBuilder::genStoreArrayFunArgsVar(name, getCurrentLoopIndex(), CS(sig)));
 
-    generateUserInterfaceTree(prepareUserInterfaceTree(fUIRoot));
-    generateMacroInterfaceTree("", prepareUserInterfaceTree(fUIRoot));
+    Tree ui = InstructionsCompiler::prepareUserInterfaceTree(fUIRoot);
+    generateUserInterfaceTree(ui);
+    generateMacroInterfaceTree("", ui);
     if (fDescription) {
-        fDescription->ui(prepareUserInterfaceTree(fUIRoot));
+        fDescription->ui(ui);
     }
 }
 
@@ -680,8 +691,8 @@ ValueInst* InstructionsCompiler::generateCode(Tree sig)
         return generateInput(sig, i);
     }
 
-    else if (isSigFixDelay(sig, x, y)) {
-        return generateFixDelay(sig, x, y);
+    else if (isSigDelay(sig, x, y)) {
+        return generateDelay(sig, x, y);
     } else if (isSigPrefix(sig, x, y)) {
         return generatePrefix(sig, x, y);
     } else if (isSigIota(sig, x)) {
@@ -708,8 +719,6 @@ ValueInst* InstructionsCompiler::generateCode(Tree sig)
 
     else if (isSigSelect2(sig, sel, x, y)) {
         return generateSelect2(sig, sel, x, y);
-    } else if (isSigSelect3(sig, sel, x, y, z)) {
-        return generateSelect3(sig, sel, x, y, z);
     }
 
     else if (isSigGen(sig, x)) {
@@ -757,30 +766,18 @@ ValueInst* InstructionsCompiler::generateCode(Tree sig)
     else if (isSigAttach(sig, x, y)) {
         CS(y);
         return generateCacheCode(sig, CS(x));
-        /*
-        HACK : 09/12/11
-        else if (isSigVectorize(sig, x, y)) {
-        printf("vectorize not implemented\n");
-        exit(0);
-        }
-        else if (isSigSerialize(sig, x)) {
-        printf("serialize not implemented\n");
-        exit(0);
-        }
-        else if (isSigConcat(sig, x, y)) {
-        printf("concatenation not implemented\n");
-        exit(0);
-        }
-        else if (isSigVectorAt(sig, x, y)) {
-        printf("vector at not implemented\n");
-        exit(0);
-        }
-        */
+       
     } else if (isSigControl(sig, x, y)) {
         if (gGlobal->gVectorSwitch) {
             throw faustexception("ERROR : 'control/enable' can only be used in scalar mode\n");
         }
         return generateControl(sig, x, y);
+        
+    } else if (isSigAssertBounds(sig, x, y, z)) {
+        /* no debug option for the moment */
+        return generateCode(z);
+    } else if (isSigLowest(sig, x) || isSigHighest(sig, x)) {
+        throw faustexception("ERROR : annotations should have been deleted in Simplification process\n");
     } else {
         stringstream error;
         error << "ERROR when compiling, unrecognized signal : " << ppsig(sig) << endl;
@@ -905,26 +902,21 @@ ValueInst* InstructionsCompiler::generateFVar(Tree sig, Tree type, const string&
 
 ValueInst* InstructionsCompiler::generateInput(Tree sig, int idx)
 {
-    // 09/12/11 : HACK
-    // int rate = getSigRate(sig);
-    int rate = 1;
-    fContainer->setInputRate(idx, rate);
-
     // Cast to internal float
     ValueInst* res;
     // HACK for Rust backend
     if (gGlobal->gOutputLang == "rust") {
-        res = InstBuilder::genCastFloatInst(
-            InstBuilder::genLoadStackVar(subst("*input$0", T(idx))));
+        res = InstBuilder::genLoadStackVar(subst("*input$0", T(idx)));
     } else if (gGlobal->gOneSampleControl) {
-        res = InstBuilder::genCastFloatInst(InstBuilder::genLoadStructVar(subst("input$0", T(idx))));
+        res = InstBuilder::genLoadStructVar(subst("input$0", T(idx)));
     } else if (gGlobal->gOneSample >= 0) {
-        res = InstBuilder::genCastFloatInst(
-            InstBuilder::genLoadArrayStackVar("inputs", InstBuilder::genInt32NumInst(idx)));
+        res = InstBuilder::genLoadArrayStackVar("inputs", InstBuilder::genInt32NumInst(idx));
     } else {
-        res = InstBuilder::genCastFloatInst(
-            InstBuilder::genLoadArrayStackVar(subst("input$0", T(idx)), getCurrentLoopIndex()));
+        res = InstBuilder::genLoadArrayStackVar(subst("input$0", T(idx)), getCurrentLoopIndex());
     }
+    
+    // Cast to internal float
+    res = InstBuilder::genCastFloatInst(res);
 
     if (gGlobal->gInPlace) {
         // inputs must be cached for in-place transformations
@@ -947,15 +939,6 @@ ValueInst* InstructionsCompiler::generateBinOp(Tree sig, int opcode, Tree a1, Tr
     ValueInst* res;
     ValueInst* v1 = CS(a1);
     ValueInst* v2 = CS(a2);
-
-    /*
-    interval i = getCertifiedSigType(a1)->getInterval();
-    interval j = getCertifiedSigType(a2)->getInterval();
-    if (j.haszero()) {
-        // potential division by zero
-        cerr << "WARNING : potential division by zero (" << i << "/" << j << ") in " << ppsig(sig) << endl;
-    }
-    */
 
     // Logical and shift operations work on kInt32, so cast both operands here
     if (isLogicalOpcode(opcode) || isShiftOpcode(opcode)) {
@@ -995,12 +978,12 @@ ValueInst* InstructionsCompiler::generateFFun(Tree sig, Tree ff, Tree largs)
     fContainer->addIncludeFile(ffincfile(ff));
     fContainer->addLibrary(fflibfile(ff));
     string funname = ffname(ff);
-    
+
     if (gGlobal->gAllowForeignFunction || gGlobal->hasMathForeignFunction(funname)) {
-        
+
         list<ValueInst*>  args_value;
         list<NamedTyped*> args_types;
-        
+
         for (int i = 0; i < ffarity(ff); i++) {
             Tree parameter = nth(largs, i);
             // Reversed...
@@ -1009,11 +992,11 @@ ValueInst* InstructionsCompiler::generateFFun(Tree sig, Tree ff, Tree largs)
             args_types.push_back(InstBuilder::genNamedTyped("dummy" + to_string(i), argtype));
             args_value.push_back(InstBuilder::genCastInst(CS(parameter), argtype));
         }
-        
+
         // Add function declaration
         FunTyped* fun_type = InstBuilder::genFunTyped(args_types, genBasicFIRTyped(ffrestype(ff)));
         pushExtGlobalDeclare(InstBuilder::genDeclareFunInst(funname, fun_type));
-        
+
         return generateCacheCode(sig, InstBuilder::genCastInst(InstBuilder::genFunCallInst(funname, args_value),
                                                                genBasicFIRTyped(ffrestype(ff))));
     } else {
@@ -1491,8 +1474,8 @@ ValueInst* InstructionsCompiler::generateTable(Tree sig, Tree tsize, Tree conten
             kvnames.second, InstBuilder::genNamedTyped(kvnames.first, InstBuilder::genBasicTyped(Typed::kObj_ptr)),
             obj));
 
-        // HACK for Rust backend
-        if (gGlobal->gOutputLang != "rust") {
+        // HACK for Rust and Julia backends
+        if (gGlobal->gOutputLang != "rust" && gGlobal->gOutputLang != "julia") {
             // Delete object
             list<ValueInst*> args3;
             if (gGlobal->gMemoryManager) {
@@ -1565,8 +1548,8 @@ ValueInst* InstructionsCompiler::generateStaticTable(Tree sig, Tree tsize, Tree 
                 kvnames.second, InstBuilder::genNamedTyped(kvnames.first, InstBuilder::genBasicTyped(Typed::kObj_ptr)),
                 obj));
 
-            // HACK for Rust backend
-            if (gGlobal->gOutputLang != "rust") {
+            // HACK for Rust and Julia backends
+            if (gGlobal->gOutputLang != "rust" && gGlobal->gOutputLang != "julia") {
                 // Delete object
                 list<ValueInst*> args3;
                 if (gGlobal->gMemoryManager) {
@@ -1644,12 +1627,15 @@ ValueInst* InstructionsCompiler::generateWRTbl(Tree sig, Tree tbl, Tree idx, Tre
             interval idx_i = getCertifiedSigType(idx)->getInterval();
             if (idx_i.lo < 0 || idx_i.hi >= tree2int(size)) {
                 stringstream error;
-                error << "ERROR : WRTbl write index [" << idx_i.lo << ":" <<idx_i.hi
-                      << "] is outside of table range (" << tree2int(size) << ") in "
-                      << *sig << endl;
                 if (gGlobal->gCheckTable == "cat") {
+                    error << "WARNING : WRTbl write index [" << idx_i.lo << ":" <<idx_i.hi
+                          << "] is outside of table range (" << tree2int(size) << ") in "
+                          << *sig << endl;
                     cerr << error.str();
                 } else {
+                    error << "ERROR : WRTbl write index [" << idx_i.lo << ":" <<idx_i.hi
+                          << "] is outside of table range (" << tree2int(size) << ") in "
+                          << *sig << endl;
                     throw faustexception(error.str());
                 }
             }
@@ -1701,12 +1687,16 @@ ValueInst* InstructionsCompiler::generateRDTbl(Tree sig, Tree tbl, Tree idx)
             interval idx_i = getCertifiedSigType(idx)->getInterval();
             if (idx_i.lo < 0 || (idx_i.hi >= tree2int(size))) {
                 stringstream error;
-                error << "ERROR : RDTbl read index [" << idx_i.lo << ":" <<idx_i.hi
-                      << "] is outside of table range (" << tree2int(size) << ") in "
-                      << *sig << endl;
+                
                 if (gGlobal->gCheckTable == "cat") {
+                    error << "WARNING : RDTbl read index [" << idx_i.lo << ":" <<idx_i.hi
+                          << "] is outside of table range (" << tree2int(size) << ") in "
+                          << *sig << endl;
                     cerr << error.str();
                 } else {
+                    error << "ERROR : RDTbl read index [" << idx_i.lo << ":" <<idx_i.hi
+                          << "] is outside of table range (" << tree2int(size) << ") in "
+                          << *sig << endl;
                     throw faustexception(error.str());
                 }
             }
@@ -1744,8 +1734,8 @@ ValueInst* InstructionsCompiler::generateSigGen(Tree sig, Tree content)
     pushInitMethod(InstBuilder::genDecStackVar(
         signame, InstBuilder::genNamedTyped(cname, InstBuilder::genBasicTyped(Typed::kObj_ptr)), obj));
 
-    // HACK for Rust backend
-    if (gGlobal->gOutputLang != "rust") {
+    // HACK for Rust an Julia backends
+    if (gGlobal->gOutputLang != "rust" && gGlobal->gOutputLang != "julia") {
         // Delete object
         list<ValueInst*> args3;
         args3.push_back(InstBuilder::genLoadStackVar(signame));
@@ -1778,8 +1768,8 @@ ValueInst* InstructionsCompiler::generateStaticSigGen(Tree sig, Tree content)
     pushStaticInitMethod(InstBuilder::genDecStackVar(
         signame, InstBuilder::genNamedTyped(cname, InstBuilder::genBasicTyped(Typed::kObj_ptr)), obj));
 
-    // HACK for Rust backend
-    if (gGlobal->gOutputLang != "rust") {
+    // HACK for Rust and Julia backends
+    if (gGlobal->gOutputLang != "rust" && gGlobal->gOutputLang != "julia") {
         // Delete object
         list<ValueInst*> args3;
         args3.push_back(InstBuilder::genLoadStackVar(signame));
@@ -1928,26 +1918,54 @@ ValueInst* InstructionsCompiler::generateSelect2(Tree sig, Tree sel, Tree s1, Tr
     ValueInst* cond = CS(sel);
     ValueInst* v1   = CS(s1);
     ValueInst* v2   = CS(s2);
-
-    int t1 = getCertifiedSigType(s1)->nature();
-    int t2 = getCertifiedSigType(s2)->nature();
-
-    ::Type type = getCertifiedSigType(s1);
-
+    
+    ::Type ct1 = getCertifiedSigType(s1);
+    ::Type ct2 = getCertifiedSigType(s2);
+    int t1 = ct1->nature();
+    int t2 = ct2->nature();
+    
     // Type promotion
     if ((t1 == kReal) || (t2 == kReal)) {
         v1 = promote2real(t1, v1);
         v2 = promote2real(t2, v2);
     }
-
+    
+    string v_then, v_else;
+    Typed::VarType t_then, t_else;
+    getTypedNames(ct1, "Then", t_then, v_then);
+    getTypedNames(ct2, "Else", t_else, v_else);
+    
+    // Create local variables to force proper execution of both branches of 'select2'
+    switch (getCertifiedSigType(sig)->variability()) {
+            
+        case kBlock:
+            // Local variable is only created if needed
+            // that is if the expression is not already a 'simple value', constant or variable
+            if (!v1->isSimpleValue()) {
+                pushComputeBlockMethod(InstBuilder::genDecStackVar(v_then, InstBuilder::genBasicTyped(t_then), v1));
+                v1 = InstBuilder::genLoadStackVar(v_then);
+            }
+            if (!v2->isSimpleValue()) {
+                pushComputeBlockMethod(InstBuilder::genDecStackVar(v_else, InstBuilder::genBasicTyped(t_else), v2));
+                v2 = InstBuilder::genLoadStackVar(v_else);
+            }
+            break;
+            
+        case kSamp:
+            // Local variable is only created if needed
+            // that is if the expression is not already a 'simple value', constant or variable
+            if (!v1->isSimpleValue()) {
+                pushComputeDSPMethod(InstBuilder::genDecStackVar(v_then, InstBuilder::genBasicTyped(t_then), v1));
+                v1 = InstBuilder::genLoadStackVar(v_then);
+            }
+            if (!v2->isSimpleValue()) {
+                pushComputeDSPMethod(InstBuilder::genDecStackVar(v_else, InstBuilder::genBasicTyped(t_else), v2));
+                v2 = InstBuilder::genLoadStackVar(v_else);
+            }
+            break;
+    }
+  
     return generateCacheCode(sig, InstBuilder::genSelect2Inst(cond, v2, v1));
-}
-
-ValueInst* InstructionsCompiler::generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3)
-{
-    // Done at signal level
-    faustassert(false);
-    return InstBuilder::genNullValueInst();
 }
 
 /*****************************************************************************
@@ -1994,7 +2012,7 @@ ValueInst* InstructionsCompiler::generateXtended(Tree sig)
  * Generate code for accessing a delayed signal. The generated code depend of
  * the maximum delay attached to exp.
  */
-ValueInst* InstructionsCompiler::generateFixDelay(Tree sig, Tree exp, Tree delay)
+ValueInst* InstructionsCompiler::generateDelay(Tree sig, Tree exp, Tree delay)
 {
     ValueInst* code = CS(exp);  // Ensure exp is compiled to have a vector name
     int        mxd  = fOccMarkup->retrieve(exp)->getMaxDelay();
@@ -2045,8 +2063,8 @@ ValueInst* InstructionsCompiler::generateFixDelay(Tree sig, Tree exp, Tree delay
 }
 
 /**
- * Generate code for the delay mecchanism. The generated code depend of the
- * maximum delay attached to exp and the "less temporaries" switch
+ * Generate code for the delay mechanism. The generated code depends of the
+ * maximum delay attached to exp and the "less temporaries" switch.
  */
 ValueInst* InstructionsCompiler::generateDelayVec(Tree sig, ValueInst* exp, Typed::VarType ctype, const string& vname,
                                                   int mxd)
@@ -2378,7 +2396,6 @@ void InstructionsCompiler::generateUserInterfaceElements(Tree elements)
  * Generate buildUserInterface C++ lines of code corresponding
  * to user interface widget t
  */
-
 void InstructionsCompiler::generateWidgetCode(Tree fulllabel, Tree varname, Tree sig)
 {
     Tree                      path, c, x, y, z;
@@ -2492,7 +2509,6 @@ void InstructionsCompiler::generateMacroInterfaceElements(const string& pathname
  * Generate user interface macros corresponding
  * to a user interface widget
  */
-
 void InstructionsCompiler::generateWidgetMacro(const string& pathname, Tree fulllabel, Tree varname, Tree sig)
 {
     Tree                      path, c, x, y, z;

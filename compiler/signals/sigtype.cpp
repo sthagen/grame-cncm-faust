@@ -171,7 +171,8 @@ bool operator==(const Type& t1, const Type& t2)
                (st1->computability() == st2->computability()) && (st1->vectorability() == st2->vectorability()) &&
                (st1->boolean() == st2->boolean()) && (st1->getInterval().lo == st2->getInterval().lo) &&
                (st1->getInterval().hi == st2->getInterval().hi) &&
-               (st1->getInterval().valid == st2->getInterval().valid);
+               (st1->getInterval().valid == st2->getInterval().valid) && st1->getRes().valid == st2->getRes().valid &&
+               st1->getRes().index == st2->getRes().index;
     if ((tt1 = isTableType(t1)) && (tt2 = isTableType(t2))) return tt1->content() == tt2->content();
     if ((nt1 = isTupletType(t1)) && (nt2 = isTupletType(t2))) {
         int a1 = nt1->arity();
@@ -299,12 +300,6 @@ int checkDelayInterval(Type t)
         error << "ERROR : invalid delay parameter range: " << i << ". The range must be between 0 and MAX_INT" << endl;
         throw faustexception(error.str());
     }
-}
-
-// Give the name of C type, corresponding to signal nature
-string old_cType(Type t)
-{
-    return (t->nature() == kInt) ? "int" : "float";
 }
 
 /*****************************************************************************

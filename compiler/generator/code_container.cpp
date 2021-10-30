@@ -36,8 +36,6 @@ void CodeContainer::initialize(int numInputs, int numOutputs)
 {
     fNumInputs  = numInputs;
     fNumOutputs = numOutputs;
-    fInputRates.resize(numInputs, 0);
-    fOutputRates.resize(numOutputs, 0);
 }
 
 CodeContainer::CodeContainer()
@@ -311,17 +309,6 @@ void CodeContainer::produceInfoFunctions(int tabs, const string& classname, cons
     producer->Tab(tabs);
     generateGetInputs(subst("getNumInputs$0", classname), obj, ismethod, isvirtual)->accept(producer);
     generateGetOutputs(subst("getNumOutputs$0", classname), obj, ismethod, isvirtual)->accept(producer);
-
-    /*
-    // 03/04/21: suppressed fo now
-    // Input Rates
-    producer->Tab(tabs);
-    generateGetInputRate(subst("getInputRate$0", classname), obj, ismethod, isvirtual)->accept(producer);
-
-    // Output Rates
-    producer->Tab(tabs);
-    generateGetOutputRate(subst("getOutputRate$0", classname), obj, ismethod, isvirtual)->accept(producer);
-    */
 }
 
 void CodeContainer::generateDAGLoopInternal(CodeLoop* loop, BlockInst* block, DeclareVarInst* count, bool omp)
@@ -627,18 +614,6 @@ DeclareFunInst* CodeContainer::generateGetIORate(const string& name, const strin
     return InstBuilder::genDeclareFunInst(name, fun_type, block);
 }
 
-DeclareFunInst* CodeContainer::generateGetInputRate(const string& name, const string& obj, bool ismethod,
-                                                    bool isvirtual)
-{
-    return generateGetIORate(name, obj, fInputRates, ismethod, isvirtual);
-}
-
-DeclareFunInst* CodeContainer::generateGetOutputRate(const string& name, const string& obj, bool ismethod,
-                                                     bool isvirtual)
-{
-    return generateGetIORate(name, obj, fOutputRates, ismethod, isvirtual);
-}
-
 DeclareFunInst* CodeContainer::generateInstanceClear(const string& name, const string& obj, bool ismethod,
                                                      bool isvirtual)
 {
@@ -737,7 +712,12 @@ DeclareFunInst* CodeContainer::generateFillFun(const string& name, const string&
 
     BlockInst* block = InstBuilder::genBlockInst();
     block->pushBackInst(fComputeBlockInstructions);
-    block->pushBackInst(fCurLoop->generateScalarLoop("count"));
+    // Hack for Julia
+    if (gGlobal->gOutputLang == "julia") {
+        block->pushBackInst(fCurLoop->generateSimpleScalarLoop("count"));
+    } else {
+        block->pushBackInst(fCurLoop->generateScalarLoop("count"));
+    }
 
     // Explicit return
     block->pushBackInst(InstBuilder::genRetInst());

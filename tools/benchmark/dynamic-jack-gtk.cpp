@@ -65,7 +65,7 @@ static bool endWith(const string& str, const string& suffix)
 
 static void printList(const vector<string>& list)
 {
-    for (int i = 0; i < list.size(); i++) {
+    for (size_t i = 0; i < list.size(); i++) {
         cout << "item: " << list[i] << "\n";
     }
 }
@@ -372,7 +372,7 @@ static bool runDynamicDSP(int argc, char* argv[], bool is_dsp_only = false)
         delete gDynamicDSP;
         gDynamicDSP = nullptr;
         gMutex.unlock();
-        // 'res' is true when gDynamicDSP whe stopped by the additional thread
+        // 'res' is true when gDynamicDSP was stopped by the additional thread
         return res;
     } catch (...) {
         gDynamicDSP = nullptr;

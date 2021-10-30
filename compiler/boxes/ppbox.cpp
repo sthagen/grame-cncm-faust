@@ -29,20 +29,22 @@
 #include "signals.hh"
 #include "xtended.hh"
 
-const char *prim0name(CTree *(*ptr)())
+const char* prim0name(CTree *(*ptr)())
 {
     return "prim0???";
 }
 
-const char *prim1name(CTree *(*ptr)(CTree *))
+const char* prim1name(CTree *(*ptr)(CTree *))
 {
     if (ptr == sigDelay1) return "mem";
     if (ptr == sigIntCast) return "int";
     if (ptr == sigFloatCast) return "float";
+    if (ptr == sigLowest) return "lowest";
+    if (ptr == sigHighest) return "highest";
     return "prim1???";
 }
 
-const char *prim2name(CTree *(*ptr)(CTree *, CTree *))
+const char* prim2name(CTree *(*ptr)(CTree *, CTree *))
 {
     if (ptr == sigAdd) return "+";
     if (ptr == sigSub) return "-";
@@ -55,7 +57,8 @@ const char *prim2name(CTree *(*ptr)(CTree *, CTree *))
     if (ptr == sigXOR) return "xor";
 
     if (ptr == sigLeftShift) return "<<";
-    if (ptr == sigRightShift) return ">>";
+    if (ptr == sigLRightShift) return ">>";
+    if (ptr == sigARightShift) return ">>>";
 
     if (ptr == sigLT) return "<";
     if (ptr == sigLE) return "<=";
@@ -64,7 +67,7 @@ const char *prim2name(CTree *(*ptr)(CTree *, CTree *))
     if (ptr == sigEQ) return "==";
     if (ptr == sigNE) return "!=";
 
-    if (ptr == sigFixDelay) return "@";
+    if (ptr == sigDelay) return "@";
     if (ptr == sigPrefix) return "prefix";
     if (ptr == sigAttach) return "attach";
     if (ptr == sigEnable) return "enable";
@@ -73,20 +76,21 @@ const char *prim2name(CTree *(*ptr)(CTree *, CTree *))
     return "prim2???";
 }
 
-const char *prim3name(CTree *(*ptr)(CTree *, CTree *, CTree *))
+const char* prim3name(CTree *(*ptr)(CTree *, CTree *, CTree *))
 {
     if (ptr == sigReadOnlyTable) return "rdtable";
     if (ptr == sigSelect2) return "select2";
+    if (ptr == sigAssertBounds) return "assertbounds";
     return "prim3???";
 }
 
-const char *prim4name(CTree *(*ptr)(CTree *, CTree *, CTree *, CTree *))
+const char* prim4name(CTree *(*ptr)(CTree *, CTree *, CTree *, CTree *))
 {
     if (ptr == sigSelect3) return "select3";
     return "prim4???";
 }
 
-const char *prim5name(CTree *(*ptr)(CTree *, CTree *, CTree *, CTree *, CTree *))
+const char* prim5name(CTree *(*ptr)(CTree *, CTree *, CTree *, CTree *, CTree *))
 {
     if (ptr == sigWriteReadTable) return "rwtable";
     return "prim5???";
@@ -130,8 +134,8 @@ static string type2str(int type)
     }
 }
 
-// if t has a node of type symbol, return its name otherwise error
-ostream &boxpp::print(ostream &fout) const
+// If t has a node of type symbol, return its name, otherwise error
+ostream& boxpp::print(ostream &fout) const
 {
     int    i, id;
     double r;
@@ -145,11 +149,11 @@ ostream &boxpp::print(ostream &fout) const
     Tree t1, t2, t3, ff, label, cur, min, max, step, type, name, file, arg, body, fun, args, abstr, genv, vis, lenv,
         ldef, slot, ident, rules, chan, ins, outs, lroutes;
 
-    const char *str;
+    const char* str;
 
-    xtended *xt = (xtended *)getUserData(box);
+    xtended* xt = (xtended*)getUserData(box);
 
-    // primitive elements
+    // Primitive elements
     if (xt)
         fout << xt->name();
     else if (isBoxInt(box, &i))
@@ -183,7 +187,7 @@ ostream &boxpp::print(ostream &fout) const
     else if (isBoxWithLocalDef(box, body, ldef))
         fout << boxpp(body) << " with { " << envpp(ldef) << " }";
 
-    // foreign elements
+    // Foreign elements
     else if (isBoxFFun(box, ff)) {
         fout << "ffunction(" << type2str(ffrestype(ff));
         Tree namelist = nth(ffsignature(ff), 1);
@@ -204,7 +208,7 @@ ostream &boxpp::print(ostream &fout) const
     else if (isBoxFVar(box, type, name, file))
         fout << "fvariable(" << type2str(tree2int(type)) << ' ' << tree2str(name) << ", " << tree2str(file) << ')';
 
-    // block diagram binary operator
+    // Block diagram binary operator
     else if (isBoxSeq(box, t1, t2))
         streambinop(fout, t1, " : ", t2, 1, priority);
     else if (isBoxSplit(box, t1, t2))
@@ -216,7 +220,7 @@ ostream &boxpp::print(ostream &fout) const
     else if (isBoxRec(box, t1, t2))
         streambinop(fout, t1, "~", t2, 4, priority);
 
-    // iterative block diagram construction
+    // Iterative block diagram construction
     else if (isBoxIPar(box, t1, t2, t3))
         fout << "par(" << boxpp(t1) << ", " << boxpp(t2) << ") {" << boxpp(t3) << "}";
     else if (isBoxISeq(box, t1, t2, t3))
@@ -231,7 +235,7 @@ ostream &boxpp::print(ostream &fout) const
     else if (isBoxOutputs(box, t1))
         fout << "outputs(" << boxpp(t1) << ")";
 
-    // user interface
+    // User interface
     else if (isBoxButton(box, label))
         fout << "button(" << tree2quotedstr(label) << ')';
     else if (isBoxCheckbox(box, label))
@@ -283,10 +287,8 @@ ostream &boxpp::print(ostream &fout) const
             sep = ',';
         }
         fout << '}';
-
         /*
         size_t n = box->arity();
-
         if (n < 6) {
             // small waveform, print all data
             fout << "waveform";
@@ -320,7 +322,7 @@ ostream &boxpp::print(ostream &fout) const
         fout << "\\(" << boxpp(slot) << ").(" << boxpp(body) << ")";
     }
 
-    // Pattern Matching Extensions
+    // pattern Matching Extensions
     else if (isBoxCase(box, rules)) {
         fout << "case {";
         while (!isNil(rules)) {
@@ -330,12 +332,12 @@ ostream &boxpp::print(ostream &fout) const
         fout << "}";
     }
 #if 1
-    // more useful for debugging output
+    // More useful for debugging output
     else if (isBoxPatternVar(box, ident)) {
         fout << "<" << boxpp(ident) << ">";
     }
 #else
-    // beautify messages involving lhs patterns
+    // Beautify messages involving lhs patterns
     else if (isBoxPatternVar(box, ident)) {
         fout << boxpp(ident);
     }
@@ -372,9 +374,9 @@ ostream &boxpp::print(ostream &fout) const
      Environment printing
 *****************************************************************************/
 
-ostream &envpp::print(ostream &fout) const
+ostream& envpp::print(ostream& fout) const
 {
-    const char *sep = "";
+    const char* sep = "";
     Tree        l   = fEnv;
 
     fout << '{';

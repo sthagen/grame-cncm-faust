@@ -243,8 +243,8 @@ EXPORT string expandDSPFromString(const string& name_app, const string& dsp_cont
             sha_key = generateSHA1(dsp_content);
             return dsp_content;
         } else {
-            // Otherwise add a new compilation options line, consider it as the new expanded code : generate SHA key and
-            // return it
+            // Otherwise add a new compilation options line, consider it as the new expanded code,
+            // generate SHA key and return it
             string new_dsp_content =
                 COMPILATION_OPTIONS + reorganizeCompilationOptions(argc, argv) + ";\n" + dsp_content;
             sha_key = generateSHA1(new_dsp_content);
@@ -290,8 +290,7 @@ EXPORT bool generateAuxFilesFromString(const string& name_app, const string& dsp
         }
         argv1[argc1] = nullptr;  // NULL terminated argv
 
-        dsp_factory_base* factory =
-            compileFaustFactory(argc1, argv1, name_app.c_str(), dsp_content.c_str(), error_msg, false);
+        dsp_factory_base* factory = createFactory(name_app.c_str(), dsp_content.c_str(), argc1, argv1, error_msg, false);
         // Factory is no more needed
         delete factory;
         return (factory != nullptr);

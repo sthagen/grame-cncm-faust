@@ -65,7 +65,7 @@
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 
-#if defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
 #include <llvm/InitializePasses.h>
 #include <llvm/Support/CodeGen.h>
 #endif
@@ -114,7 +114,8 @@ void llvm_dynamic_dsp_factory_aux::write(ostream* out, bool binary, bool small)
     string res;
     raw_string_ostream out_str(res);
     if (binary) {
-#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || \
+    defined(LLVM_130) || defined(LLVM_140)
         WriteBitcodeToFile(*fModule, out_str);
 #else
         WriteBitcodeToFile(fModule, out_str);
@@ -130,7 +131,8 @@ string llvm_dynamic_dsp_factory_aux::writeDSPFactoryToBitcode()
 {
     string res;
     raw_string_ostream out(res);
-#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || \
+    defined(LLVM_130) || defined(LLVM_140)
     WriteBitcodeToFile(*fModule, out);
 #else
     WriteBitcodeToFile(fModule, out);
@@ -147,7 +149,8 @@ bool llvm_dynamic_dsp_factory_aux::writeDSPFactoryToBitcodeFile(const string& bi
         cerr << "ERROR : writeDSPFactoryToBitcodeFile could not open file : " << err.message();
         return false;
     }
-#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || \
+    defined(LLVM_130) || defined(LLVM_140)
     WriteBitcodeToFile(*fModule, out);
 #else
     WriteBitcodeToFile(fModule, out);
@@ -285,11 +288,12 @@ bool llvm_dynamic_dsp_factory_aux::initJIT(string& error_msg)
     targetOptions.GuaranteedTailCallOpt = true;
     targetOptions.NoTrappingFPMath      = true;
     
-#if defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || \
+    defined(LLVM_140)
     targetOptions.NoSignedZerosFPMath   = true;
 #endif
     
-#if defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
     targetOptions.setFPDenormalMode(DenormalMode::getIEEE());
 #else
     targetOptions.FPDenormalMode = FPDenormal::IEEE;
@@ -299,9 +303,9 @@ bool llvm_dynamic_dsp_factory_aux::initJIT(string& error_msg)
     
     string debug_var = (getenv("FAUST_DEBUG")) ? string(getenv("FAUST_DEBUG")) : "";
     if ((debug_var != "") && (debug_var.find("FAUST_LLVM3") != string::npos)) {
-    #if !defined(LLVM_120) && !defined(LLVM_130)
+#if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
         targetOptions.PrintMachineCode = true;
-    #endif
+#endif
     }
 
     builder.setTargetOptions(targetOptions);
@@ -361,7 +365,7 @@ bool llvm_dynamic_dsp_factory_aux::initJIT(string& error_msg)
 
     fObjectCache = new FaustObjectCache();
     fJIT->setObjectCache(fObjectCache);
-    return initJITAux(error_msg);
+    return initJITAux();
 }
 
 // Bitcode <==> string
@@ -388,7 +392,6 @@ static llvm_dsp_factory* readDSPFactoryFromBitcodeAux(MEMORY_BUFFER buffer, cons
                 factory->setSHAKey(sha_key);
                 return factory;
             } else {
-                error_msg = "ERROR : " + error_msg;
                 delete factory_aux;
                 return nullptr;
             }
@@ -423,14 +426,14 @@ bool llvm_dynamic_dsp_factory_aux::writeDSPFactoryToObjectcodeFileAux(const stri
     fModule->setDataLayout(TheTargetMachine->createDataLayout());
 
     error_code EC;
-    raw_fd_ostream  dest(object_code_path.c_str(), EC, sys::fs::F_None);
+    raw_fd_ostream  dest(object_code_path.c_str(), EC, sys::fs::OF_None);
     if (EC) {
         errs() << "ERROR : writeDSPFactoryToObjectcodeFile could not open file : " << EC.message();
         return false;
     }
 
     legacy::PassManager pass;
-#if defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130)
+#if defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
     if (TheTargetMachine->addPassesToEmitFile(pass, dest, nullptr, CGFT_ObjectFile)) {
 #elif defined(LLVM_80) || defined(LLVM_90)
     if (TheTargetMachine->addPassesToEmitFile(pass, dest, nullptr, TargetMachine::CGFT_ObjectFile)) {
@@ -505,7 +508,6 @@ static llvm_dsp_factory* readDSPFactoryFromIRAux(MEMORY_BUFFER buffer, const str
                 factory->setSHAKey(sha_key);
                 return factory;
             } else {
-                error_msg = "ERROR : " + error_msg;
                 delete factory_aux;
                 return nullptr;
             }
@@ -592,15 +594,12 @@ EXPORT llvm_dsp_factory* createDSPFactoryFromString(const string& name_app, cons
 {
     LOCK_API
     string expanded_dsp_content, sha_key;
-    
-    //if ((expanded_dsp_content = expandDSPFromString(name_app, dsp_content, argc, argv, sha_key, error_msg)) == "") {
+   
     if ((expanded_dsp_content = sha1FromDSP(name_app, dsp_content, argc, argv, sha_key)) == "") {
         return nullptr;
     } else {
         
         dsp_factory_table<SDsp_factory>::factory_iterator it;
-        llvm_dsp_factory* factory = nullptr;
-        
         if (llvm_dsp_factory_aux::gLLVMFactoryTable.getFactory(sha_key, it)) {
             SDsp_factory sfactory = (*it).first;
             sfactory->addReference();
@@ -619,24 +618,24 @@ EXPORT llvm_dsp_factory* createDSPFactoryFromString(const string& name_app, cons
                     argv1[argc1++] = argv[i];
                 }
                 argv1[argc1] = nullptr;  // NULL terminated argv
+                
                 llvm_dynamic_dsp_factory_aux* factory_aux
-                    = static_cast<llvm_dynamic_dsp_factory_aux*>(compileFaustFactory(argc1, argv1,
-                                                                                     name_app.c_str(),
-                                                                                     dsp_content.c_str(),
-                                                                                     error_msg,
-                                                                                     true));
+                    = static_cast<llvm_dynamic_dsp_factory_aux*>(createFactory(name_app.c_str(),
+                                                                               dsp_content.c_str(),
+                                                                               argc1, argv1,
+                                                                               error_msg,
+                                                                               true));
                 if (factory_aux && factory_aux->initJIT(error_msg)) {
                     factory_aux->setTarget(target);
                     factory_aux->setOptlevel(opt_level);
                     factory_aux->setClassName(getParam(argc, argv, "-cn", "mydsp"));
                     factory_aux->setName(name_app);
-                    factory = new llvm_dsp_factory(factory_aux);
+                    llvm_dsp_factory* factory = new llvm_dsp_factory(factory_aux);
                     llvm_dsp_factory_aux::gLLVMFactoryTable.setFactory(factory);
                     factory->setSHAKey(sha_key);
                     factory->setDSPCode(expanded_dsp_content);
                     return factory;
                 } else {
-                    error_msg = "ERROR : " + error_msg;
                     delete factory_aux;
                     return nullptr;
                 }
@@ -645,6 +644,63 @@ EXPORT llvm_dsp_factory* createDSPFactoryFromString(const string& name_app, cons
                 return nullptr;
             }
         }
+    }
+}
+        
+EXPORT llvm_dsp_factory* createDSPFactoryFromSignals(const std::string& name_app, tvec signals,
+                                                    int argc, const char* argv[],
+                                                    const std::string& target,
+                                                    std::string& error_msg,
+                                                    int opt_level)
+{
+    LOCK_API
+    try {
+        int         argc1 = 0;
+        const char* argv1[64];
+        argv1[argc1++] = "faust";
+        argv1[argc1++] = "-lang";
+        argv1[argc1++] = "llvm";
+        argv1[argc1++] = "-o";
+        argv1[argc1++] = "string";
+            // Copy arguments
+        for (int i = 0; i < argc; i++) {
+            argv1[argc1++] = argv[i];
+        }
+        argv1[argc1] = nullptr;  // NULL terminated argv
+        
+        llvm_dynamic_dsp_factory_aux* factory_aux
+            = static_cast<llvm_dynamic_dsp_factory_aux*>(createFactory(name_app.c_str(), signals, argc1, argv1, error_msg));
+        if (factory_aux && factory_aux->initJIT(error_msg)) {
+            factory_aux->setTarget(target);
+            factory_aux->setOptlevel(opt_level);
+            factory_aux->setClassName(getParam(argc, argv, "-cn", "mydsp"));
+            factory_aux->setName(name_app);
+            llvm_dsp_factory* factory = new llvm_dsp_factory(factory_aux);
+            llvm_dsp_factory_aux::gLLVMFactoryTable.setFactory(factory);
+            return factory;
+        } else {
+            delete factory_aux;
+            return nullptr;
+        }
+    } catch (faustexception& e) {
+        error_msg = e.what();
+        return nullptr;
+    }
+}
+        
+EXPORT llvm_dsp_factory* createDSPFactoryFromBoxes(const std::string& name_app, Tree box,
+                                                   int argc, const char* argv[],
+                                                   const std::string& target,
+                                                   std::string& error_msg,
+                                                   int opt_level)
+{
+    LOCK_API
+    try {
+        tvec signals = boxesToSignalsAux(box);
+        return createDSPFactoryFromSignals(name_app, signals, argc, argv, target, error_msg, opt_level);
+    } catch (faustexception& e) {
+        error_msg = e.Message();
+        return nullptr;
     }
 }
 
@@ -737,6 +793,36 @@ EXPORT llvm_dsp_factory* createCDSPFactoryFromString(const char* name_app, const
     string error_msg_aux;
     llvm_dsp_factory* factory =
         createDSPFactoryFromString(name_app, dsp_content, argc, argv, target, error_msg_aux, opt_level);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return factory;
+}
+    
+EXPORT llvm_dsp_factory* createCDSPFactoryFromSignals(const char* name_app, Signal* signals_aux,
+                                                      int argc, const char* argv[],
+                                                      const char* target,
+                                                      char* error_msg,
+                                                      int opt_level)
+{
+    string error_msg_aux;
+    tvec signals;
+    int i = 0;
+    while (signals_aux[i]) { signals.push_back(signals_aux[i]); i++; }
+    llvm_dsp_factory* factory =
+        createDSPFactoryFromSignals(name_app, signals, argc, argv, target, error_msg_aux, opt_level);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return factory;
+}
+
+EXPORT llvm_dsp_factory* createCDSPFactoryFromBoxes(const char* name_app,
+                                                    Tree box,
+                                                    int argc, const char* argv[],
+                                                    const char* target,
+                                                    char* error_msg,
+                                                    int opt_level)
+{
+    string error_msg_aux;
+    llvm_dsp_factory* factory =
+        createDSPFactoryFromBoxes(name_app, box, argc, argv, target, error_msg_aux, opt_level);
     strncpy(error_msg, error_msg_aux.c_str(), 4096);
     return factory;
 }

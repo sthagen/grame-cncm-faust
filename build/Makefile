@@ -11,7 +11,7 @@ system := $(shell echo $(system) | grep MINGW > /dev/null && echo MINGW || echo 
 # output directories
 FAUSTDIR ?= faustdir
 IOSDIR   := iosdir
-VERSION := 2.33.1
+VERSION := 2.37.3
 
 #===============================================================
 # current generator and backends
@@ -125,7 +125,7 @@ help:
 	@echo "  WORKLET                     : Compile wasm glue library for worklet (default is off)"
 	@echo
 	@echo "Backends:"
-	@echo "  the FAUST backends currently included are described in the '$(BACKENDS)' file"
+	@echo "  the Faust backends currently included are described in the '$(BACKENDS)' file"
 	@echo "  you can freely customize this file or use another file with the BACKENDS option"
 	@echo
 	@echo "Targets:"
@@ -150,8 +150,8 @@ help:
 	@echo "------ see also the README.md file ------"
 	@echo
 	@echo "Packaging targets:"
-	@echo " 'package'    : build a faust package for the current platform"
-	@echo " 'release'    : build a faust release (MacOS only)"
+	@echo " 'package'    : build a Faust package for the current platform"
+	@echo " 'release'    : build a Faust release (MacOS only)"
 	@echo "                includes faust, faustgen and dist packages"
 
 	

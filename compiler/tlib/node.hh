@@ -53,6 +53,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <iostream>
+
 #include "garbageable.hh"
 #include "symbol.hh"
 
@@ -133,7 +134,7 @@ inline ostream& operator<<(ostream& s, const Node& n)
 }
 
 //-------------------------------------------------------------------------
-// Perdicates and pattern matching
+// Predicates and pattern matching
 //-------------------------------------------------------------------------
 
 // integers

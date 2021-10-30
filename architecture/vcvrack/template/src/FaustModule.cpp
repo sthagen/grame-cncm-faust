@@ -51,6 +51,10 @@ static Plugin* pluginInstance;
 #define FAUSTFLOAT float
 #endif
 
+#ifdef _WIN32
+typedef unsigned int uint
+#endif
+
 /*
 // Pixels are just a weird unit, defined by VCV Rack as 1/75 inches, or 0.338(6) mm
 */
@@ -92,8 +96,15 @@ struct one_sample_dsp : public rack_dsp {
     int* iZone;
     FAUSTFLOAT* fZone;
     
-    one_sample_dsp():iZone(nullptr), fZone(nullptr)
+    one_sample_dsp()
+    :iZone(nullptr), fZone(nullptr)
     {}
+    
+    one_sample_dsp(int* icontrol, FAUSTFLOAT* fcontrol)
+    :iZone(icontrol), fZone(fcontrol)
+    {
+        assert(false);
+    }
     
     virtual ~one_sample_dsp()
     {

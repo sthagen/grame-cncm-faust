@@ -3,7 +3,7 @@ project (faust)
 
 #######################################
 # versions management
-set (VERSION 2.33.1)
+set (VERSION 2.37.3)
 macro (get_major_minor_patch version)
 	string( REGEX REPLACE "([0-9]*)\\.([0-9]*)\\.([0-9]*)" "\\1"  VERSION_MAJOR ${version} )
 	string( REGEX REPLACE "([0-9]*)\\.([0-9]*)\\.([0-9]*)" "\\2"  VERSION_MINOR ${version} )
@@ -62,12 +62,13 @@ set (FAUST_INC ${SRCDIR}
 	${SRCDIR}/boxes ${SRCDIR}/documentator ${SRCDIR}/draw
 	${SRCDIR}/errors ${SRCDIR}/evaluate ${SRCDIR}/extended
 	${SRCDIR}/generator
+	${SRCDIR}/generator/dlang
+	${SRCDIR}/generator/csharp
 	${SRCDIR}/generator/fir
+	${SRCDIR}/generator/julia
 	${SRCDIR}/generator/interpreter
 	${SRCDIR}/generator/rust
 	${SRCDIR}/generator/soul
-	${SRCDIR}/generator/dlang
-	${SRCDIR}/generator/csharp
 	${SRCDIR}/normalize ${SRCDIR}/parallelize ${SRCDIR}/parser
 	${SRCDIR}/patternmatcher ${SRCDIR}/propagate ${SRCDIR}/signals
 	${SRCDIR}/tlib ${SRCDIR}/transform ${SRCDIR}/utils
@@ -306,7 +307,7 @@ install (
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 install (
-    FILES     ${SRCDIR}/generator/libfaust.h ${SRCDIR}/generator/libfaust-c.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include/faust/dsp
+    FILES     ${SRCDIR}/generator/libfaust.h ${SRCDIR}/generator/libfaust-c.h ${SRCDIR}/generator/libfaust-signal.h ${SRCDIR}/generator/libfaust-signal-c.h ${SRCDIR}/generator/libfaust-box.h ${SRCDIR}/generator/libfaust-box-c.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include/faust/dsp
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 # the file below is part of the httpd lib but installed even if the lib is not part of the config
@@ -371,11 +372,10 @@ install (
 file (GLOB FAUSTDSPLIBS ${ROOT}/libraries/*.lib ${ROOT}/libraries/old/*.lib)
 file (GLOB FAUSTDPSEMB ${ROOT}/libraries/embedded/*.lib)
 # install various files from the architecture root folder
-file (GLOB FAUSTARCHS   ${ARCHDIR}/*.cpp ${ARCHDIR}/*.c
-						${ARCHDIR}/*.rs  ${ARCHDIR}/*.js
-						${ARCHDIR}/*.java ${ARCHDIR}/*.h
-						${ARCHDIR}/*.d   ${ARCHDIR}/*.d
-						${ARCHDIR}/mathdoctexts-*.txt  ${ARCHDIR}/latexheader.tex)
+file (GLOB FAUSTARCHS ${ARCHDIR}/*.cpp ${ARCHDIR}/*.c ${ARCHDIR}/*.cs ${ARCHDIR}/*.rs ${ARCHDIR}/*.jl
+					${ARCHDIR}/*.java ${ARCHDIR}/*.h 
+					${ARCHDIR}/*.d ${ARCHDIR}/mathdoctexts-*.txt  
+					${ARCHDIR}/latexheader.tex)
 install (
     FILES     ${FAUSTDSPLIBS} ${FAUSTARCHS} ${ROOT}/tools/faust2appls/Info.plist DESTINATION ${CMAKE_INSTALL_PREFIX}/share/faust
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
@@ -386,7 +386,7 @@ install (
 )
 
 # install folders
-set (ARCHSRC android api AU audiokit daisy esp32 iOS juce soul max-msp nodejs osclib sam smartKeyboard teensy unity vcvrack webaudio)
+set (ARCHSRC android api AU audiokit daisy esp32 iOS juce julia soul max-msp nodejs osclib sam smartKeyboard teensy unity vcvrack webaudio)
 foreach (dir ${ARCHSRC})
 	set(ARCHFOLDERS ${ARCHFOLDERS} ${ARCHDIR}/${dir})
 endforeach()

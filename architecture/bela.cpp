@@ -374,7 +374,7 @@ BelaOSCUI gOSCUI(OSC_IP_ADDRESS, OSC_IN_PORT, OSC_OUT_PORT);
 #endif
 
 #ifdef HTTPDGUI
-httpdUI* gHttpdInterface;
+httpdUI* gHttpdInterface = NULL;
 #endif
 
 #ifdef SOUNDFILE
@@ -441,7 +441,7 @@ bool setup(BelaContext* context, void* userData)
         
 #ifdef MIDICTRL
         if (midi_sync) {
-            gDSP = new timed_dsp(DSP);
+            gDSP = new timed_dsp(gDSP);
         }
 #endif
     } else {
