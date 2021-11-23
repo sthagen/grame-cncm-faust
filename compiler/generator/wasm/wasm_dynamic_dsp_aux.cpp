@@ -37,10 +37,10 @@
 using namespace emscripten;
 #endif
 
-wasm_dsp_factory* wasm_dynamic_dsp_factory::createWasmDSPFactoryFromString2(const string&         name_app,
-                                                                            const string&         dsp_content,
+wasm_dsp_factory* wasm_dynamic_dsp_factory::createWasmDSPFactoryFromString2(const string& name_app,
+                                                                            const string& dsp_content,
                                                                             const vector<string>& argv,
-                                                                            bool                  internal_memory)
+                                                                            bool internal_memory)
 {
     int         argc1 = 0;
     const char* argv1[64];
@@ -53,10 +53,10 @@ wasm_dsp_factory* wasm_dynamic_dsp_factory::createWasmDSPFactoryFromString2(cons
                                                                wasm_dsp_factory::gErrorMessage, internal_memory);
 }
 
-std::string wasm_dynamic_dsp_factory::generateWasmFromString2(const std::string&           name_app,
-                                                            const std::string&              dsp_content,
-                                                            const std::vector<std::string>& argv,
-                                                            bool                            internal_memory)
+std::string wasm_dynamic_dsp_factory::generateWasmFromString2(const std::string& name_app,
+                                                              const std::string& dsp_content,
+                                                              const std::vector<std::string>& argv,
+                                                              bool internal_memory)
 {
     int         argc1 = 0;
     const char* argv1[64];
@@ -137,8 +137,7 @@ EXPORT wasm_dsp_factory* createWasmDSPFactoryFromSignals(const std::string& name
     const char* argv1[64];
     argv1[argc1++] = "faust";
     argv1[argc1++] = "-lang";
-    // argv1[argc1++] = (internal_memory) ? "wasm-i" : "wasm-e";
-    argv1[argc1++] = (internal_memory) ? "wasm-ib" : "wasm-eb";
+    argv1[argc1++] = (internal_memory) ? "wasm-i" : "wasm-e";
     argv1[argc1++] = "-o";
     argv1[argc1++] = "binary";
     // Copy argument

@@ -984,50 +984,50 @@ string printHelp()
         << "-inj <f>    --inject <f>                inject source file <f> into architecture file instead of compiling "
            "a dsp file."
         << endl;
-    sstr << tab << "-scal      --scalar                     generate non-vectorized code." << endl;
+    sstr << tab << "-scal       --scalar                    generate non-vectorized code." << endl;
     sstr << tab
-         << "-inpl      --in-place                   generates code working when input and output buffers are the same "
+         << "-inpl       --in-place                  generates code working when input and output buffers are the same "
             "(scalar mode only)."
          << endl;
-    sstr << tab << "-vec       --vectorize                  generate easier to vectorize code." << endl;
-    sstr << tab << "-vs <n>    --vec-size <n>               size of the vector (default 32 samples)." << endl;
-    sstr << tab << "-lv <n>    --loop-variant <n>           [0:fastest (default), 1:simple]." << endl;
-    sstr << tab << "-omp       --openmp                     generate OpenMP pragmas, activates --vectorize option."
+    sstr << tab << "-vec        --vectorize                 generate easier to vectorize code." << endl;
+    sstr << tab << "-vs <n>     --vec-size <n>              size of the vector (default 32 samples)." << endl;
+    sstr << tab << "-lv <n>     --loop-variant <n>          [0:fastest (default), 1:simple]." << endl;
+    sstr << tab << "-omp        --openmp                    generate OpenMP pragmas, activates --vectorize option."
          << endl;
-    sstr << tab << "-pl        --par-loop                   generate parallel loops in --openmp mode." << endl;
+    sstr << tab << "-pl         --par-loop                  generate parallel loops in --openmp mode." << endl;
     sstr << tab
-         << "-sch       --scheduler                  generate tasks and use a Work Stealing scheduler, activates "
+         << "-sch        --scheduler                 generate tasks and use a Work Stealing scheduler, activates "
             "--vectorize option."
          << endl;
-    sstr << tab << "-ocl       --opencl                     generate tasks with OpenCL (experimental)." << endl;
-    sstr << tab << "-cuda      --cuda                       generate tasks with CUDA (experimental)." << endl;
-    sstr << tab << "-dfs       --deep-first-scheduling      schedule vector loops in deep first order." << endl;
+    sstr << tab << "-ocl        --opencl                    generate tasks with OpenCL (experimental)." << endl;
+    sstr << tab << "-cuda       --cuda                      generate tasks with CUDA (experimental)." << endl;
+    sstr << tab << "-dfs        --deep-first-scheduling     schedule vector loops in deep first order." << endl;
     sstr << tab
-         << "-g         --group-tasks                group single-threaded sequential tasks together when -omp or -sch "
+         << "-g          --group-tasks               group single-threaded sequential tasks together when -omp or -sch "
             "is used."
          << endl;
     sstr << tab
-         << "-fun       --fun-tasks                  separate tasks code as separated functions (in -vec, -sch, or "
+         << "-fun        --fun-tasks                 separate tasks code as separated functions (in -vec, -sch, or "
             "-omp mode)."
          << endl;
     sstr << tab
-         << "-fm <file> --fast-math <file>           use optimized versions of mathematical functions implemented in "
+         << "-fm <file>  --fast-math <file>          use optimized versions of mathematical functions implemented in "
             "<file>, use 'faust/dsp/fastmath.cpp' when file is 'def'."
          << endl;
     sstr << tab
 
-         << "-mapp      --math-approximation         simpler/faster versions of 'floor/ceil/fmod/remainder' functions." << endl;
+         << "-mapp       --math-approximation        simpler/faster versions of 'floor/ceil/fmod/remainder' functions." << endl;
     sstr << tab
-         << "-ns <name> --namespace <name>           generate C++ or D code in a namespace <name>." << endl;
+         << "-ns <name>  --namespace <name>          generate C++ or D code in a namespace <name>." << endl;
 
-    sstr << tab << "-vhdl      --vhdl                       output vhdl file." << endl;
+    sstr << tab << "-vhdl       --vhdl                      output vhdl file." << endl;
     
     sstr << tab
-         << "-wi <n>    --widening-iterations <n>    number of iterations before widening in signal bounding."
+         << "-wi <n>     --widening-iterations <n>   number of iterations before widening in signal bounding."
          << endl;
 
     sstr << tab
-         << "-ni <n>    --narrowing-iterations <n>   number of iterations before stopping narrowing in signal bounding."
+         << "-ni <n>     --narrowing-iterations <n>  number of iterations before stopping narrowing in signal bounding."
          << endl;
 
     sstr << endl << "Block diagram options:" << line;
