@@ -578,7 +578,12 @@ void InstructionsCompiler::compileMultiSignal(Tree L)
         string name;
         if (gGlobal->gOutputLang == "rust") {
             name = subst("*output$0", T(index));
-            pushComputeDSPMethod(InstBuilder::genStoreStackVar(name, res));
+            if (gGlobal->gComputeMix) {
+                ValueInst* res1 = InstBuilder::genAdd(res, InstBuilder::genLoadStackVar(name));
+                pushComputeDSPMethod(InstBuilder::genStoreStackVar(name, res1));
+            } else {
+                pushComputeDSPMethod(InstBuilder::genStoreStackVar(name, res));
+            }
         } else if (gGlobal->gOneSampleControl) {
             name = subst("output$0", T(index));
             if (gGlobal->gComputeMix) {

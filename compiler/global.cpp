@@ -653,16 +653,28 @@ void global::printCompilationOptions(stringstream& dst, bool backend)
     if (gMaskDelayLineThreshold != INT_MAX) dst << "-dtl " << gMaskDelayLineThreshold << " ";
     dst << "-es " << gEnableFlag << " ";
     if (gHasExp10) dst << "-exp10 ";
-    if (gSchedulerSwitch) dst << "-sch ";
     if (gOpenMPSwitch) dst << "-omp " << ((gOpenMPLoop) ? "-pl " : "");
-    if (gVectorSwitch) {
-        dst << "-vec "
-            << "-lv " << gVectorLoopVariant << " "
-            << "-vs " << gVecSize << " " << ((gFunTaskSwitch) ? "-fun " : "") << ((gGroupTaskSwitch) ? "-g " : "")
-            << ((gDeepFirstSwitch) ? "-dfs " : "") << printFloat() << "-ftz " << gFTZMode << " "
-            << "-mcd " << gGlobal->gMaxCopyDelay;
+    if (gSchedulerSwitch) {
+        dst << "-sch"
+            << " -vs " << gVecSize << ((gFunTaskSwitch) ? " -fun" : "") << ((gGroupTaskSwitch) ? " -g" : "")
+            << ((gDeepFirstSwitch) ? " -dfs" : "")
+            << ((gFloatSize == 2) ? " -double" : (gFloatSize == 3) ? " -quad" : "") << " -ftz " << gFTZMode << " -mcd "
+            << gGlobal->gMaxCopyDelay << ((gMemoryManager) ? " -mem" : "") << ((gComputeMix) ? " -cm" : "");
+    } else if (gVectorSwitch) {
+        dst << "-vec"
+            << " -lv " << gVectorLoopVariant << " -vs " << gVecSize << ((gFunTaskSwitch) ? " -fun" : "")
+            << ((gGroupTaskSwitch) ? " -g" : "") << ((gDeepFirstSwitch) ? " -dfs" : "")
+            << ((gFloatSize == 2) ? " -double" : (gFloatSize == 3) ? " -quad" : "") << " -ftz " << gFTZMode << " -mcd "
+            << gGlobal->gMaxCopyDelay << ((gMemoryManager) ? " -mem" : "") << ((gComputeMix) ? " -cm" : "");
+    } else if (gOpenMPSwitch) {
+        dst << "-omp"
+            << " -vs " << gVecSize << " -vs " << gVecSize << ((gFunTaskSwitch) ? " -fun" : "")
+            << ((gGroupTaskSwitch) ? " -g" : "") << ((gDeepFirstSwitch) ? " -dfs" : "")
+            << ((gFloatSize == 2) ? " -double" : (gFloatSize == 3) ? " -quad" : "") << " -ftz " << gFTZMode << " -mcd "
+            << gGlobal->gMaxCopyDelay << ((gMemoryManager) ? " -mem" : "") << ((gComputeMix) ? " -cm" : "");
     } else {
-        dst << printFloat() << "-ftz " << gFTZMode;
+        dst << ((gFloatSize == 1) ? "-scal" : ((gFloatSize == 2) ? "-double" : (gFloatSize == 3) ? "-quad" : ""))
+            << " -ftz " << gFTZMode << ((gMemoryManager) ? " -mem" : "") << ((gComputeMix) ? " -cm" : "");
     }
 
     // Add 'compile_options' metadata
