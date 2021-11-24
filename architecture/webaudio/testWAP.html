@@ -50,6 +50,7 @@
                 })
             });
         });
+        node.start();
         console.log(node.getDescriptor());
         mediaSource.connect(node);
         node.connect(ctx.destination);

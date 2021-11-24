@@ -116,6 +116,7 @@
                 var factory_url = ".";
                 var factory = new FaustorganPoly(audio_context, 16, factory_url);
                 factory.create().then(node => {
+                    node.start();
                     organ_dsp = node;
                     console.log(organ_dsp.getJSON());
                     // Print paths to be used with 'setParamValue'

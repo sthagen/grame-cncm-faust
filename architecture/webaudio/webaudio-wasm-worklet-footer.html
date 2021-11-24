@@ -146,6 +146,7 @@
 
     // Node activation
     function startDSPAux(aw_node) {
+        aw_node.start();
         node = aw_node;
 
         if (node.getNumInputs() > 0) {

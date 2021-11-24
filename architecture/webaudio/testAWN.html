@@ -2,7 +2,7 @@
 <html>
 
 <head>
-	<title>Host that loads a plugin with its GUI</title>
+    <title>Host that loads a plugin with its GUI</title>
 </head>
 <script src="DSP.js"></script>
 
@@ -17,7 +17,7 @@
     var factory = new VENDORDSP(ctx);
 
     factory.load().then((node) => {
-
+        node.start();
         console.log(node.getDescriptor());
         console.log(node.getParams());
         console.log(node.getJSON());
@@ -37,9 +37,9 @@
         // Connect the node to the destination
         console.log("Connect to output");
         node.connect(ctx.destination);
-                        
+
     });
-    
+
 </script>
 
 </html>

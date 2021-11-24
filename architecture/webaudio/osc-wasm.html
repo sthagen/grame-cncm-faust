@@ -51,6 +51,7 @@
                 var factory_url = ".";
                 var factory = new Faustosc(audio_context, factory_url);
                 factory.create().then(node => {
+                    node.start();
                     osc_dsp = node;
                     console.log(osc_dsp.getJSON());
                     // Print paths to be used with 'setParamValue'

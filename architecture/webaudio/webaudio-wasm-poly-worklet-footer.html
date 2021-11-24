@@ -147,6 +147,7 @@
 
     // Node activation
     function startDSPAux(aw_node) {
+        aw_node.start();
         node = aw_node;
 
         // We may have a polyphonic DSP with an audio input, so connect it...

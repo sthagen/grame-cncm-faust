@@ -76,6 +76,8 @@ function startnoise() {
     var factory_url = ".";
     var factory = new Faustnoise(audio_context, factory_url);
     factory.create().then(node => {
+        // The node has to be explicitely started 
+        node.start(); 
         noise_dsp = node;
         console.log(noise_dsp.getJSON());
         // Print path to be used with 'setParamValue'

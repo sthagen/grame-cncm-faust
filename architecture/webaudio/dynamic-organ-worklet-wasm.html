@@ -133,7 +133,8 @@
 
                 // Dynamically create the Faust generated node from explicit DSP source in 'dsp_code'
                 organ_dsp = await Faust.compileAudioNode(audio_context, module, dsp_code, null, 16);
-
+                // The node has to be explicitely started	
+                organ_dsp.start();
                 // Print DSP JSON	
                 console.log(organ_dsp.getJSON());
                 // Print paths to be used with 'setParamValue'
