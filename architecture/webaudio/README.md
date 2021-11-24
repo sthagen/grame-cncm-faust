@@ -264,7 +264,7 @@ A higher-level API can be used to simplify some of the previously described step
 function compileAudioNode(audioCtx: BaseAudioContext, module: FaustModule, dsp_code: string, effect_code: string | null, voices: number): Promise<FaustMonoNode | FaustPolyNode | null>
 ```
 
-A monophonic can directly be created written with:
+A monophonic node can directly be created with:
 
 ```
 var isWebKitAudio = (typeof (webkitAudioContext) !== "undefined");
@@ -291,7 +291,7 @@ async function startosc(module) {
 }
 ```
 
-A polyphonic node can directly be created written with:
+A polyphonic node can directly be created with:
 
 ```
 var isWebKitAudio = (typeof (webkitAudioContext) !== "undefined");
