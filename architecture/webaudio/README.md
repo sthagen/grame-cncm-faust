@@ -278,10 +278,10 @@ var osc_dsp = null;
 FaustModule().then((module) => { startosc(module); });
 
 async function startosc(module) {
-
     // Dynamically create the Faust generated node from explicit DSP source in 'dsp_code'
     osc_dsp = await Faust.compileAudioNode(audio_context, module, dsp_code, null, 0);
-
+    // The node has to be explicitely started	
+    osc_dsp.start();
     // Print DSP JSON																				
     console.log(osc_dsp.getJSON());
     // Print paths to be used with 'setParamValue'
@@ -308,7 +308,8 @@ async function startorgan(module) {
 
     // Dynamically create the Faust generated node from explicit DSP source in 'dsp_code'
     organ_dsp = await Faust.compileAudioNode(audio_context, module, dsp_code, null, 16);
-
+    // The node has to be explicitely started	
+    organ_dsp.start();
     // Print DSP JSON	
     console.log(organ_dsp.getJSON());
     // Print paths to be used with 'setParamValue'
