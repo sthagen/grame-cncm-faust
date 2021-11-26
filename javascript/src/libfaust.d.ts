@@ -7,7 +7,7 @@ declare namespace Faust {
         readFile(path: string, opts: { encoding: 'utf8'; flags?: string }): string;
     }
 
-    interface IntVector { size(): number; get(i: number): number; }
+    interface IntVector { size(): number; get(i: number): number; delete(): void }
 
     interface FaustWasm {
         /* The C++ factory pointer as in integer */

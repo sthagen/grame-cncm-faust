@@ -61,6 +61,8 @@ namespace Faust {
                         const factory = { cfactory: faust_wasm.cfactory, code: code, module: module, json: faust_wasm.json, poly: poly }
                         // Factory C++ side can be deallocated immediately
                         this.deleteDSPFactory(factory);
+                        // C++ vector<int> can be deallocated from JS side
+                        faust_wasm.data.delete();
                         // Keep the compiled factory in the cache
                         CompilerImp.gFactories.set(sha_key, factory);
                         return factory;
