@@ -4,7 +4,10 @@ set(HAVE_FLAG_SEARCH_PATHS_FIRST 0)
 
 project (faustemcc)
 
-set ( CMAKE_OSX_DEPLOYMENT_TARGET	"")
+# Does not work on Apple M1 where -arch arm64 is generated but does not compile
+#set ( CMAKE_OSX_ARCHITECTURES	"") 
+
+set ( CMAKE_OSX_DEPLOYMENT_TARGET      "")
 set ( CMAKE_OSX_SYSROOT 		"")
 set ( CMAKE_CXX_COMPILER 	"emcc")
 set ( CMAKE_CXX_LINK_FLAGS "")
