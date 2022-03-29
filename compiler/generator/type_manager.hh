@@ -43,7 +43,7 @@ struct StringTypeManager {
 
     virtual ~StringTypeManager() {}
 
-    virtual std::string generateType(Typed* type)                          = 0;
+    virtual std::string generateType(Typed* type, NamedTyped::Attribute attr = NamedTyped::kDefault) = 0;
     virtual std::string generateType(Typed* type, const std::string& name) = 0;
 };
 
@@ -74,9 +74,10 @@ class CStringTypeManager : public StringTypeManager {
         fTypeDirectTable[Typed::kDouble_ptr_ptr] = "double" + fPtrRef + fPtrRef;
         fTypeDirectTable[Typed::kDouble_vec]     = "vector<double>";
 
-        fTypeDirectTable[Typed::kQuad]     = "quad";
-        fTypeDirectTable[Typed::kQuad_ptr] = "quad" + fPtrRef;
-        fTypeDirectTable[Typed::kQuad_vec] = "vector<quad>";
+        fTypeDirectTable[Typed::kQuad]         = "quad";
+        fTypeDirectTable[Typed::kQuad_ptr]     = "quad" + fPtrRef;
+        fTypeDirectTable[Typed::kQuad_ptr_ptr] = "quad" + fPtrRef + fPtrRef;
+        fTypeDirectTable[Typed::kQuad_vec]     = "vector<quad>";
         
         fTypeDirectTable[Typed::kFixedPoint]     = "fixpoint_t";
         fTypeDirectTable[Typed::kFixedPoint_ptr] = "fixpoint_t" + fPtrRef;
@@ -100,7 +101,7 @@ class CStringTypeManager : public StringTypeManager {
         fTypeDirectTable[Typed::kUint_ptr] = "uintptr_t";
     }
 
-    virtual std::string generateType(Typed* type)
+    virtual std::string generateType(Typed* type, NamedTyped::Attribute attr = NamedTyped::kDefault)
     {
         BasicTyped* basic_typed = dynamic_cast<BasicTyped*>(type);
         NamedTyped* named_typed = dynamic_cast<NamedTyped*>(type);
@@ -110,7 +111,7 @@ class CStringTypeManager : public StringTypeManager {
         if (basic_typed) {
             return fTypeDirectTable[basic_typed->fType];
         } else if (named_typed) {
-            return generateType(named_typed->fType) + " " + named_typed->fName;
+            return generateType(named_typed->fType) + NamedTyped::AttributeMap[attr] + named_typed->fName;
         } else if (array_typed) {
             return fTypeDirectTable[array_typed->getType()];
         } else if (struct_typed) {
@@ -137,9 +138,9 @@ class CStringTypeManager : public StringTypeManager {
         } else if (named_typed) {
             return named_typed->fName + generateType(named_typed->fType) + " " + name;
         } else if (array_typed) {
-            return (array_typed->fSize == 0 || array_typed->fIsPtr)
-                       ? generateType(array_typed->fType) + fPtrRef + " " + name
-            : generateType(array_typed->fType) + " " + name + "[" + std::to_string(array_typed->fSize) + "]";
+            return (array_typed->fSize == 0)
+                    ? generateType(array_typed->fType) + fPtrRef + " " + name
+                    : generateType(array_typed->fType) + " " + name + "[" + std::to_string(array_typed->fSize) + "]";
         } else {
             faustassert(false);
             return "";
@@ -198,7 +199,7 @@ class RustStringTypeManager : public StringTypeManager {
         // TODO : handling kUint_ptr
     }
 
-    virtual std::string generateType(Typed* type)
+    virtual std::string generateType(Typed* type, NamedTyped::Attribute attr = NamedTyped::kDefault)
     {
         BasicTyped* basic_typed = dynamic_cast<BasicTyped*>(type);
         NamedTyped* named_typed = dynamic_cast<NamedTyped*>(type);
@@ -289,7 +290,7 @@ class SOULStringTypeManager : public StringTypeManager {
         // TODO : handling kUint_ptr
     }
 
-    virtual std::string generateType(Typed* type)
+    virtual std::string generateType(Typed* type, NamedTyped::Attribute attr = NamedTyped::kDefault)
     {
         BasicTyped* basic_typed = dynamic_cast<BasicTyped*>(type);
         NamedTyped* named_typed = dynamic_cast<NamedTyped*>(type);
@@ -318,9 +319,9 @@ class SOULStringTypeManager : public StringTypeManager {
         } else if (named_typed) {
             return named_typed->fName + generateType(named_typed->fType) + " " + name;
         } else if (array_typed) {
-            return (array_typed->fSize == 0 || array_typed->fIsPtr)
-                       ? generateType(array_typed->fType) + fPtrRef + " " + name
-                       : generateType(array_typed->fType) + "[" + std::to_string(array_typed->fSize) + "] " + name;
+            return (array_typed->fSize == 0)
+                    ? generateType(array_typed->fType) + fPtrRef + " " + name
+                    : generateType(array_typed->fType) + "[" + std::to_string(array_typed->fSize) + "] " + name;
         } else {
             faustassert(false);
             return "";
@@ -380,7 +381,7 @@ class JuliaStringTypeManager : public StringTypeManager {
         fTypeDirectTable[Typed::kUint_ptr] = "uintptr_t";
     }
 
-    virtual std::string generateType(Typed* type)
+    virtual std::string generateType(Typed* type, NamedTyped::Attribute attr = NamedTyped::kDefault)
     {
         BasicTyped* basic_typed = dynamic_cast<BasicTyped*>(type);
         NamedTyped* named_typed = dynamic_cast<NamedTyped*>(type);

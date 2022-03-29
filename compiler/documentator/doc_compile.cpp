@@ -199,12 +199,7 @@ string DocCompiler::generateCode(Tree sig, int priority)
     } else if (isSigPrefix(sig, x, y)) {
         printGCCall(sig, "generatePrefix");
         return generatePrefix(sig, x, y, priority);
-    } else if (isSigIota(sig, x)) {
-        printGCCall(sig, "generateIota");
-        return generateIota(sig, x);
-    }
-
-    else if (isSigBinOp(sig, &i, x, y)) {
+    } else if (isSigBinOp(sig, &i, x, y)) {
         printGCCall(sig, "generateBinOp");
         return generateBinOp(sig, i, x, y, priority);
     } else if (isSigFFun(sig, ff, largs)) {
@@ -988,24 +983,7 @@ string DocCompiler::generatePrefix(Tree sig, Tree x, Tree e, int priority)
     return generateCacheCode(sig, subst("$0(t)", var));
 }
 
-/*****************************************************************************
-                               IOTA(n)
-*****************************************************************************/
-
-/**
- * Generate a "iota" time function, n-cyclical.
- */
-string DocCompiler::generateIota(Tree sig, Tree n)
-{
-    int size;
-    if (!isSigInt(n, &size)) {
-        throw faustexception("ERROR in generateIota\n");
-    }
-    // cout << "iota !" << endl;
-    return subst(" t \\bmod{$0} ", docT(size));
-}
-
-// a revoir en utilisant la lecture de table et en partageant la construction de la paire de valeurs
+// to be reviewed using table reading and sharing the construction of the value pair
 
 /**
  * Generate a select2 code
@@ -1022,33 +1000,6 @@ string DocCompiler::generateSelect2(Tree sig, Tree sel, Tree s1, Tree s2, int pr
     ltqSelDef += "\\left\\{\\begin{array}{ll}\n";
     ltqSelDef += subst("$0 & \\mbox{if \\,} $1 = 0\\\\\n", exps1, expsel);
     ltqSelDef += subst("$0 & \\mbox{if \\,} $1 = 1\n", exps2, expsel);
-    ltqSelDef += "\\end{array}\\right.";
-
-    fLateq->addSelectSigFormula(ltqSelDef);
-    gGlobal->gDocNoticeFlagMap["selectionsigs"] = true;
-
-    // return generateCacheCode(sig, subst("$0(t)", var));
-    setVectorNameProperty(sig, var);
-    return subst("$0(t)", var);
-}
-
-/**
- * Generate a select3 code
- */
-string DocCompiler::generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3, int priority)
-{
-    string var    = getFreshID("q");
-    string expsel = CS(sel, 0);
-    string exps1  = CS(s1, 0);
-    string exps2  = CS(s2, 0);
-    string exps3  = CS(s3, 0);
-
-    string ltqSelDef;
-    ltqSelDef += subst("$0(t) = \n", var);
-    ltqSelDef += "\\left\\{\\begin{array}{ll}\n";
-    ltqSelDef += subst("$0 & \\mbox{if \\,} $1 = 0\\\\\n", generateVariableStore(s1, exps1), expsel);
-    ltqSelDef += subst("$0 & \\mbox{if \\,} $1 = 1\\\\\n", generateVariableStore(s2, exps2), expsel);
-    ltqSelDef += subst("$0 & \\mbox{if \\,} $1 = 2\n", generateVariableStore(s3, exps3), expsel);
     ltqSelDef += "\\end{array}\\right.";
 
     fLateq->addSelectSigFormula(ltqSelDef);

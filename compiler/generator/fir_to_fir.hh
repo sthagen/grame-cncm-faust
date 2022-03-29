@@ -159,7 +159,9 @@ struct RemoverCloneVisitor : public BasicCloneVisitor {
     }
 };
 
+// ========================================
 // Used in WebAssembly and Interp backends
+// ========================================
 
 /*
  For subcontainers table generation : rename 'sig' in 'dsp' and remove 'dsp' allocation.
@@ -188,7 +190,6 @@ struct DspRenamer : public BasicCloneVisitor {
         }
     }
 
-    BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
 };
 
 // Moves all variables declaration at the beginning of the block and rewrite them as 'declaration' followed by 'store'
@@ -436,11 +437,11 @@ struct LoopVariableRenamer : public BasicCloneVisitor {
         }
     }
     
-    BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
 };
 
-
+// ===============
 // Inlining tools
+// ===============
 
 // TODO: stack variables should be renamed since inlining the same function several times will create variables name clash
 
@@ -453,6 +454,7 @@ struct FunctionInliner {
 
 // Replace a function call with the actual inlined function code
 struct FunctionCallInliner : public BasicCloneVisitor {
+    
     DeclareFunInst* fFunction;
 
     FunctionCallInliner(DeclareFunInst* function) : fFunction(function) {}
@@ -475,11 +477,11 @@ struct FunctionCallInliner : public BasicCloneVisitor {
         }
     }
 
-    BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
 };
 
 // Compute the size in bytes of variables of a given type
 struct VariableSizeCounter : public DispatchVisitor {
+    
     int                 fSizeBytes;
     Typed::VarType      fType;
     Address::AccessType fAccess;
@@ -496,13 +498,14 @@ struct VariableSizeCounter : public DispatchVisitor {
         DispatchVisitor::visit(inst);
 
         if (((fType == Typed::kNoType) || (inst->fType->getType() == fType)) && inst->fAddress->getAccess() | fAccess) {
-            fSizeBytes += inst->fType->getSize();
+            fSizeBytes += inst->fType->getSizeBytes();
         }
     }
 };
 
 // Remove unneeded cast
 struct CastRemover : public BasicTypingCloneVisitor {
+    
     virtual ValueInst* visit(::CastInst* inst)
     {
         inst->fInst->accept(&fTypingVisitor);
@@ -538,7 +541,6 @@ struct CastRemover : public BasicTypingCloneVisitor {
         }
     }
 
-    BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
 };
 
 /*
@@ -547,6 +549,7 @@ struct CastRemover : public BasicTypingCloneVisitor {
   v1 = &foo[n];      ==> usage of v1[m] are replaced with foo[n+m]
  */
 struct VarAddressRemover : public BasicCloneVisitor {
+    
     std::map<string, LoadVarAddressInst*> fVariableMap;
 
     virtual StatementInst* visit(DeclareVarInst* inst)
@@ -587,7 +590,6 @@ struct VarAddressRemover : public BasicCloneVisitor {
         }
     }
 
-    BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
 };
 
 // Expand and rewrite ControlInst as 'IF (cond) {....}' instructions
@@ -616,10 +618,132 @@ struct ControlExpander : public BasicCloneVisitor {
     
     StatementInst* visit(ControlInst* inst);
     StatementInst* visit(BlockInst* inst);
-   
-    BlockInst* getCode(BlockInst* src)
+    
+};
+
+// Base class for iConst/fConst memory copy in -osX modes
+struct ConstantsCopyMemory : public BasicCloneVisitor {
+    
+    int fIntIndex = 0;
+    int fRealIndex = 0;
+    
+    ConstantsCopyMemory(int int_index, int float_index):fIntIndex(int_index), fRealIndex(float_index)
+    {}
+    
+    StatementInst* visit(DeclareVarInst* inst)
     {
-        return static_cast<BlockInst*>(src->clone(this));
+        return InstBuilder::genDropInst();
+    }
+    
+};
+
+// Analysis to copy constants from an external memory zone (FunArgs version)
+struct ConstantsCopyFromMemory : public ConstantsCopyMemory {
+    
+    ConstantsCopyFromMemory(int int_index, int float_index):ConstantsCopyMemory(int_index, float_index)
+    {}
+    
+    StatementInst* visit(StoreVarInst* inst)
+    {
+        string name = inst->fAddress->getName();
+        bool is_struct = inst->fAddress->getAccess() & Address::kStruct;
+        if (startWith(name, "iConst") && is_struct) {
+            ValueInst* zone = InstBuilder::genLoadArrayFunArgsVar("iZone", FIRIndex(fIntIndex++));
+            return InstBuilder::genStoreVarInst(inst->fAddress->clone(this), zone);
+        } else if (startWith(name, "fConst") && is_struct) {
+            ValueInst* zone = InstBuilder::genLoadArrayFunArgsVar("fZone", FIRIndex(fRealIndex++));
+            return InstBuilder::genStoreVarInst(inst->fAddress->clone(this), zone);
+        } else if (name == "fSampleRate") {
+            return BasicCloneVisitor::visit(inst);
+        } else {
+            return InstBuilder::genDropInst();
+        }
+    }
+    
+};
+
+// Analysis to copy constants from an external memory zone (Struct version)
+struct ConstantsCopyFromMemory1 : public ConstantsCopyMemory {
+    
+    ConstantsCopyFromMemory1(int int_index, int float_index):ConstantsCopyMemory(int_index, float_index)
+    {}
+    
+    StatementInst* visit(StoreVarInst* inst)
+    {
+        string name = inst->fAddress->getName();
+        bool is_struct = inst->fAddress->getAccess() & Address::kStruct;
+        if (startWith(name, "iConst") && is_struct) {
+            ValueInst* zone = InstBuilder::genLoadArrayStructVar("iZone", FIRIndex(fIntIndex++));
+            return InstBuilder::genStoreVarInst(inst->fAddress->clone(this), zone);
+        } else if (startWith(name, "fConst") && is_struct) {
+            ValueInst* zone = InstBuilder::genLoadArrayStructVar("fZone", FIRIndex(fRealIndex++));
+            return InstBuilder::genStoreVarInst(inst->fAddress->clone(this), zone);
+        } else if (name == "fSampleRate") {
+            return BasicCloneVisitor::visit(inst);
+        } else {
+            return InstBuilder::genDropInst();
+        }
+    }
+    
+};
+
+// Analysis to copy constants to an external memory zone (FunArgs version)
+struct ConstantsCopyToMemory : public ConstantsCopyMemory {
+    
+    ConstantsCopyToMemory(int int_index, int float_index):ConstantsCopyMemory(int_index, float_index)
+    {}
+    
+    StatementInst* visit(StoreVarInst* inst)
+    {
+        string name = inst->fAddress->getName();
+        bool is_struct = inst->fAddress->getAccess() & Address::kStruct;
+        if (startWith(name, "iConst") && is_struct) {
+            return InstBuilder::genStoreArrayFunArgsVar("iZone", FIRIndex(fIntIndex++), InstBuilder::genLoadStructVar(name));
+        } else if (startWith(name, "fConst") && is_struct) {
+            return InstBuilder::genStoreArrayFunArgsVar("fZone", FIRIndex(fRealIndex++), InstBuilder::genLoadStructVar(name));
+        } else if (name == "fSampleRate") {
+            return BasicCloneVisitor::visit(inst);
+        } else {
+            return InstBuilder::genDropInst();
+        }
+    }
+
+};
+
+// Analysis to copy constants to an external memory zone (Struct version)
+struct ConstantsCopyToMemory1 : public ConstantsCopyMemory {
+    
+    ConstantsCopyToMemory1(int int_index, int float_index):ConstantsCopyMemory(int_index, float_index)
+    {}
+    
+    StatementInst* visit(StoreVarInst* inst)
+    {
+        string name = inst->fAddress->getName();
+        bool is_struct = inst->fAddress->getAccess() & Address::kStruct;
+        if (startWith(name, "iConst") && is_struct) {
+            return InstBuilder::genStoreArrayStructVar("iZone", FIRIndex(fIntIndex++), InstBuilder::genLoadStructVar(name));
+        } else if (startWith(name, "fConst") && is_struct) {
+            return InstBuilder::genStoreArrayStructVar("fZone", FIRIndex(fRealIndex++), InstBuilder::genLoadStructVar(name));
+        } else if (name == "fSampleRate") {
+            return BasicCloneVisitor::visit(inst);
+        } else {
+            return InstBuilder::genDropInst();
+        }
+    }
+    
+};
+
+// Rewrite DSP array fields as pointers
+struct ArrayToPointer : public BasicCloneVisitor {
+    
+    virtual StatementInst* visit(DeclareVarInst* inst)
+    {
+        ArrayTyped* array_typed = dynamic_cast<ArrayTyped*>(inst->fType);
+        if (array_typed) {
+            return InstBuilder::genDecStructVar(inst->getName(), InstBuilder::genArrayTyped(array_typed->fType->clone(this), 0));
+        } else {
+            return BasicCloneVisitor::visit(inst);
+        }
     }
     
 };

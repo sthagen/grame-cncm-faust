@@ -1,4 +1,4 @@
-% man(1) Version 2.37.3 (22-October-2021) | Faust man page
+% man(1) Version 2.40.0 (18-March-2022) | Faust man page
 
 NAME
 ====
@@ -27,7 +27,7 @@ Input options:
 
   **-A** \<dir>  **--architecture-dir** \<dir>      add the directory \<dir> to the architecture search path.
 
-  **-I** \<dir>  **--import-dir** \<dir>            add the directory \<dir> to the import search path.
+  **-I** \<dir>  **--import-dir** \<dir>            add the directory \<dir> to the libraries search path.
 
   **-L** \<file> **--library** \<file>              link with the LLVM module \<file>.
 
@@ -72,6 +72,8 @@ Code generation options:
 
   **-clang**      **--clang**                     when compiled with clang/clang++, adds specific #pragma for auto-vectorization.
 
+  **-nvi**        **--no-virtual**                when compiled with the C++ backend, does not add the 'virtual' keyword.
+
   **-exp10**      **--generate-exp10**            pow(10,x) replaced by possibly faster exp10(x).
 
   **-os**         **--one-sample**                generate one sample computation (same as -os0).
@@ -79,6 +81,10 @@ Code generation options:
   **-os0**        **--one-sample0**               generate one sample computation (0 = separated control).
 
   **-os1**        **--one-sample1**               generate one sample computation (1 = separated control and DSP struct).
+
+  **-os2**        **--one-sample2**               generate one sample computation (2 = separated control and DSP struct. Separation in short and long delay lines).
+
+  **-os3**        **--one-sample3**               generate one sample computation (3 = like 2 but with external memory pointers kept in the DSP struct).
 
   **-cm**         **--compute-mix**               mix in outputs buffers.
 
@@ -92,7 +98,7 @@ Code generation options:
 
   **-dlt** \<n>    **--delay-line-threshold** \<n>  threshold between 'mask' and 'select' ring buffer implementation (default INT_MAX samples).
 
-  **-mem**        **--memory**                    allocate static in global state using a custom memory manager.
+  **-mem**        **--memory-manager**            allocate static in global state using a custom memory manager.
 
   **-ftz** \<n>    **--flush-to-zero** \<n>         code added to recursive signals [0:no (default), 1:fabs based, 2:mask based (fastest)].
 
@@ -229,6 +235,6 @@ Please report bugs to: **<https://github.com/grame-cncm/faust/issues>**
 AUTHOR
 ======
 
-Copyright (C) 2002-2021, GRAME - Centre National de Creation Musicale.
+Copyright (C) 2002-2022, GRAME - Centre National de Creation Musicale.
 All rights reserved.
 

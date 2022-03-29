@@ -1,27 +1,26 @@
-/************************** BEGIN dsp-optimizer.h **************************/
-/************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2016-2020 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
-    This Architecture section is free software; you can redistribute it 
-    and/or modify it under the terms of the GNU General Public License 
-    as published by the Free Software Foundation; either version 3 of 
-    the License, or (at your option) any later version.
+/************************** BEGIN dsp-optimizer.h ***************************
+FAUST Architecture File
+Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License 
-    along with this program; If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-    EXCEPTION : As a special exception, you may create a larger work 
-    that contains this FAUST architecture section and distribute  
-    that work under terms of your choice, so long as this FAUST 
-    architecture section is not modified. 
-
-************************************************************************/
+EXCEPTION : As a special exception, you may create a larger work
+that contains this FAUST architecture section and distribute
+that work under terms of your choice, so long as this FAUST
+architecture section is not modified.
+***************************************************************************/
 
 #ifndef __dsp_optimizer__
 #define __dsp_optimizer__
@@ -41,6 +40,9 @@
 template <typename REAL>
 class dsp_optimizer_real {
 
+    typedef std::vector<std::string> TOption;
+    typedef std::vector<TOption> TOptionTable;
+    
     private:
     
         int fBufferSize;     // size of a vector in samples
@@ -66,7 +68,7 @@ class dsp_optimizer_real {
         std::string fTarget;
         std::string fError;
     
-        std::vector<std::vector <std::string> > fOptionsTable;
+        TOptionTable fOptionsTable;
     
         double bench(int run)
         {
@@ -114,7 +116,7 @@ class dsp_optimizer_real {
                 fOptionsTable.push_back(t1);
             }
             
-            // vec -lv 0
+            // vec -lv 0 -fun
             for (int size = 4; size <= fBufferSize; size *= 2) {
                 std::vector <std::string> t1;
                 t1.push_back("-vec");
@@ -125,7 +127,8 @@ class dsp_optimizer_real {
                 t1.push_back(std::to_string(size));
                 fOptionsTable.push_back(t1);
             }
-            
+        
+            /*
             // vec -lv 0 -g
             for (int size = 4; size <= fBufferSize; size *= 2) {
                 std::vector <std::string> t1;
@@ -149,7 +152,8 @@ class dsp_optimizer_real {
                 t1.push_back("-dfs");
                 fOptionsTable.push_back(t1);
             }
-      
+            */
+            
             // vec -lv 1
             for (int size = 4; size <= fBufferSize; size *= 2) {
                 std::vector <std::string> t1;
@@ -160,7 +164,20 @@ class dsp_optimizer_real {
                 t1.push_back(std::to_string(size));
                 fOptionsTable.push_back(t1);
             }
+             
+            // vec -lv 1 -fun
+            for (int size = 4; size <= fBufferSize; size *= 2) {
+                std::vector <std::string> t1;
+                t1.push_back("-vec");
+                t1.push_back("-fun");
+                t1.push_back("-lv");
+                t1.push_back("1");
+                t1.push_back("-vs");
+                t1.push_back(std::to_string(size));
+                fOptionsTable.push_back(t1);
+            }
             
+            /*
             // vec -lv 1 -g
             for (int size = 4; size <= fBufferSize; size *= 2) {
                 std::vector <std::string> t1;
@@ -185,7 +202,6 @@ class dsp_optimizer_real {
                 fOptionsTable.push_back(t1);
             }
             
-            /*
             // sch
             for (int size = 4; size <= fBufferSize; size *= 2) {
                  std::vector <std::string> t1;
@@ -214,7 +230,7 @@ class dsp_optimizer_real {
             return res_item;
         }
         
-        bool computeOne(const std::vector<std::string>& item, int run, double& res)
+        bool computeOne(const TOption& item, int run, double& res)
         {
             int argc = 0;
             const char* argv[64];
@@ -252,7 +268,7 @@ class dsp_optimizer_real {
             return true;
         }
     
-        std::pair<double, std::vector<std::string> > findOptimizedParametersAux(const std::vector<std::vector <std::string> >& options)
+        std::pair<double, TOption> findOptimizedParametersAux(const TOptionTable& options)
         {
             std::vector<std::pair<int, double > > table_res;
             double res = 0.;
@@ -364,15 +380,21 @@ class dsp_optimizer_real {
          *
          * @return the best result (in Megabytes/seconds), and compilation parameters in a vector.
          */
-        std::pair<double, std::vector<std::string> > findOptimizedParameters()
+        std::pair<double, TOption> findOptimizedParameters()
         {
             if (fTrace) fprintf(stdout, "Discover best parameters option\n");
-            std::pair<double, std::vector<std::string> > best1 = findOptimizedParametersAux(fOptionsTable);
+            std::pair<double, TOption> best1 = findOptimizedParametersAux(fOptionsTable);
             
             if (fTrace) fprintf(stdout, "Refined with -mcd\n");
-            std::vector<std::vector <std::string> > options_table;
+            TOptionTable options_table;
+        
+            // Start from 0
+            TOption best2 = best1.second;
+            best2.push_back("-mcd");
+            best2.push_back("0");
+            options_table.push_back(best2);
             for (int size = 2; size <= 256; size *= 2) {
-                std::vector<std::string> best2 = best1.second;
+                TOption best2 = best1.second;
                 best2.push_back("-mcd");
                 best2.push_back(std::to_string(size));
                 options_table.push_back(best2);
@@ -380,12 +402,44 @@ class dsp_optimizer_real {
             
             if (fNeedExp10) {
                 if (fTrace) fprintf(stdout, "Use -exp10\n");
-                std::vector<std::string> t0_exp10;
+                TOption t0_exp10;
                 t0_exp10.push_back("-exp10");
                 options_table.push_back(t0_exp10);
             }
             
-            return findOptimizedParametersAux(options_table);
+            std::pair<double, TOption > best3 = findOptimizedParametersAux(options_table);
+           
+            if (best3.second[0] == "-vec") {
+                if (fTrace) fprintf(stdout, "Check with -g or -dfs\n");
+                // Current best
+                TOptionTable options_table1;
+                {
+                    TOption best2 = best3.second;
+                    options_table1.push_back(best2);
+                }
+                // Add -g
+                {
+                    TOption best2 = best3.second;
+                    best2.push_back("-g");
+                    options_table1.push_back(best2);
+                }
+                // Add -dfs
+                {
+                    TOption best2 = best3.second;
+                    best2.push_back("-dfs");
+                    options_table1.push_back(best2);
+                }
+                // Add -g and -dfs
+                {
+                    TOption best2 = best3.second;
+                    best2.push_back("-g");
+                    best2.push_back("-dfs");
+                    options_table1.push_back(best2);
+                }
+                return findOptimizedParametersAux(options_table1);
+            } else {
+                return best3;
+            }
         }
     
         /**

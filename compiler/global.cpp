@@ -87,6 +87,10 @@
 #include "dlang_code_container.hh"
 #endif
 
+#ifdef JULIA_BUILD
+#include "julia_code_container.hh"
+#endif
+
 // Parser
 extern FILE*       yyin;
 extern const char* yyfilename;
@@ -151,6 +155,7 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gDSPStruct  = false;
     gLightMode  = false;
     gClang      = false;
+    gNoVirtual  = false;
     gCheckTable = "";
     
     gMathExceptions = false;
@@ -358,7 +363,6 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     SIGDELAY1          = symbol("SigDelay1");
     SIGDELAY           = symbol("SigDelay");
     SIGPREFIX          = symbol("SigPrefix");
-    SIGIOTA            = symbol("SigIota");
     SIGRDTBL           = symbol("SigRDTbl");
     SIGWRTBL           = symbol("SigWRTbl");
     SIGTABLE           = symbol("SigTable");
@@ -407,11 +411,13 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     SYMRECREF = symbol("SYMRECREF");
     SYMLIFTN  = symbol("LIFTN");
 
-    gMachineFloatSize  = sizeof(float);
-    gMachineInt32Size  = sizeof(int);
-    gMachineInt64Size  = sizeof(long int);
-    gMachineDoubleSize = sizeof(double);
-    gMachineBoolSize   = sizeof(bool);
+    gMachineFloatSize      = sizeof(float);
+    gMachineInt32Size      = sizeof(int);
+    gMachineInt64Size      = sizeof(long int);
+    gMachineDoubleSize     = sizeof(double);
+    gMachineQuadSize       = sizeof(long double);
+    gMachineFixedPointSize = gMachineFloatSize;
+    gMachineBoolSize       = sizeof(bool);
 
     // Assuming we are compiling for a 64 bits machine
     gMachinePtrSize = sizeof(nullptr);
@@ -612,7 +618,7 @@ void global::init()
     gMathForeignFunctions["copysignl"] = true;
 }
 
-static string printFloat()
+string global::printFloat()
 {
     switch (gGlobal->gFloatSize) {
         case 1:
@@ -622,7 +628,7 @@ static string printFloat()
         case 3:
             return "-quad ";
         case 4:
-            return "-fp ";
+            return "-fx ";
         default:
             faustassert(false);
             return "";
@@ -643,6 +649,7 @@ void global::printCompilationOptions(stringstream& dst, bool backend)
         dst << "-lang " << gOutputLang << " ";
 #endif
     }
+    if (gInlineArchSwitch) dst << "-i ";
     if (gInPlace) dst << "-inpl ";
     if (gOneSample >= 0) dst << "-os" << gOneSample << " ";
     if (gLightMode) dst << "-light ";
@@ -650,28 +657,40 @@ void global::printCompilationOptions(stringstream& dst, bool backend)
     if (gComputeMix) dst << "-cm ";
     if (gRangeUI) dst << "-rui ";
     if (gMathApprox) dst << "-mapp ";
+    if (gClassName != "mydsp") dst << "-cn " << gClassName << " ";
+    if (gSuperClassName != "dsp") dst << "-scn " << gSuperClassName << " ";
+    if (gProcessName != "process") dst << "-pn " << gProcessName << " ";
     if (gMaskDelayLineThreshold != INT_MAX) dst << "-dtl " << gMaskDelayLineThreshold << " ";
     dst << "-es " << gEnableFlag << " ";
     if (gHasExp10) dst << "-exp10 ";
     if (gSchedulerSwitch) dst << "-sch ";
     if (gOpenMPSwitch) dst << "-omp " << ((gOpenMPLoop) ? "-pl " : "");
+    dst << "-mcd " << gGlobal->gMaxCopyDelay << " ";
+    if (gGlobal->gUIMacroSwitch) dst << "-uim ";
+    dst << printFloat() << "-ftz " << gFTZMode << " ";
     if (gVectorSwitch) {
         dst << "-vec "
             << "-lv " << gVectorLoopVariant << " "
             << "-vs " << gVecSize << " " << ((gFunTaskSwitch) ? "-fun " : "") << ((gGroupTaskSwitch) ? "-g " : "")
-            << ((gDeepFirstSwitch) ? "-dfs " : "") << printFloat() << "-ftz " << gFTZMode << " "
-            << "-mcd " << gGlobal->gMaxCopyDelay;
-    } else {
-        dst << printFloat() << "-ftz " << gFTZMode;
+            << ((gDeepFirstSwitch) ? "-dfs " : "");
     }
-
+  
     // Add 'compile_options' metadata
-    gGlobal->gMetaDataSet[tree("compile_options")].insert(tree("\"" + dst.str() + "\""));
+    string res = dst.str();
+    gGlobal->gMetaDataSet[tree("compile_options")].insert(tree("\"" + res.substr(0, res.size()-1) + "\""));
+}
+
+string global::printCompilationOptions1()
+{
+    stringstream dst;
+    printCompilationOptions(dst, true);
+    string res = dst.str();
+    return res.substr(0, res.size()-1);
 }
 
 void global::initTypeSizeMap()
 {
-    // Init type size table
+    // Init type size table (in bytes)
     gTypeSizeMap[Typed::kFloat]         = gMachineFloatSize;
     gTypeSizeMap[Typed::kFloat_ptr]     = gMachinePtrSize;
     gTypeSizeMap[Typed::kFloat_ptr_ptr] = gMachinePtrSize;
@@ -683,6 +702,18 @@ void global::initTypeSizeMap()
     gTypeSizeMap[Typed::kDouble_ptr_ptr] = gMachinePtrSize;
     gTypeSizeMap[Typed::kDouble_vec]     = gMachineDoubleSize * gVecSize;
     gTypeSizeMap[Typed::kDouble_vec_ptr] = gMachinePtrSize;
+    
+    gTypeSizeMap[Typed::kQuad]         = gMachineQuadSize;
+    gTypeSizeMap[Typed::kQuad_ptr]     = gMachinePtrSize;
+    gTypeSizeMap[Typed::kQuad_ptr_ptr] = gMachinePtrSize;
+    gTypeSizeMap[Typed::kQuad_vec]     = gMachineQuadSize * gVecSize;
+    gTypeSizeMap[Typed::kQuad_vec_ptr] = gMachinePtrSize;
+    
+    gTypeSizeMap[Typed::kFixedPoint]         = gMachineFixedPointSize;
+    gTypeSizeMap[Typed::kFixedPoint_ptr]     = gMachinePtrSize;
+    gTypeSizeMap[Typed::kFixedPoint_ptr_ptr] = gMachinePtrSize;
+    gTypeSizeMap[Typed::kFixedPoint_vec]     = gMachineFixedPointSize * gVecSize;
+    gTypeSizeMap[Typed::kFixedPoint_vec_ptr] = gMachinePtrSize;
 
     gTypeSizeMap[Typed::kInt32]         = gMachineInt32Size;
     gTypeSizeMap[Typed::kInt32_ptr]     = gMachinePtrSize;
@@ -715,6 +746,25 @@ void global::initTypeSizeMap()
 int global::audioSampleSize()
 {
     return int(pow(2.f, float(gFloatSize + 1)));
+}
+
+bool global::hasForeignFunction(const string& name, const string& inc_file)
+{
+    // LLVM backend can use 'standard' foreign linked functions
+    static vector<std::string> inc_file_list = { "<math.h>", "<cmath>", "<stdlib.h>" };
+    bool is_linkable = (gOutputLang == "llvm") && (find(begin(inc_file_list), end(inc_file_list), inc_file) != inc_file_list.end());
+    
+    bool has_internal_math_ff = ((gOutputLang == "llvm")
+                                 || startWith(gOutputLang, "wast")
+                                 || startWith(gOutputLang, "wasm")
+                                 || (gOutputLang == "interp")
+                                 || startWith(gOutputLang, "soul")
+                                 || (gOutputLang == "dlang")
+                                 || (gOutputLang == "csharp")
+                                 || (gOutputLang == "rust")
+                                 || (gOutputLang == "julia"));
+    
+    return (has_internal_math_ff && (gMathForeignFunctions.find(name) != gMathForeignFunctions.end())) || is_linkable;
 }
 
 BasicTyped* global::genBasicTyped(Typed::VarType type)
@@ -766,7 +816,7 @@ global::~global()
 #ifdef JAVA_BUILD
     JAVAInstVisitor::cleanup();
 #endif
-#ifdef JULIS_BUILD
+#ifdef JULIA_BUILD
     JuliaInstVisitor::cleanup();
 #endif
 #ifdef RUST_BUILD

@@ -30,6 +30,8 @@
 // Used when inlining functions
 std::stack<BlockInst*> BasicCloneVisitor::fBlockStack;
 
+vector <string> NamedTyped::AttributeMap = {" ", " RESTRICT "};
+
 DeclareStructTypeInst* isStructType(const string& name)
 {
     if (gGlobal->gVarTypeTable.find(name) != gGlobal->gVarTypeTable.end()) {
@@ -102,9 +104,16 @@ DeclareVarInst::DeclareVarInst(Address* address, Typed* type, ValueInst* value)
         } else {
             // If array type, check their size and internal type
             ArrayTyped* array_t1 = dynamic_cast<ArrayTyped*>(gGlobal->gVarTypeTable[fAddress->getName()]);
-            ArrayTyped* arry_t2  = dynamic_cast<ArrayTyped*>(type);
-            if (array_t1 && arry_t2) {
-                faustassert(array_t1->fSize == arry_t2->fSize && array_t1->fType == arry_t2->fType);
+            ArrayTyped* array_t2  = dynamic_cast<ArrayTyped*>(type);
+            if (array_t1 && array_t2) {
+                // Arrays have the exact same size
+                bool same_size = array_t1->fSize == array_t2->fSize;
+                // Or not but one of them is actually a pointer
+                bool compatible_size = (array_t1->fSize != array_t2->fSize)
+                    && array_t1->fType == array_t2->fType
+                    && (array_t1->fSize == 0 || array_t2->fSize == 0);
+                bool same_type = array_t1->fType == array_t2->fType;
+                faustassert((same_size && same_type) || compatible_size);
             } else {
                 faustassert(false);
             }
@@ -144,25 +153,25 @@ BasicTyped* InstBuilder::genBasicTyped(Typed::VarType type)
     return gGlobal->genBasicTyped(type);
 }
 
-int BasicTyped::getSize() const
+int BasicTyped::getSizeBytes() const
 {
     faustassert(gGlobal->gTypeSizeMap.find(fType) != gGlobal->gTypeSizeMap.end());
     return gGlobal->gTypeSizeMap[fType];
 }
 
-int FunTyped::getSize() const
+int FunTyped::getSizeBytes() const
 {
     return gGlobal->gTypeSizeMap[Typed::kVoid_ptr];
 }
 
-int ArrayTyped::getSize() const
+int ArrayTyped::getSizeBytes() const
 {
     if (fSize == 0) {
         // Array of zero size are treated as pointer in the corresponding type
         faustassert(gGlobal->gTypeSizeMap.find(getType()) != gGlobal->gTypeSizeMap.end());
         return gGlobal->gTypeSizeMap[getType()];
     } else {
-        return fType->getSize() * fSize;
+        return fType->getSizeBytes() * fSize;
     }
 }
 

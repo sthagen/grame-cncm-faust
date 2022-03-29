@@ -4,7 +4,7 @@ Several programs and tools are available to test the dynamic compilation chain, 
 
 ## dynamic-faust
 
-The **dynamic-faust** tool uses the dynamic compilation chain (based on the LLVM backend), and compiles a Faust DSP source to a LLVM IR (.ll), bicode (.bc), machine code (.mc) or object code (.o) output file.
+The **dynamic-faust** tool uses the dynamic compilation chain (based on the LLVM backend), and compiles a Faust DSP source to a LLVM IR (.ll), bicode (.bc), machine code (.mc) or object code (.o) output file. CPU cross-compilation can be done using the `-target` option. The best compilation options for the native CPU (at Faust compiler level) can be discovered using the `-opt` option. 
 
 `dynamic-faust [-target xxx] [-opt native|generic] [-o foo.ll|foo.bc|foo.mc|foo.o] [additional Faust options (-vec -vs 8...)] foo.dsp`
 
@@ -69,7 +69,7 @@ Note that using the `-inj foo.cpp` option allows to compile any C++ class contai
 
 ## dynamic-jack-gtk/dynamic-coreaudio-gtk
 
-The **dynamic-jack-gtk/dynamic-coreaudio-gtk** tools use the dynamic compilation chain, compile a Faust DSP source, and run it with the LLVM or Interpreter backend. They can also read a precompiled DSP factory, either in IR (.ll), bitcode (.bc), or machine code (.mc) when using the LLVM backend, or byte code (.fbc) when using the Interpreter backend. The `-edit` option can be used to start an *edit/compile/run loop* where the DSP can be edited with an external editor, and will be recompiled on the fly and executed. 
+The **dynamic-jack-gtk/dynamic-coreaudio-gtk** tools use the dynamic compilation chain, compile a Faust DSP source, and run it with the LLVM or Interpreter backend. They can also read a precompiled DSP factory, either in IR (.ll), bitcode (.bc), or machine code (.mc) when using the LLVM backend, or byte code (.fbc) when using the Interpreter backend. The `-edit` option can be used to start an *edit/compile/run loop* where the DSP can be edited with an external editor, will be recompiled on the fly each time it changes, and then executed. 
 
 `dynamic-jack-gtk|dynamic-coreaudio-gtk [-llvm|interp] [-edit] [-generic] [-nvoices <num>] [-all] [-midi] [-osc] [-httpd] [-resample] [additional Faust options (-vec -vs 8...)] foo.dsp/foo.ll/foo.bc/foo.mc/foo.fbc`
 
@@ -154,7 +154,7 @@ Here are the available options:
 
 ## faustbench
 
-The **faustbench** tool uses the C++ backend to generate a set of C++ files produced with different Faust compiler options. All files are then compiled in a unique binary that will measure the DSP CPU of all versions of the compiled DSP. The tool is supposed to be launched in a terminal, but it can be used to generate an iOS project, ready to be launched and tested in Xcode. Using the `-source` option allows to create and keep the intermediate C++ files, with a Makefile to produce the binary. The generated DSP struct memory size in bytes is also printed for each compiler option.
+The **faustbench** tool uses the C++ backend to generate a set of C++ files produced with different Faust compiler options. All files are then compiled in a unique binary that will measure the DSP CPU usage of all versions of the compiled DSP. The tool is supposed to be launched in a terminal, but it can be used to generate an iOS project, ready to be launched and tested in Xcode. Using the `-source` option allows to create and keep the intermediate C++ files, with a Makefile to produce the binary. The generated DSP struct memory size in bytes is also printed for each compiler option.
 
 Note that result is given as *MBytes/sec* (higher is better) which is computed as the mean of the 10 best values on the measurement period. An estimation of the DSP CPU use (in percentage of the available bandwidth at 44.1 kHz) is also computed using the effective duration of the measure. This value may not be perfectly coherent with the MBytes/sec value which is the one to be taken in account.
 
@@ -182,7 +182,7 @@ Using `-single` and additional Faust options (like `-vec -vs 8...`) allows to ru
 
 ## faustbench-llvm
 
-The **faustbench-llvm** tool uses the libfaust library and its LLVM backend to dynamically compile DSP objects produced with different Faust compiler options, and then measure their DSP CPU. Additional Faust compiler options can be given beside the ones that will be automatically explored by the tool.
+The **faustbench-llvm** tool uses the libfaust library and its LLVM backend to dynamically compile DSP objects produced with different Faust compiler options, and then measures their DSP CPU usage. Additional Faust compiler options can be given beside the ones that will be automatically explored by the tool.
 
 Note that result is given as *MBytes/sec* (higher is better) which is computed as the mean of the 10 best values on the measurement period. An estimation of the DSP CPU use (in percentage of the available bandwidth at 44.1 kHz) is also computed using the effective duration of the measure. This value may not be perfectly coherent with the MBytes/sec value which is the one to be taken in account, and is finally used to return the best estimation.
 

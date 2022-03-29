@@ -59,7 +59,10 @@ class InstructionsCompiler : public virtual Garbageable {
     old_OccMarkup*                  fOccMarkup;
 
     // Ensure IOTA base fixed delays are computed once
-    std::map<int, std::string> fIOTATable;
+    map<int, string> fIOTATable;
+    
+    // Several 'IOTA' variables may be needed when subcontainers are inlined in the main module
+    string fCurrentIOTA;
 
     Tree         fUIRoot;
     Description* fDescription;
@@ -69,9 +72,7 @@ class InstructionsCompiler : public virtual Garbageable {
      'mask' delay-lines use the next power-of-two value size and a mask (faster but use more memory)
      'select' delay-line use N+1 and use select to wrap the read/write indexes (use less memory but slower)
     */
-    
-    bool fHasIota;
-
+  
     void getTypedNames(::Type t, const string& prefix, Typed::VarType& ctype, string& vname);
 
     bool     getCompiledExpression(Tree sig, InstType& cexp);
@@ -181,7 +182,6 @@ class InstructionsCompiler : public virtual Garbageable {
     virtual ValueInst* generateXtended(Tree sig);
     virtual ValueInst* generateDelay(Tree sig, Tree arg, Tree size);
     virtual ValueInst* generatePrefix(Tree sig, Tree x, Tree e);
-    virtual ValueInst* generateIota(Tree sig, Tree arg);
     virtual ValueInst* generateBinOp(Tree sig, int opcode, Tree arg1, Tree arg2);
 
     virtual ValueInst* generateFFun(Tree sig, Tree ff, Tree largs);

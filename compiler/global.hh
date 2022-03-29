@@ -67,6 +67,8 @@ struct dsp_factory_base;
 
 typedef long double quad;
 
+typedef map<string, int> PathTableType;
+
 struct comp_str {
     bool operator()(Tree s1, Tree s2) const { return (strcmp(tree2str(s1), tree2str(s2)) < 0); }
 };
@@ -146,6 +148,7 @@ struct global {
     bool gLightMode;  // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
                       // for JavaScript)
     bool   gClang;    // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
+    bool   gNoVirtual;   // when compiled with the C++ backend, does not add the 'virtual' keyword
     string gCheckTable;  // whether to check RDTable and RWTable index range
     
     bool   gMathExceptions;  // whether to check math functions domains
@@ -171,7 +174,7 @@ struct global {
     bool   gMathApprox;            // Simpler/faster versions of 'floor/fmod/remainder' functions
     bool   gNeedManualPow;         // If manual pow(x, y) generation when y is an integer is needed
     bool   gRemoveVarAddress;      // If used of variable addresses (like &foo or &foo[n]) have to be removed
-    int    gOneSample;              // Generate one sample computation:  (0 = separated control) (1 = separated control and DSP struct)
+    int    gOneSample;             // Generate one sample computation: (0 = separated control) (1 = separated control and DSP struct)
     bool   gOneSampleControl;      // Generate one sample computation control structure in DSP module
     bool   gComputeMix;            // Mix in outputs buffers
     string gFastMathLib;           // The fastmath code mapping file
@@ -227,7 +230,7 @@ struct global {
     int gBoxSlotNumber;  ///< counter for unique slot number
 
     bool gMemoryManager;
-
+   
     bool gLocalCausalityCheck;  ///< when true trigs local causality errors (negative delay)
 
     bool gCausality;  ///< (FIXME: global used as a parameter of typeAnnotation) when true trigs causality errors
@@ -363,7 +366,6 @@ struct global {
     Sym SIGDELAY1;
     Sym SIGDELAY;
     Sym SIGPREFIX;
-    Sym SIGIOTA;
     Sym SIGRDTBL;
     Sym SIGWRTBL;
     Sym SIGTABLE;
@@ -457,6 +459,8 @@ struct global {
     int gMachineInt32Size;
     int gMachineInt64Size;
     int gMachineDoubleSize;
+    int gMachineQuadSize;
+    int gMachineFixedPointSize;
     int gMachineBoolSize;
     int gMachinePtrSize;
 
@@ -485,6 +489,7 @@ struct global {
     map<Typed::VarType, BasicTyped*> gTypeTable;     // To share a unique BasicTyped* object for a given type
     map<string, Typed*>              gVarTypeTable;  // Types of variables or functions
     map<Typed::VarType, int>         gTypeSizeMap;   // Size of types in bytes
+    map<string, pair<string, int>>   gTablesSize;    // Global tables size in bytes: class name, <table name, size>
 
     // colorize
     map<Tree, int> gColorMap;
@@ -565,6 +570,8 @@ struct global {
 
     static void allocate();
     static void destroy();
+    
+    static string printFloat();
 
     string getFreshID(const string& prefix);
 
@@ -591,21 +598,10 @@ struct global {
     inline bool startWith(const string& str, const string& prefix) { return (str.substr(0, prefix.size()) == prefix); }
 
     // Some backends have an internal implementation of foreign functions like acos, asinh...
-    bool hasMathForeignFunction(const string& name)
-    {
-        bool has_internal_math_ff = ((gOutputLang == "llvm")
-                                     || startWith(gOutputLang, "wast")
-                                     || startWith(gOutputLang, "wasm")
-                                     || (gOutputLang == "interp")
-                                     || startWith(gOutputLang, "soul")
-                                     || (gOutputLang == "dlang")
-                                     || (gOutputLang == "csharp")
-                                     || (gOutputLang == "rust")
-                                     || (gOutputLang == "julia"));
-        return has_internal_math_ff && (gMathForeignFunctions.find(name) != gMathForeignFunctions.end());
-    }
-
+    bool hasForeignFunction(const string& name, const string& inc_file);
+   
     void printCompilationOptions(stringstream& dst, bool backend = true);
+    string printCompilationOptions1();
 
     void initTypeSizeMap();
 

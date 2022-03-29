@@ -355,11 +355,37 @@ class CPPInstVisitor : public TextInstVisitor {
         generateFunDefArgs(inst);
         generateFunDefBody(inst);
     }
+    
+    virtual void generateFunDefArgs(DeclareFunInst* inst)
+    {
+        *fOut << "(";
+        
+        size_t size = inst->fType->fArgsTypes.size(), i = 0;
+        for (const auto& it : inst->fType->fArgsTypes) {
+            // Pointers are set with 'noalias' for non paired arguments, which are garantied to be unique
+            if (isPtrType(it->getType()) && !inst->fType->isPairedFunArg(it->fName)) {
+                *fOut << fTypeManager->generateType(it, NamedTyped::kNoalias);
+            } else {
+                *fOut << fTypeManager->generateType(it);
+            }
+            if (i++ < size - 1) *fOut << ", ";
+        }
+    }
 
     virtual void visit(LoadVarAddressInst* inst)
     {
         *fOut << "&";
         inst->fAddress->accept(this);
+    }
+    
+    virtual bool needParenthesis(BinopInst* inst, ValueInst* arg)
+    {
+        int p0 = gBinOpTable[inst->fOpcode]->fPriority;
+        BinopInst* a = dynamic_cast<BinopInst*>(arg);
+        int p1 = a ? gBinOpTable[a->fOpcode]->fPriority : INT_MAX;
+        return (isLogicalOpcode(inst->fOpcode) || (p0 > p1))
+            && !arg->isSimpleValue()
+            && !dynamic_cast<CastInst*>(arg);
     }
     
     virtual void visit(BinopInst* inst)
@@ -378,7 +404,7 @@ class CPPInstVisitor : public TextInstVisitor {
             inst->fInst1->accept(this);
             *fOut << ") >> ";
             inst->fInst2->accept(this);
-            *fOut << "))w";
+            *fOut << "))";
         } else {
             TextInstVisitor::visit(inst);
         }
@@ -461,82 +487,70 @@ class CPPInstVisitor : public TextInstVisitor {
     static void cleanup() { gFunctionSymbolTable.clear(); }
 };
 
-// Used for -os mode (TODO : does not work with 'soundfile')
+// Used for -os1 mode (TODO : does not work with 'soundfile')
 class CPPInstVisitor1 : public CPPInstVisitor {
     
     private:
         
+        // Fields are moved in iZone/fZone model
         StructInstVisitor fStructVisitor;
-        bool fZoneAddress;      // If a zone address is currently written
-        bool fIndexedAddress;   // If an indexed address is currently written
         
     public:
         
         CPPInstVisitor1(std::ostream* out, int tab = 0)
-        :CPPInstVisitor(out, tab), fZoneAddress(false), fIndexedAddress(false)
+        :CPPInstVisitor(out, tab)
         {}
         
         virtual void visit(AddSoundfileInst* inst)
         {
             // Not supported for now
-            throw faustexception("ERROR : AddSoundfileInst not supported for -os mode\n");
+            throw faustexception("ERROR : AddSoundfileInst not supported for -osX mode\n");
         }
         
         virtual void visit(DeclareVarInst* inst)
         {
             Address::AccessType access = inst->fAddress->getAccess();
             string name = inst->fAddress->getName();
-            bool is_control = startWith(name, "fButton")
-                || startWith(name, "fCheckbox")
-                || startWith(name, "fVslider")
-                || startWith(name, "fHslider")
-                || startWith(name, "fEntry")
-                || startWith(name, "fVbargraph")
-                || startWith(name, "fHbargraph")
-                || name == "fSampleRate";
-            if (((access & Address::kStruct) || (access & Address::kStaticStruct)) && !is_control) {
+            if (((access & Address::kStruct) || (access & Address::kStaticStruct)) && !isControl(name)) {
                 fStructVisitor.visit(inst);
             } else {
                 CPPInstVisitor::visit(inst);
             }
         }
-        
+    
         virtual void visit(NamedAddress* named)
         {
             Typed::VarType type;
-            if (fStructVisitor.hasField(named->fName, type)) {
-                // Zone address zone[id][index] are rewritten as zone[id+index]
-                fZoneAddress = true;
+            string name = named->getName();
+            
+            if (fStructVisitor.hasField(name, type)) {
                 if (type == Typed::kInt32) {
-                    *fOut << "iZone[" << fStructVisitor.getFieldIntOffset(named->fName)/sizeof(int);
+                    FIRIndex value = FIRIndex(fStructVisitor.getFieldIntOffset(name)/sizeof(int));
+                    InstBuilder::genLoadArrayFunArgsVar("iZone", value)->accept(this);
                 } else {
-                    *fOut << "fZone[" << fStructVisitor.getFieldRealOffset(named->fName)/ifloatsize();
+                    FIRIndex value = FIRIndex(fStructVisitor.getFieldRealOffset(name)/ifloatsize());
+                    InstBuilder::genLoadArrayFunArgsVar("fZone", value)->accept(this);
                 }
-                if (!fIndexedAddress) { *fOut << "]"; }
             } else {
-                fZoneAddress = false;
-                *fOut << named->fName;
+                TextInstVisitor::visit(named);
             }
         }
         
-        /*
-         Indexed address can actually be values in an array or fields in a struct type
-         */
         virtual void visit(IndexedAddress* indexed)
         {
-            fIndexedAddress = true;
-            indexed->fAddress->accept(this);
-            DeclareStructTypeInst* struct_type = isStructType(indexed->getName());
-            if (struct_type) {
-                Int32NumInst* field_index = static_cast<Int32NumInst*>(indexed->fIndex);
-                *fOut << "->" << struct_type->fType->getName(field_index->fNum);
+            Typed::VarType type;
+            string name = indexed->getName();
+            
+            if (fStructVisitor.hasField(name, type)) {
+                if (type == Typed::kInt32) {
+                    FIRIndex value = FIRIndex(indexed->fIndex) + fStructVisitor.getFieldIntOffset(name)/sizeof(int);
+                    InstBuilder::genLoadArrayFunArgsVar("iZone", value)->accept(this);
+                } else {
+                    FIRIndex value = FIRIndex(indexed->fIndex) + fStructVisitor.getFieldRealOffset(name)/ifloatsize();
+                    InstBuilder::genLoadArrayFunArgsVar("fZone", value)->accept(this);
+                }
             } else {
-                // Zone address zone[id][index] are rewritten as zone[id+index]
-                if (fZoneAddress) { *fOut << "+"; } else { *fOut << "["; }
-                fIndexedAddress = false;
-                fZoneAddress = false;
-                indexed->fIndex->accept(this);
-                *fOut << "]";
+                TextInstVisitor::visit(indexed);
             }
         }
         
@@ -544,6 +558,88 @@ class CPPInstVisitor1 : public CPPInstVisitor {
         int getIntZoneSize() { return fStructVisitor.getStructIntSize()/sizeof(int); }
         int getRealZoneSize() { return fStructVisitor.getStructRealSize()/ifloatsize(); }
     
+};
+
+// Used for -os2 mode, accessing iZone/fZone as function args (TODO : does not work with 'soundfile')
+class CPPInstVisitor2 : public CPPInstVisitor {
+    
+    protected:
+        
+        // Fields are distributed between the DSP struct and iZone/fZone model
+        StructInstVisitor1 fStructVisitor;
+       
+    public:
+        
+        CPPInstVisitor2(std::ostream* out, int external_memory, int tab = 0)
+        :CPPInstVisitor(out, tab), fStructVisitor(external_memory, 4)
+        {}
+        
+        virtual void visit(DeclareVarInst* inst)
+        {
+            Address::AccessType access = inst->fAddress->getAccess();
+            string name = inst->fAddress->getName();
+            if (((access & Address::kStruct) || (access & Address::kStaticStruct)) && !isControl(name)) {
+                fStructVisitor.visit(inst);
+                // Local fields have to be generated
+                if (fStructVisitor.getFieldMemoryType(name) == MemoryDesc::kLocal) {
+                    CPPInstVisitor::visit(inst);
+                }
+            } else {
+                CPPInstVisitor::visit(inst);
+            }
+        }
+        
+        virtual void visit(IndexedAddress* indexed)
+        {
+            Typed::VarType type;
+            string name = indexed->getName();
+            
+            if (fStructVisitor.hasField(name, type) && fStructVisitor.getFieldMemoryType(name) == MemoryDesc::kExternal) {
+                if (type == Typed::kInt32) {
+                    FIRIndex value = FIRIndex(indexed->fIndex) + fStructVisitor.getFieldIntOffset(name)/sizeof(int);
+                    InstBuilder::genLoadArrayFunArgsVar("iZone", value)->accept(this);
+                } else {
+                    FIRIndex value = FIRIndex(indexed->fIndex) + fStructVisitor.getFieldRealOffset(name)/ifloatsize();
+                    InstBuilder::genLoadArrayFunArgsVar("fZone", value)->accept(this);
+                }
+            } else {
+                TextInstVisitor::visit(indexed);
+            }
+        }
+      
+        // Size is expressed in unit of the actual type (so 'int' or 'float/double')
+        int getIntZoneSize() { return fStructVisitor.getStructIntSize()/sizeof(int); }
+        int getRealZoneSize() { return fStructVisitor.getStructRealSize()/ifloatsize(); }
+    
+};
+
+// Used for -os3 mode, accessing iZone/fZone in DSP struct (TODO : does not work with 'soundfile')
+class CPPInstVisitor3 : public CPPInstVisitor2 {
+    
+    public:
+        
+        CPPInstVisitor3(std::ostream* out, int external_memory, int tab = 0)
+        :CPPInstVisitor2(out, external_memory, tab)
+        {}
+          
+        virtual void visit(IndexedAddress* indexed)
+        {
+            Typed::VarType type;
+            string name = indexed->getName();
+            
+            if (fStructVisitor.hasField(name, type) && fStructVisitor.getFieldMemoryType(name) == MemoryDesc::kExternal) {
+                if (type == Typed::kInt32) {
+                    FIRIndex value = FIRIndex(indexed->fIndex) + fStructVisitor.getFieldIntOffset(name)/sizeof(int);
+                    InstBuilder::genLoadArrayStructVar("iZone", value)->accept(this);
+                } else {
+                    FIRIndex value = FIRIndex(indexed->fIndex) + fStructVisitor.getFieldRealOffset(name)/ifloatsize();
+                    InstBuilder::genLoadArrayStructVar("fZone", value)->accept(this);
+                }
+            } else {
+                TextInstVisitor::visit(indexed);
+            }
+        }
+     
 };
 
 class CPPVecInstVisitor : public CPPInstVisitor {

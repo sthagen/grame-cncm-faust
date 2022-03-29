@@ -34,21 +34,22 @@
 #pragma warning(disable : 4250)
 #endif
 
-using namespace std;
-
 class CPPCodeContainer : public virtual CodeContainer {
    protected:
     CPPInstVisitor* fCodeProducer;
     std::ostream*  fOut;
-    string         fSuperKlassName;
+    std::string    fSuperKlassName;
 
     void produceMetadata(int tabs);
     void produceInit(int tabs);
-
+    
+    std::string genVirtual();
+    std::string genFinal();
+  
    public:
     CPPCodeContainer()
     {}
-    CPPCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out) : fSuperKlassName(super)
+    CPPCodeContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out) : fSuperKlassName(super)
     {
         initialize(numInputs, numOutputs);
         fKlassName = name;
@@ -97,10 +98,11 @@ class CPPCodeContainer : public virtual CodeContainer {
         *fOut << "#endif" << std::endl;
     }
 
-    CodeContainer* createScalarContainer(const string& name, int sub_container_type);
-
-    static CodeContainer* createContainer(const string& name, const string& super, int numInputs, int numOutputs,
-                                          ostream* dst = new stringstream());
+    CodeContainer* createScalarContainer(const std::string& name, int sub_container_type);
+    static CodeContainer* createScalarContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs, ostream* dst, int sub_container_type);
+    
+    static CodeContainer* createContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs,
+                                          ostream* dst = new std::stringstream());
 };
 
 class CPPScalarCodeContainer : public CPPCodeContainer {
@@ -108,7 +110,7 @@ class CPPScalarCodeContainer : public CPPCodeContainer {
    public:
     CPPScalarCodeContainer()
     {}
-    CPPScalarCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out,
+    CPPScalarCodeContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out,
                            int sub_container_type);
     virtual ~CPPScalarCodeContainer()
     {}
@@ -121,21 +123,21 @@ class CPPScalarOneSampleCodeContainer1 : public CPPScalarCodeContainer {
    protected:
     virtual void produceClass();
    public:
-    CPPScalarOneSampleCodeContainer1(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out,
+    CPPScalarOneSampleCodeContainer1(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out,
                                     int sub_container_type)
     {
         initialize(numInputs, numOutputs);
         fKlassName = name;
         fOut = out;
         
-            // For mathematical functions
+        // For mathematical functions
         if (gGlobal->gFastMath) {
             addIncludeFile((gGlobal->gFastMathLib == "def") ? "\"faust/dsp/fastmath.cpp\""
                            : ("\"" + gGlobal->gFastMathLib + "\""));
         } else {
             addIncludeFile("<cmath>");
             addIncludeFile("<algorithm>");
-                // For int64_t type
+            // For int64_t type
             addIncludeFile("<cstdint>");
         }
         
@@ -147,12 +149,14 @@ class CPPScalarOneSampleCodeContainer1 : public CPPScalarCodeContainer {
     void generateCompute(int tab);
 };
 
-// Special version for -os1 generation mode
+// Special version for -os1 generation mode with iZone and fZone
 class CPPScalarOneSampleCodeContainer2 : public CPPScalarCodeContainer {
     protected:
         virtual void produceClass();
     public:
-        CPPScalarOneSampleCodeContainer2(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out,
+        CPPScalarOneSampleCodeContainer2()
+        {}
+        CPPScalarOneSampleCodeContainer2(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out,
                                          int sub_container_type)
         {
             initialize(numInputs, numOutputs);
@@ -178,10 +182,66 @@ class CPPScalarOneSampleCodeContainer2 : public CPPScalarCodeContainer {
         void generateCompute(int tab);
 };
 
+/*
+ Some of the DSP struct fields will be moved in the iZone/fZone (typically long delay lines).
+ The others will stay in the DSP structure.
+ */
+
+// Special version for -os2 generation mode with iZone and fZone
+class CPPScalarOneSampleCodeContainer3 : public CPPScalarOneSampleCodeContainer2 {
+    protected:
+        virtual void produceClass();
+    public:
+        CPPScalarOneSampleCodeContainer3(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out,
+                                         int sub_container_type)
+        {
+            initialize(numInputs, numOutputs);
+            fKlassName = name;
+            fOut = out;
+            
+            // For mathematical functions
+            if (gGlobal->gFastMath) {
+                addIncludeFile((gGlobal->gFastMathLib == "def") ? "\"faust/dsp/fastmath.cpp\""
+                               : ("\"" + gGlobal->gFastMathLib + "\""));
+            } else {
+                addIncludeFile("<cmath>");
+                addIncludeFile("<algorithm>");
+                // For int64_t type
+                addIncludeFile("<cstdint>");
+            }
+        
+            // Setup in produceClass
+            fCodeProducer = nullptr;
+        }
+        virtual ~CPPScalarOneSampleCodeContainer3()
+        {}
+ 
+};
+
+// Special version for -os3 generation mode with iZone and fZone in DSP struct
+class CPPScalarOneSampleCodeContainer4 : public CPPScalarOneSampleCodeContainer3 {
+
+    protected:
+        virtual void produceClass();
+    public:
+        CPPScalarOneSampleCodeContainer4(const std::string& name, const std::string& super,
+                                         int numInputs, int numOutputs,
+                                         std::ostream* out,
+                                         int sub_container_type)
+        :CPPScalarOneSampleCodeContainer3(name, super, numInputs, numOutputs, out, sub_container_type)
+        {}
+    
+    virtual ~CPPScalarOneSampleCodeContainer4()
+    {}
+    
+    void generateCompute(int tab);
+    
+};
+
 class CPPVectorCodeContainer : public VectorCodeContainer, public CPPCodeContainer {
    protected:
    public:
-    CPPVectorCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out);
+    CPPVectorCodeContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out);
     virtual ~CPPVectorCodeContainer()
     {}
 
@@ -191,7 +251,7 @@ class CPPVectorCodeContainer : public VectorCodeContainer, public CPPCodeContain
 class CPPOpenMPCodeContainer : public OpenMPCodeContainer, public CPPCodeContainer {
    protected:
    public:
-    CPPOpenMPCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out);
+    CPPOpenMPCodeContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs, std::ostream* out);
     virtual ~CPPOpenMPCodeContainer()
     {}
 
@@ -201,7 +261,7 @@ class CPPOpenMPCodeContainer : public OpenMPCodeContainer, public CPPCodeContain
 class CPPWorkStealingCodeContainer : public WSSCodeContainer, public CPPCodeContainer {
    protected:
    public:
-    CPPWorkStealingCodeContainer(const string& name, const string& super, int numInputs, int numOutputs,
+    CPPWorkStealingCodeContainer(const std::string& name, const std::string& super, int numInputs, int numOutputs,
                                  std::ostream* out);
     virtual ~CPPWorkStealingCodeContainer()
     {}

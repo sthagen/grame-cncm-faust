@@ -116,7 +116,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
 
         if (array_typed && array_typed->fSize > 1) {
             if (is_struct) {
-                fFieldTable[name] = MemoryDesc(-1, fStructOffset, array_typed->fSize, array_typed->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fStructOffset, array_typed->fSize, array_typed->getSizeBytes(), array_typed->fType->getType());
                 // Always use biggest size so that int/real access are correctly aligned
                 fStructOffset += (array_typed->fSize * gGlobal->audioSampleSize());
             } else {
@@ -125,7 +125,7 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
             }
         } else {
             if (is_struct) {
-                fFieldTable[name] = MemoryDesc(-1, fStructOffset, 1, inst->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fStructOffset, 1, inst->fType->getSizeBytes(), inst->fType->getType());
                 // Always use biggest size so that int/real access are correctly aligned
                 fStructOffset += gGlobal->audioSampleSize();
             } else {
@@ -151,11 +151,10 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
 
     virtual void generateFunDefArgs(DeclareFunInst* inst)
     {
-        list<NamedTyped*>::const_iterator it;
-        size_t                            size = inst->fType->fArgsTypes.size(), i = 0;
-        for (it = inst->fType->fArgsTypes.begin(); it != inst->fType->fArgsTypes.end(); it++, i++) {
-            *fOut << "(param $" << (*it)->fName << " " << type2String((*it)->getType()) << ")";
-            if (i < size - 1) *fOut << " ";
+        size_t size = inst->fType->fArgsTypes.size(), i = 0;
+        for (const auto& it : inst->fType->fArgsTypes) {
+            *fOut << "(param $" << it->fName << " " << type2String(it->getType()) << ")";
+            if (i++ < size - 1) *fOut << " ";
         }
         if (inst->fType->getType() != Typed::kVoid) {
             *fOut << " (result " << type2String(inst->getResType()) << ")";
@@ -170,12 +169,10 @@ class WASTInstVisitor : public TextInstVisitor, public WASInst {
         fTab--;
     }
 
-    virtual void generateFunCallArgs(list<ValueInst*>::const_iterator beg, list<ValueInst*>::const_iterator end,
-                                     int size)
+    virtual void generateFunCallArgs(ListValuesIt beg, ListValuesIt end, size_t size)
     {
-        list<ValueInst*>::const_iterator it = beg;
-        int                              i  = 0;
-        for (it = beg; it != end; it++, i++) {
+        size_t i = 0;
+        for (ListValuesIt it = beg; it != end; it++, i++) {
             // Compile argument
             (*it)->accept(this);
             if (i < size - 1) *fOut << " ";

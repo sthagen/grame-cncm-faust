@@ -115,6 +115,8 @@ struct VectorTyped;
 struct NamedAddress;
 struct IndexedAddress;
 
+typedef list<ValueInst*>::const_iterator ListValuesIt;
+
 // Type checking
 
 inline bool isRealType(Typed::VarType type)
@@ -425,7 +427,7 @@ struct BasicTyped : public Typed {
 
     VarType getType() const { return fType; }
 
-    int getSize() const;  // moved in "instructions.cpp"
+    int getSizeBytes() const;  // moved in "instructions.cpp"
 
     virtual void accept(InstVisitor* visitor) { visitor->visit(this); }
 
@@ -433,6 +435,10 @@ struct BasicTyped : public Typed {
 };
 
 struct NamedTyped : public Typed {
+    
+    enum Attribute { kDefault, kNoalias };
+    static vector <string> AttributeMap;
+    
     const string fName;
     Typed* fType;
 
@@ -441,8 +447,10 @@ struct NamedTyped : public Typed {
     virtual ~NamedTyped() {}
 
     VarType getType() const { return fType->getType(); }
-
-    int getSize() const { return fType->getSize(); }
+    
+    string getName() const { return fName; }
+    
+    int getSizeBytes() const { return fType->getSizeBytes(); }
 
     virtual void accept(InstVisitor* visitor) { visitor->visit(this); }
 
@@ -478,8 +486,17 @@ struct FunTyped : public Typed {
         }
         return res;
     }
+    
+    // Check if 'name' is paired with another argument, like "fRec0" and "fRec0_tmp" when generating functions in -fun mode
+    bool isPairedFunArg(const string& name)
+    {
+        for (const auto& it : fArgsTypes) {
+            if (isPtrType(it->getType()) && (name != it->fName) && (startWith(it->fName, name) || startWith(name, it->fName))) return true;
+        }
+        return false;
+    }
 
-    int getSize() const;  // moved in "instructions.cpp"
+    int getSizeBytes() const;  // moved in "instructions.cpp"
 
     virtual void accept(InstVisitor* visitor) { visitor->visit(this); }
 
@@ -488,16 +505,15 @@ struct FunTyped : public Typed {
 
 struct ArrayTyped : public Typed {
     Typed*     fType;
-    const int  fSize;
-    const bool fIsPtr;
-
-    ArrayTyped(Typed* type, int size, bool is_ptr = false) : fType(type), fSize(size), fIsPtr(is_ptr) {}
+    const int  fSize;   // Size of 0 is interpreted as a pointer on fType
+   
+    ArrayTyped(Typed* type, int size) : fType(type), fSize(size) {}
 
     virtual ~ArrayTyped() {}
 
     VarType getType() const { return getPtrFromType(fType->getType()); }
 
-    int getSize() const;  // moved in "instructions.cpp"
+    int getSizeBytes() const;  // moved in "instructions.cpp"
 
     virtual void accept(InstVisitor* visitor) { visitor->visit(this); }
 
@@ -515,11 +531,11 @@ struct StructTyped : public Typed {
     VarType getType() const { return kObj_ptr; }
     VarType getType(int index) { return fFields[index]->getType(); }
 
-    int getSize() const
+    int getSizeBytes() const
     {
         int size = 0;
         for (const auto& it : fFields) {
-            size += it->getSize();
+            size += it->getSizeBytes();
         }
         return size;
     }
@@ -528,7 +544,7 @@ struct StructTyped : public Typed {
     {
         int offset = 0;
         for (int i = 0; i < field; i++) {
-            offset += fFields[i]->getSize();
+            offset += fFields[i]->getSizeBytes();
         }
         return offset;
     }
@@ -550,7 +566,7 @@ struct VectorTyped : public Typed {
 
     VarType getType() const { return getVecFromType(fType->getType()); }
 
-    int getSize() const { return fType->getSize() * fSize; }
+    int getSizeBytes() const { return fType->getSizeBytes() * fSize; }
 
     virtual void accept(InstVisitor* visitor) { visitor->visit(this); }
 
@@ -939,9 +955,9 @@ struct ArrayNumInst : public ValueInst {
     ArrayNumInst(int size) : ValueInst() { fNumTable.resize(size); }
 
     void setValue(int index, TYPE num) { fNumTable[index] = num; }
-    void addValue(TYPE num) { fNumTable.push_back(num); }
     TYPE getValue(int index) { return fNumTable[index]; }
-
+    void addValue(TYPE num) { fNumTable.push_back(num); }
+    
     void accept(InstVisitor* visitor) { visitor->visit(this); }
 
     virtual bool isSimpleValue() const { return true; }
@@ -1454,13 +1470,14 @@ class BasicCloneVisitor : public CloneVisitor {
         for (const auto& it : inst->fArgs) {
             cloned_args.push_back(it->clone(this));
         }
-
         return new FunCallInst(inst->fName, cloned_args, inst->fMethod);
     }
+    
     virtual StatementInst* visit(RetInst* inst)
     {
         return new RetInst((inst->fResult) ? inst->fResult->clone(this) : nullptr);
     }
+    
     virtual StatementInst* visit(DropInst* inst)
     {
         return new DropInst((inst->fResult) ? inst->fResult->clone(this) : nullptr);
@@ -1570,7 +1587,7 @@ class BasicCloneVisitor : public CloneVisitor {
     }
     virtual Typed* visit(ArrayTyped* typed)
     {
-        return new ArrayTyped(typed->fType->clone(this), typed->fSize, typed->fIsPtr);
+        return new ArrayTyped(typed->fType->clone(this), typed->fSize);
     }
     virtual Typed* visit(StructTyped* typed)
     {
@@ -1585,6 +1602,10 @@ class BasicCloneVisitor : public CloneVisitor {
     {
         return new VectorTyped(static_cast<BasicTyped*>(typed->fType->clone(this)), typed->fSize);
     }
+    
+    // Return the cloned block, possibly refined in subclasses.
+    virtual BlockInst* getCode(BlockInst* src) { return static_cast<BlockInst*>(src->clone(this)); }
+    
 };
 
 // =======================
@@ -1597,7 +1618,7 @@ struct DispatchVisitor : public InstVisitor {
     virtual void visit(DeclareVarInst* inst)
     {
         inst->fAddress->accept(this);
-        // No visitor on types
+        inst->fType->accept(this);
         if (inst->fValue) {
             inst->fValue->accept(this);
         }
@@ -1854,6 +1875,11 @@ class CombinerVisitor : public DispatchVisitor {
 // Instruction generator
 // ======================
 
+#define castInt32(e) dynamic_cast<Int32NumInst*>(e)
+#define castInt64(e) dynamic_cast<Int64NumInst*>(e)
+#define castFloat(e) dynamic_cast<FloatNumInst*>(e)
+#define castDouble(e) dynamic_cast<DoubleNumInst*>(e)
+
 struct InstBuilder {
     // User interface
     static AddMetaDeclareInst* genAddMetaDeclareInst(const string& zone, const string& key, const string& value)
@@ -2041,9 +2067,9 @@ struct InstBuilder {
 
     static ValueInst* genCastInst(ValueInst* inst, Typed* typed_ext)
     {
-        Int32NumInst*  int_num    = dynamic_cast<Int32NumInst*>(inst);
-        FloatNumInst*  float_num  = dynamic_cast<FloatNumInst*>(inst);
-        DoubleNumInst* double_num = dynamic_cast<DoubleNumInst*>(inst);
+        Int32NumInst*  int_num    = castInt32(inst);
+        FloatNumInst*  float_num  = castFloat(inst);
+        DoubleNumInst* double_num = castDouble(inst);
         BasicTyped*    typed      = dynamic_cast<BasicTyped*>(typed_ext);
         CastInst*      cast       = dynamic_cast<CastInst*>(inst);
 
@@ -2167,8 +2193,8 @@ struct InstBuilder {
                                                    ValueInst* lowerBound = new Int32NumInst(0), bool reverse = false,
                                                    BlockInst* code = new BlockInst())
     {
-        faustassert(dynamic_cast<Int32NumInst*>(upperBound) || dynamic_cast<LoadVarInst*>(upperBound));
-        faustassert(dynamic_cast<Int32NumInst*>(lowerBound) || dynamic_cast<LoadVarInst*>(lowerBound));
+        faustassert(castInt32(upperBound) || dynamic_cast<LoadVarInst*>(upperBound));
+        faustassert(castInt32(lowerBound) || dynamic_cast<LoadVarInst*>(lowerBound));
         return new SimpleForLoopInst(name, upperBound, lowerBound, reverse, code);
     }
     static IteratorForLoopInst* genIteratorForLoopInst(const std::vector<NamedAddress*>& iterators, bool reverse = false,
@@ -2201,9 +2227,9 @@ struct InstBuilder {
         return new FunTyped(args, result, attribute);
     }
     static VectorTyped* genVectorTyped(BasicTyped* type, int size) { return new VectorTyped(type, size); }
-    static ArrayTyped*  genArrayTyped(Typed* type, int size, bool is_ptr = false)
+    static ArrayTyped*  genArrayTyped(Typed* type, int size)
     {
-        return new ArrayTyped(type, size, is_ptr);
+        return new ArrayTyped(type, size);
     }
     static StructTyped* genStructTyped(const string& name, const vector<NamedTyped*>& fields)
     {
@@ -2513,19 +2539,61 @@ struct InstBuilder {
     {
         return genStoreVarInst(genNamedAddress(vname, Address::kGlobal), exp);
     }
+    
+    static bool isZero(ValueInst* val)
+    {
+        return (castInt32(val) && castInt32(val)->fNum == 0)
+            || (castInt64(val) && castInt64(val)->fNum == 0)
+            || (castFloat(val) && castFloat(val)->fNum == 0.f)
+            || (castDouble(val) && castDouble(val)->fNum == 0.);
+    }
+    
+    static bool isOne(ValueInst* val)
+    {
+        return (castInt32(val) && castInt32(val)->fNum == 1)
+            || (castInt64(val) && castInt64(val)->fNum == 1)
+            || (castFloat(val) && castFloat(val)->fNum == 1.f)
+            || (castDouble(val) && castDouble(val)->fNum == 1.);
+    }
 
     // Binop operations
-    static BinopInst* genAdd(ValueInst* a1, ValueInst* a2) { return genBinopInst(kAdd, a1, a2); }
+    static ValueInst* genAdd(ValueInst* a1, ValueInst* a2)
+    {
+        if (isZero(a1)) {
+            return a2;
+        } else if (isZero(a2)) {
+            return a1;
+        } else if (castInt32(a1) && castInt32(a2)) {
+            return genInt32NumInst(castInt32(a1)->fNum + castInt32(a2)->fNum);
+        } else if (castInt64(a1) && castInt64(a2)) {
+            return genInt64NumInst(castInt64(a1)->fNum + castInt64(a2)->fNum);
+        } else if (castFloat(a1) && castFloat(a2)) {
+            return genFloatNumInst(castFloat(a1)->fNum + castFloat(a2)->fNum);
+        } else if (castDouble(a1) && castDouble(a2)) {
+            return genDoubleNumInst(castDouble(a1)->fNum + castDouble(a2)->fNum);
+        }  else {
+            return genBinopInst(kAdd, a1, a2);
+        }
+    }
+                
+    static ValueInst* genAdd(ValueInst* a1, int a2) { return genAdd(a1, genInt32NumInst(a2)); }
 
-    static BinopInst* genAdd(ValueInst* a1, int a2) { return genBinopInst(kAdd, a1, genInt32NumInst(a2)); }
+    static ValueInst* genSub(ValueInst* a1, ValueInst* a2)
+    {
+        return isZero(a2) ? a1 : genBinopInst(kSub, a1, a2);
+    }
 
-    static BinopInst* genSub(ValueInst* a1, ValueInst* a2) { return genBinopInst(kSub, a1, a2); }
+    static ValueInst* genSub(ValueInst* a1, int a2) { return genSub(a1, genInt32NumInst(a2)); }
 
-    static BinopInst* genSub(ValueInst* a1, int a2) { return genBinopInst(kSub, a1, genInt32NumInst(a2)); }
+    static ValueInst* genMul(ValueInst* a1, ValueInst* a2)
+    {
+        return isOne(a1) ? a2 : (isOne(a2) ? a1 : genBinopInst(kMul, a1, a2));
+    }
 
-    static BinopInst* genMul(ValueInst* a1, ValueInst* a2) { return genBinopInst(kMul, a1, a2); }
-
-    static BinopInst* genDiv(ValueInst* a1, ValueInst* a2) { return genBinopInst(kDiv, a1, a2); }
+    static ValueInst* genDiv(ValueInst* a1, ValueInst* a2)
+    {
+        return isOne(a2) ? a1 : genBinopInst(kDiv, a1, a2);
+    }
 
     static BinopInst* genRem(ValueInst* a1, ValueInst* a2) { return genBinopInst(kRem, a1, a2); }
 
@@ -2583,7 +2651,7 @@ struct InstBuilder {
     // static Typed* mapFIRType(AudioType* type);
 };
 
-/* syntactic sugar for index computations
+/* Syntactic sugar for index computations
  *
  * wrapper for ValueInst* with support for basic arithmetics
  *
@@ -2743,7 +2811,7 @@ Value       := LoadVar (Address)
             | Cast (Type, Value)
             | Null ()
 
-Code rewritting :
+Code rewritting:
 
 For WSS:
 
@@ -2773,36 +2841,36 @@ Scalarisation (some ideas, possibly not correct or not complete...):
 4) rename loop variable into the Compute variable name
 5) extract code and put it in Compute, suppress Loop statements
 
-Vision des boucles (count, liste de vecteurs d'entrée, liste de vecteurs de sorties) différente du prototype externe
-compute(count, float**, float**) ou veut homogenéiser
-
-D'ou:
-
-DAG de boucles au format (count, liste de vecteurs d'entrée, liste de vecteurs de sorties)
-compute(count, float**, float**)
-
-1) générer le header qui prépare les tableaux d'entrée et de sortie séparés
-2) compiler les boucles
-
-Comment différencier les vecteurs sans retard (qu'on peut transformer en scalaire) des vecteurs avec retard ? Avec un
-nommage spécifique ?
-
-TODO : gestion des indices de boucles:
-
- - dans IndexedAddress, mettre un ValueInst à la place de fIndex, mettre à jour les visiteurs
-
- - dans InstructionsCompiler, générer des accès avec "LoadVar" (loop-index)
-
- - dans ForLoopInst, fName devient un "DeclareVarInst" (permet de nommer et d'initialiser l'indice), ajout d'une
-expression test, ajout de ValueInst fNext, calcul qui utilise fName.
-
- - nouveau type d'accès kLoop pour les variables de loop
-
- - lors des transformations sur les loops, Loop2FunctionBuider, SeqLoopBuilderVisitor, "désactiver" les statements qui
-manipulent les indices de la boucle ?? (pas besoin, ils n'apparaissent pas dans le corps de le boucle, par contre
-l'indice de la boucle est utilisé dans le corps de la boucle, il faut le faire correspondre au nouvel indice de boucle,
-renommage nécessaire ?)
-
- - utiliser le *même* nom d'index dans ForLoopInst et dans le code interne de la loop
-
+ Vision of the loops (count, list of input vectors, list of output vectors) different from the external prototype
+ compute(count, float**, float**) or want to homogenize.
+ 
+ Hence:
+ 
+ DAG of loops in the format (count, list of input vectors, list of output vectors)
+ compute(count, float**, float**)
+ 
+ 1) generate the header that prepares the separate input and output arrays
+ 2) compile the loops
+ 
+ How to differentiate vectors without delay (which can be transformed into a scalar) from vectors with delay? With a specific
+ specific naming?
+ 
+ TODO: management of loop indices
+ 
+ - in IndexedAddress, put a ValueInst instead of fIndex, update visitors
+ 
+ - in InstructionsCompiler, generate accesses with "LoadVar" (loop-index)
+ 
+ - in ForLoopInst, fName becomes a "DeclareVarInst" (allows to name and initialize the index), add a test expression,
+addition of ValueInst fNext, calculation using fName.
+ 
+ - new kLoop access type for loop variables
+ 
+ - when transforming loops, Loop2FunctionBuider, SeqLoopBuilderVisitor, "disable" statements that
+ manipulate the indices of the loop ? (no need, they don't appear in the loop body, but
+ the loop index is used in the loop body, it must be matched with the new loop index,
+ renaming necessary?)
+ 
+ - use the *same* index name in ForLoopInst and in the internal code of the loop
+ 
 */

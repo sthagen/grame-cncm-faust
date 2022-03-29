@@ -96,7 +96,6 @@ class DocCompiler : public virtual Garbageable {
     string generateXtended(Tree sig, int priority);
     string generateDelay(Tree sig, Tree arg, Tree size, int priority);
     string generatePrefix(Tree sig, Tree x, Tree e, int priority);
-    string generateIota(Tree sig, Tree arg);
     string generateBinOp(Tree sig, int opcode, Tree arg1, Tree arg2, int priority);
 
     string generateFFun(Tree sig, Tree ff, Tree largs, int priority);
@@ -109,8 +108,7 @@ class DocCompiler : public virtual Garbageable {
     string generateDocAccessTbl(Tree sig, Tree tbl, Tree ridx);
 
     string generateSelect2(Tree sig, Tree sel, Tree s1, Tree s2, int priority);
-    string generateSelect3(Tree sig, Tree sel, Tree s1, Tree s2, Tree s3, int priority);
-
+   
     string generateRecProj(Tree sig, Tree exp, int i, int priority);
     void   generateRec(Tree sig, Tree var, Tree le, int priority);
 

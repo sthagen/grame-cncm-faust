@@ -57,13 +57,12 @@ using namespace llvm;
 
 #define MakeIdx(beg, end) llvm::ArrayRef<LLVMValue>(beg, end)
 #define MakeArgs(args) llvm::ArrayRef<lLLVMValue>(args)
-#define MakeStructGEP(v1, v2) fBuilder->CreateStructGEP(0, v1, v2);
+#define MakeStructGEP(v1, v2) fBuilder->CreateStructGEP(v1, v2);
 #define MakeConstGEP32(type_def, llvm_name) fBuilder->CreateConstGEP2_32(type_def, llvm_name, 0, 0);
 #define MakeIntPtrType() fModule->getDataLayout().getIntPtrType(fModule->getContext())
 
 #define CreateFuncall(fun, args) fBuilder->CreateCall(fun, makeArrayRef(args))
 #define CreatePhi(type, name) fBuilder->CreatePHI(type, 0, name);
-
 #define GetIterator(it) &(*(it))
 
 #define dumpLLVM(val)                    \
@@ -74,7 +73,7 @@ using namespace llvm;
         cout << out_str.str() << endl;   \
     }
 
-#if defined(LLVM_140)
+#if LLVM_VERSION_MAJOR >= 14
     #define ADD_ATTRIBUTE_AT_INDEX(a, b, c) a->addAttributeAtIndex(b, c)
 #else
     #define ADD_ATTRIBUTE_AT_INDEX(a, b, c) a->addAttribute(b, c)
@@ -94,32 +93,32 @@ struct LLVMTypeHelper {
         fTypeMap[Typed::kFloat]         = getFloatTy();
         fTypeMap[Typed::kFloat_ptr]     = getTyPtr(fTypeMap[Typed::kFloat]);
         fTypeMap[Typed::kFloat_ptr_ptr] = getTyPtr(fTypeMap[Typed::kFloat_ptr]);
-    #if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR < 12
         fTypeMap[Typed::kFloat_vec]     = VectorType::get(fTypeMap[Typed::kFloat], gGlobal->gVecSize);
         fTypeMap[Typed::kFloat_vec_ptr] = getTyPtr(fTypeMap[Typed::kFloat_vec]);
     #endif
         fTypeMap[Typed::kDouble]         = getDoubleTy();
         fTypeMap[Typed::kDouble_ptr]     = getTyPtr(fTypeMap[Typed::kDouble]);
         fTypeMap[Typed::kDouble_ptr_ptr] = getTyPtr(fTypeMap[Typed::kDouble_ptr]);
-    #if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR < 12
         fTypeMap[Typed::kDouble_vec]     = VectorType::get(fTypeMap[Typed::kDouble], gGlobal->gVecSize);
         fTypeMap[Typed::kDouble_vec_ptr] = getTyPtr(fTypeMap[Typed::kDouble_vec]);
     #endif
         fTypeMap[Typed::kInt32]         = getInt32Ty();
         fTypeMap[Typed::kInt32_ptr]     = getTyPtr(fTypeMap[Typed::kInt32]);
-    #if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR < 12
         fTypeMap[Typed::kInt32_vec]     = VectorType::get(fTypeMap[Typed::kInt32], gGlobal->gVecSize);
         fTypeMap[Typed::kInt32_vec_ptr] = getTyPtr(fTypeMap[Typed::kInt32_vec]);
     #endif
         fTypeMap[Typed::kInt64]         = getInt64Ty();
         fTypeMap[Typed::kInt64_ptr]     = getTyPtr(fTypeMap[Typed::kInt64]);
-    #if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR < 12
         fTypeMap[Typed::kInt64_vec]     = VectorType::get(fTypeMap[Typed::kInt64], gGlobal->gVecSize);
         fTypeMap[Typed::kInt64_vec_ptr] = getTyPtr(fTypeMap[Typed::kInt64_vec]);
     #endif
         fTypeMap[Typed::kBool]         = getInt1Ty();
         fTypeMap[Typed::kBool_ptr]     = getTyPtr(fTypeMap[Typed::kBool]);
-    #if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR < 12
         fTypeMap[Typed::kBool_vec]     = VectorType::get(fTypeMap[Typed::kBool], gGlobal->gVecSize);
         fTypeMap[Typed::kBool_vec_ptr] = getTyPtr(fTypeMap[Typed::kBool_vec]);
     #endif
@@ -176,7 +175,7 @@ struct LLVMTypeHelper {
     LLVMType getStructType(const string& name, const LLVMVecTypes& types)
     {
         // We want to have a unique creation for struct types, so check if the given type has already been created
-    #if defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR >= 12
         StructType* struct_type = StructType::getTypeByName(fModule->getContext(), name);
     #else
         StructType* struct_type = fModule->getTypeByName(name);
@@ -201,7 +200,7 @@ struct LLVMTypeHelper {
         if (basic_typed) {
             return fTypeMap[basic_typed->fType];
         } else if (named_typed) {
-        #if defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
+        #if LLVM_VERSION_MAJOR >= 12
             LLVMType type = StructType::getTypeByName(fModule->getContext(), "struct.dsp" + named_typed->fName);
         #else
             LLVMType type = fModule->getTypeByName("struct.dsp" + named_typed->fName);
@@ -214,7 +213,7 @@ struct LLVMTypeHelper {
                        ? fTypeMap[array_typed->getType()]
                        : ArrayType::get(fTypeMap[Typed::getTypeFromPtr(array_typed->getType())], array_typed->fSize);
         } else if (vector_typed) {
-        #if !defined(LLVM_120) && !defined(LLVM_130) && !defined(LLVM_140)
+        #if LLVM_VERSION_MAJOR < 12
             return VectorType::get(fTypeMap[vector_typed->fType->fType], vector_typed->fSize);
         #else
             faustassert(false);
@@ -252,7 +251,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
     list<string> fMathLibTable;                 // All standard math functions
 
-#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
+#if LLVM_VERSION_MAJOR >= 8
     map<string, Intrinsic::ID> fUnaryIntrinsicTable;    // LLVM unary intrinsic
     map<string, Intrinsic::ID> fBinaryIntrinsicTable;   // LLVM binary intrinsic
 #endif
@@ -285,24 +284,42 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
     LLVMValue loadStructVarAddress(const string& name)
     {
+#if LLVM_VERSION_MAJOR >= 15
+#warning FIXME
+        faustassert(false);
+        return {};
+#else
         return MakeStructGEP(loadFunArg("dsp"), fStructVisitor->getFieldIndex(name));
+#endif
     }
 
     LLVMValue loadStructArrayVarAddress(const string& name)
     {
+#if LLVM_VERSION_MAJOR >= 15
+#warning FIXME
+        faustassert(false);
+        return {};
+#else
         int       field_index = fStructVisitor->getFieldIndex(name);
         LLVMValue idx[]       = {genInt32(0), genInt32(field_index)};
         return fBuilder->CreateInBoundsGEP(loadFunArg("dsp"), MakeIdx(idx, idx + 2));
+#endif
     }
 
     LLVMValue loadArrayAsPointer(LLVMValue variable, bool is_volatile = false)
     {
+#if LLVM_VERSION_MAJOR >= 15
+#warning FIXME
+        faustassert(false);
+        return {};
+#else
         if (isa<ArrayType>(variable->getType()->getPointerElementType())) {
             LLVMValue idx[] = {genInt32(0), genInt32(0)};
             return fBuilder->CreateInBoundsGEP(variable, MakeIdx(idx, idx + 2));
         } else {
             return fBuilder->CreateLoad(variable, is_volatile);
         }
+#endif
     }
 
     LLVMValue loadFunArg(const string& name)
@@ -326,7 +343,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         fTypeMap[Typed::kObj_ptr] = dsp_ptr;
         fAllocaBuilder            = new IRBuilder<>(fModule->getContext());
  
-    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR >= 8
         
         /* This does not work in visit(FunCallInst* inst) for intrinsic, which are deactivated for now
         call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::Builtin);
@@ -361,66 +378,27 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         */
     #endif
         
-        // Integer version
-        fMathLibTable.push_back("abs");
-
-        // Float version
-        fMathLibTable.push_back("fabsf");
-        fMathLibTable.push_back("acosf");
-        fMathLibTable.push_back("asinf");
-        fMathLibTable.push_back("atanf");
-        fMathLibTable.push_back("atan2f");
-        fMathLibTable.push_back("ceilf");
-        fMathLibTable.push_back("cosf");
-        fMathLibTable.push_back("expf");
-        fMathLibTable.push_back("exp10f");
-        fMathLibTable.push_back("floorf");
-        fMathLibTable.push_back("fmodf");
-        fMathLibTable.push_back("logf");
-        fMathLibTable.push_back("log10f");
-        fMathLibTable.push_back("powf");
-        fMathLibTable.push_back("rintf");
-        fMathLibTable.push_back("roundf");
-        fMathLibTable.push_back("sinf");
-        fMathLibTable.push_back("sqrtf");
-        fMathLibTable.push_back("tanf");
-        
-        // Additional hyperbolic math functions
-        fMathLibTable.push_back("acoshf");
-        fMathLibTable.push_back("asinhf");
-        fMathLibTable.push_back("atanhf");
-        fMathLibTable.push_back("coshf");
-        fMathLibTable.push_back("sinhf");
-        fMathLibTable.push_back("tanhf");
-
-        // Double version
-        fMathLibTable.push_back("fabs");
-        fMathLibTable.push_back("acos");
-        fMathLibTable.push_back("asin");
-        fMathLibTable.push_back("atan");
-        fMathLibTable.push_back("atan2");
-        fMathLibTable.push_back("ceil");
-        fMathLibTable.push_back("cos");
-        fMathLibTable.push_back("exp");
-        fMathLibTable.push_back("exp10");
-        fMathLibTable.push_back("floor");
-        fMathLibTable.push_back("fmod");
-        fMathLibTable.push_back("log");
-        fMathLibTable.push_back("log10");
-        fMathLibTable.push_back("pow");
-        fMathLibTable.push_back("rint");
-        fMathLibTable.push_back("round");
-        fMathLibTable.push_back("sin");
-        fMathLibTable.push_back("sqrt");
-        fMathLibTable.push_back("tan");
-        
-        // Additional hyperbolic math functions
-        fMathLibTable.push_back("acosh");
-        fMathLibTable.push_back("asinh");
-        fMathLibTable.push_back("atanh");
-        fMathLibTable.push_back("cosh");
-        fMathLibTable.push_back("sinh");
-        fMathLibTable.push_back("tanh");
+        fMathLibTable = {
+            // Integer version
+            "abs",
+            
+            // Float version
+            "fabsf", "acosf", "asinf", "atanf",
+            "atan2f", "ceilf", "cosf", "expf",
+            "exp10f", "floorf", "fmodf", "logf",
+            "log10f", "powf", "rintf", "roundf",
+            "sinf", "sqrtf", "tanf", "acoshf", "asinhf",
+            "atanhf", "coshf", "sinhf", "tanhf",
+            
+            // Double version
+            "fabs", "acos","asin", "atan",
+            "atan2", "ceil", "cos", "exp",
+            "exp10", "floor", "fmod", "log",
+            "log10f", "pow", "rint", "round",
+            "sin", "sqrt", "tan", "acosh", "asinh",
+            "atanh", "cosh", "sinh", "tanh"
+        };
+    
     }
 
     virtual ~LLVMInstVisitor() { delete fAllocaBuilder; }
@@ -433,7 +411,8 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     {
         // Get LLVM constant string
         LLVMType type_def  = nullptr;
-        return MakeConstGEP32(type_def, addStringConstant(label, type_def));
+        GlobalVariable* var = addStringConstant(label, type_def);
+        return MakeConstGEP32(type_def, var);
     }
 
     //==============
@@ -482,7 +461,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         // No result in fCurValue
         fCurValue = nullptr;
     }
-
+   
     virtual void visit(DeclareFunInst* inst)
     {
         Function* function = fModule->getFunction(inst->fName);
@@ -518,11 +497,17 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
             }
             function->setDoesNotThrow();
 
-            // Set name for function arguments
+            // Set name and 'noalias' (on pointers) for function arguments
             Function::arg_iterator args = function->arg_begin();
+            int arg_index = 0;
             for (const auto& it : inst->fType->fArgsTypes) {
                 LLVMValue arg = GetIterator(args++);
                 arg->setName(it->fName);
+                // Pointers are set with 'noalias' for non paired arguments, which are garantied to be unique
+                if (isPtrType(it->getType()) && !inst->fType->isPairedFunArg(it->fName)) {
+                    function->addParamAttr(arg_index, Attribute::NoAlias);
+                }
+                arg_index++;
             }
 
             // If there is a body, compile it
@@ -598,6 +583,11 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
             return nullptr;
         }
 
+#if LLVM_VERSION_MAJOR >= 15
+#warning FIXME
+        faustassert(false);
+        return {};
+#else
         // Indexed adresses can actually be values in an array or fields in a struct type
         if (isStructType(indexed_address->getName())) {
             LLVMValue idx[] = {genInt32(0), fCurValue};
@@ -605,6 +595,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         } else {
             return fBuilder->CreateInBoundsGEP(load_ptr, fCurValue);
         }
+#endif
     }
     
     virtual LLVMValue visit(Address* address)
@@ -639,7 +630,14 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
                 fCurValue = loadArrayAsPointer(visit(inst->fAddress), named_address->fAccess & Address::kVolatile);
             }
         } else if (indexed_address) {
+
+#if LLVM_VERSION_MAJOR >= 15
+#warning FIXME
+        faustassert(false);
+        return;
+#else
             fCurValue = fBuilder->CreateLoad(visit(inst->fAddress));
+#endif
         } else {
             faustassert(false);
         }
@@ -743,10 +741,10 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     {
         // Compile instruction to be casted, result in fCurValue
         inst->fInst->accept(this);
-        visitCastAux(inst->fType->getType());
+        visitCast(inst->fType->getType());
     }
 
-    void visitCastAux(Typed::VarType type)
+    void visitCast(Typed::VarType type)
     {
         switch (type) {
                 
@@ -861,7 +859,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
             fCurValue = generateFunPolymorphicMinMax(fun_args[0], fun_args[1], kLT);
         } else if (checkMax(inst->fName) && fun_args.size() == 2) {
             fCurValue = generateFunPolymorphicMinMax(fun_args[0], fun_args[1], kGT);
-    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110) || defined(LLVM_120) || defined(LLVM_130) || defined(LLVM_140)
+    #if LLVM_VERSION_MAJOR >= 8
         // LLVM unary intrinsic
         } else if (fUnaryIntrinsicTable.find(inst->fName) != fUnaryIntrinsicTable.end()) {
             
@@ -888,23 +886,20 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         }
     }
     
-    /*
+    // Strict select
     virtual void visit(Select2Inst* inst)
     {
-        if (inst->fThen->isSimpleValue() && inst->fElse->isSimpleValue()) {
-            visitSelect(inst);
-        } else {
-            visitIf(inst);
-        }
+        visitSelect(inst);
     }
-    */
     
-    // Actually faster...
+    /*
+    // Lazy select
     virtual void visit(Select2Inst* inst)
     {
         visitIf(inst);
     }
- 
+    */
+    
     // Select that computes both branches
     void visitSelect(Select2Inst* inst)
     {
@@ -991,8 +986,14 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         function->getBasicBlockList().push_back(merge_block);
         fBuilder->SetInsertPoint(merge_block);
         
+#if LLVM_VERSION_MAJOR >= 15
+#warning FIXME
+        faustassert(false);
+        return;
+#else
         // Load result in fCurValue
         fCurValue = fBuilder->CreateLoad(typed_res);
+#endif
     }
     
     virtual void visit(IfInst* inst)

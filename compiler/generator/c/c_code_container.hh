@@ -119,6 +119,7 @@ class CCodeContainer : public virtual CodeContainer {
     }
 
     CodeContainer* createScalarContainer(const std::string& name, int sub_container_type);
+    static CodeContainer* createScalarContainer(const std::string& name, int numInputs, int numOutputs, ostream* dst, int sub_container_type);
 
     static CodeContainer* createContainer(const std::string& name, int numInputs, int numOutputs,
                                           std::ostream* dst = new std::stringstream());
@@ -184,6 +185,8 @@ class CScalarOneSampleCodeContainer2 : public CScalarCodeContainer {
     protected:
         virtual void produceClass();
     public:
+        CScalarOneSampleCodeContainer2()
+        {}
         CScalarOneSampleCodeContainer2(const std::string& name,
                                       int numInputs,
                                       int numOutputs,
@@ -215,6 +218,70 @@ class CScalarOneSampleCodeContainer2 : public CScalarCodeContainer {
         {}
     
         void generateComputeAux(int tab);
+};
+
+/*
+ Some of the DSP struct fields will be moved in the iZone/fZone (typically long delay lines).
+ The others will stay in the DSP structure.
+ */
+
+// Special version for -os2 generation mode with iZone and fZone
+class CScalarOneSampleCodeContainer3 : public CScalarOneSampleCodeContainer2 {
+    protected:
+        virtual void produceClass();
+    public:
+        CScalarOneSampleCodeContainer3(const std::string& name,
+                                       int numInputs,
+                                       int numOutputs,
+                                       std::ostream* out,
+                                       int sub_container_type)
+        {
+            initialize(numInputs, numOutputs);
+            fKlassName = name;
+            fOut = out;
+            
+            // For mathematical functions
+            if (gGlobal->gFastMath) {
+                addIncludeFile((gGlobal->gFastMathLib == "def") ? "\"faust/dsp/fastmath.cpp\""
+                               : ("\"" + gGlobal->gFastMathLib + "\""));
+            } else {
+                addIncludeFile("<math.h>");
+            }
+            
+            // For malloc/free
+            addIncludeFile("<stdlib.h>");
+            // For int64_t type
+            addIncludeFile("<stdint.h>");
+            
+            fSubContainerType = sub_container_type;
+        
+            // Setup in produceClass
+            fCodeProducer = nullptr;
+        }
+        
+        virtual ~CScalarOneSampleCodeContainer3()
+        {}
+    
+};
+
+// Special version for -os3 generation mode with iZone and fZone in DSP struct
+class CScalarOneSampleCodeContainer4 : public CScalarOneSampleCodeContainer3 {
+    protected:
+        virtual void produceClass();
+    public:
+        CScalarOneSampleCodeContainer4(const std::string& name,
+                                       int numInputs,
+                                       int numOutputs,
+                                       std::ostream* out,
+                                       int sub_container_type)
+        :CScalarOneSampleCodeContainer3(name, numInputs, numOutputs, out, sub_container_type)
+        {}
+        
+        virtual ~CScalarOneSampleCodeContainer4()
+        {}
+        
+        void generateComputeAux(int tab);
+    
 };
 
 class CVectorCodeContainer : public VectorCodeContainer, public CCodeContainer {

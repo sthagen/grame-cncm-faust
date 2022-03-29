@@ -1,27 +1,26 @@
-/************************** BEGIN faust-poly-engine.h **************************/
-/************************************************************************
- FAUST Architecture File
- Copyright (C) 2013 GRAME, Romain Michon, CCRMA - Stanford University
- Copyright (C) 2003-2017 GRAME, Centre National de Creation Musicale
- ---------------------------------------------------------------------
- This Architecture section is free software; you can redistribute it
- and/or modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 3 of
- the License, or (at your option) any later version.
- 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
- 
- You should have received a copy of the GNU General Public License
- along with this program; If not, see <http://www.gnu.org/licenses/>.
- 
- EXCEPTION : As a special exception, you may create a larger work
- that contains this FAUST architecture section and distribute
- that work under terms of your choice, so long as this FAUST
- architecture section is not modified.
- ************************************************************************/
+/************************** BEGIN faust-poly-engine.h *******************
+FAUST Architecture File
+Copyright (C) 2003-2022 GRAME, Centre National de Creation Musicale
+---------------------------------------------------------------------
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+EXCEPTION : As a special exception, you may create a larger work
+that contains this FAUST architecture section and distribute
+that work under terms of your choice, so long as this FAUST
+architecture section is not modified.
+************************************************************************/
 
 #ifndef __faust_poly_engine__
 #define __faust_poly_engine__
@@ -29,6 +28,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "faust/dsp/dsp.h"
 #include "faust/audio/audio.h"
@@ -100,7 +100,7 @@ class FaustPolyEngine {
                 fJSONMeta = jsonui2M.JSON();
                 
             } else {
-                fPolyDSP = NULL;
+                fPolyDSP = nullptr;
                 fFinalDSP = mono_dsp;
             }
             
@@ -126,20 +126,21 @@ class FaustPolyEngine {
                 // If driver cannot be initialized, start will fail later on...
                 if (!driver->init(meta.fName.c_str(), fFinalDSP)) {
                     delete driver;
-                    fDriver = NULL;
+                    fDriver = nullptr;
                 } else {
                     fDriver = driver;
                 }
             } else {
-                fDriver = NULL;
+                fDriver = nullptr;
             }
         }
     
     public:
     
-        FaustPolyEngine(dsp* mono_dsp, audio* driver = NULL, midi_handler* midi = NULL):fMidiUI(&fMidiHandler)
+        FaustPolyEngine(dsp* mono_dsp, audio* driver = nullptr, midi_handler* midi = nullptr):fMidiUI(&fMidiHandler)
         {
-            init(((mono_dsp) ? mono_dsp : new mydsp()), driver, midi);
+            assert(mono_dsp);
+            init(mono_dsp, driver, midi);
         }
     
         virtual ~FaustPolyEngine()
@@ -325,9 +326,13 @@ class FaustPolyEngine {
         void setParamValue(const char* address, float value)
         {
             int id = (address) ? fAPIUI.getParamIndex(address) : -1;
-            if (id >= 0) setParamValue(id, value);
+            if (id >= 0) {
+                setParamValue(id, value);
+            } else {
+                fprintf(stderr, "setParamValue : '%s' not found\n", (address == nullptr ? "NULL" : address));
+            }
         }
-
+        
         /*
          * getParamValue(address)
          * Takes the address of a parameter and returns its current
@@ -336,7 +341,12 @@ class FaustPolyEngine {
         float getParamValue(const char* address)
         {
             int id = (address) ? fAPIUI.getParamIndex(address) : -1;
-            return (id >= 0) ? fAPIUI.getParamValue(id) : 0.f;
+            if (id >= 0) {
+                return fAPIUI.getParamValue(id);
+            } else {
+                fprintf(stderr, "getParamValue : '%s' not found\n", (address == nullptr ? "NULL" : address));
+                return 0.f;
+            }
         }
     
         /*
@@ -582,7 +592,10 @@ extern "C" {
 
     int getParamsCount(void* dsp) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getParamsCount(); }
     
-    void setParamValue(void* dsp, const char* address, float value) { reinterpret_cast<FaustPolyEngine*>(dsp)->setParamValue(address, value); }
+    void setParamValue(void* dsp, const char* address, float value)
+    {
+        reinterpret_cast<FaustPolyEngine*>(dsp)->setParamValue(address, value);
+    }
     float getParamValue(void* dsp, const char* address) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getParamValue(address); }
    
     void setParamIdValue(void* dsp, int id, float value) { reinterpret_cast<FaustPolyEngine*>(dsp)->setParamValue(id, value); }
@@ -592,7 +605,10 @@ extern "C" {
     {
         reinterpret_cast<FaustPolyEngine*>(dsp)->setVoiceParamValue(address, voice, value);
     }
-    float getVoiceParamValue(void* dsp, const char* address, uintptr_t voice) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getVoiceParamValue(address, voice); }
+    float getVoiceParamValue(void* dsp, const char* address, uintptr_t voice)
+    {
+        return reinterpret_cast<FaustPolyEngine*>(dsp)->getVoiceParamValue(address, voice);
+    }
     
     const char* getParamAddress(void* dsp, int id) { return reinterpret_cast<FaustPolyEngine*>(dsp)->getParamAddress(id); }
 

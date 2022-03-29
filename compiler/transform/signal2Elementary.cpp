@@ -90,9 +90,6 @@ void Signal2Elementary::visit(Tree sig)
         self(x);
         self(y);
         return;
-    } else if (isSigIota(sig, x)) {
-        self(x);
-        return;
     } else if (isSigBinOp(sig, &i, x, y)) {
         fOut << "el." << binopname[i] << "(";
         self(x);
@@ -145,7 +142,7 @@ void Signal2Elementary::visit(Tree sig)
         return;
     }
     
-    // Select2 and Select3
+    // Select2 (and Select3 expressed with Select2)
     else if (isSigSelect2(sig, sel, x, y)) {
         self(sel);
         self(x);
@@ -203,7 +200,7 @@ void Signal2Elementary::visit(Tree sig)
         return;
     }
     
-    // Soundfile length, rate, channels, buffer
+    // Soundfile length, rate, buffer
     else if (isSigSoundfile(sig, label)) {
         return;
     } else if (isSigSoundfileLength(sig, sf, x)) {

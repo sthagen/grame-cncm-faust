@@ -3,7 +3,7 @@ project (faust)
 
 #######################################
 # versions management
-set (VERSION 2.37.3)
+set (VERSION 2.40.0)
 macro (get_major_minor_patch version)
 	string( REGEX REPLACE "([0-9]*)\\.([0-9]*)\\.([0-9]*)" "\\1"  VERSION_MAJOR ${version} )
 	string( REGEX REPLACE "([0-9]*)\\.([0-9]*)\\.([0-9]*)" "\\2"  VERSION_MINOR ${version} )
@@ -133,7 +133,7 @@ if(APPLE)
 		endif()
 		if (UNIVERSAL)
 			message (STATUS "Compiles an universal binary")
-			set (CMAKE_OSX_ARCHITECTURES x86_64 i386)
+			set (CMAKE_OSX_ARCHITECTURES x86_64 arm64)
 			set (FAUST_DEFINITIONS ${FAUST_DEFINITIONS} -DLLVM_BUILD_UNIVERSAL)
 		endif()
 	endif()
@@ -194,6 +194,18 @@ if (INCLUDE_STATIC)
 		POSITION_INDEPENDENT_CODE ON)
 	set (INSTALL_TARGETS ${INSTALL_TARGETS} staticlib)
 	scan_backends (staticlib STATIC)
+	if (INCLUDE_LLVM)
+		if (WIN32)
+			set (MAKELIBCMD Make.llvm.static.bat) 
+		else()
+			set (MAKELIBCMD make -f Make.llvm.static || true) 
+		endif()
+		add_custom_command(TARGET staticlib POST_BUILD
+                   COMMAND ${MAKELIBCMD}
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                   COMMENT "Embed LLVM static libraries with libfaust" )
+    endif()
+
 endif()
 
 
@@ -292,6 +304,24 @@ install ( TARGETS dynamiclib
 )
 endif()
 
+
+####################################
+# install the faust with llvm library
+if (INCLUDE_STATIC AND INCLUDE_LLVM)
+if (WIN32)
+	set (LFWITHLLVM  ${LIBDIR}/libfaustwithllvm.lib)
+else()
+	set (LFWITHLLVM  ${LIBDIR}/libfaustwithllvm.a)
+endif()
+install (
+    FILES  ${LFWITHLLVM} DESTINATION ${CMAKE_INSTALL_PREFIX}/${LIBSDIR}
+    PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    OPTIONAL
+)
+endif()
+
+
+
 ####################################
 # install headers
 install (
@@ -307,7 +337,7 @@ install (
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 install (
-    FILES     ${SRCDIR}/generator/libfaust.h ${SRCDIR}/generator/libfaust-c.h ${SRCDIR}/generator/libfaust-signal.h ${SRCDIR}/generator/libfaust-signal-c.h ${SRCDIR}/generator/libfaust-box.h ${SRCDIR}/generator/libfaust-box-c.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include/faust/dsp
+    FILES     ${SRCDIR}/generator/libfaust.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include/faust/dsp
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 # the file below is part of the httpd lib but installed even if the lib is not part of the config
@@ -325,7 +355,7 @@ install (
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_EXECUTE WORLD_READ
 )
 install (
-    FILES     ${ROOT}/tools/faust2appls/faustoptflags ${ROOT}/tools/faust2appls/faustpath DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+    FILES  ${ROOT}/tools/faust-config ${ROOT}/tools/faust2appls/faustoptflags ${ROOT}/tools/faust2appls/faustpath DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_EXECUTE WORLD_READ
 )
 

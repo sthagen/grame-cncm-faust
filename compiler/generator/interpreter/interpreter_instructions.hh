@@ -270,22 +270,22 @@ struct InterpreterInstVisitor : public DispatchVisitor {
         if (array_typed && array_typed->fSize > 1) {
             if (array_typed->fType->getType() == Typed::kInt32) {
                 fFieldTable[name] =
-                    MemoryDesc(-1, fIntHeapOffset, array_typed->fSize, array_typed->fType->getType());
+                    MemoryDesc(-1, fIntHeapOffset, array_typed->fSize, array_typed->getSizeBytes(), array_typed->fType->getType());
                 fIntHeapOffset += array_typed->fSize;
             } else {
                 fFieldTable[name] =
-                    MemoryDesc(-1, fRealHeapOffset, array_typed->fSize, array_typed->fType->getType());
+                    MemoryDesc(-1, fRealHeapOffset, array_typed->fSize, array_typed->getSizeBytes(), array_typed->fType->getType());
                 fRealHeapOffset += array_typed->fSize;
             }
         } else {
             if (inst->fType->getType() == Typed::kInt32) {
-                fFieldTable[name] = MemoryDesc(-1, fIntHeapOffset, 1, inst->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fIntHeapOffset, 1, inst->fType->getSizeBytes(), inst->fType->getType());
                 fIntHeapOffset++;
             } else if (inst->fType->getType() == Typed::kSound_ptr) {
-                fFieldTable[name] = MemoryDesc(-1, fSoundHeapOffset, 1, inst->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fSoundHeapOffset, 1, inst->fType->getSizeBytes(), inst->fType->getType());
                 fSoundHeapOffset++;
             } else {
-                fFieldTable[name] = MemoryDesc(-1, fRealHeapOffset, 1, inst->fType->getType());
+                fFieldTable[name] = MemoryDesc(-1, fRealHeapOffset, 1, inst->fType->getSizeBytes(), inst->fType->getType());
                 fRealHeapOffset++;
             }
         }

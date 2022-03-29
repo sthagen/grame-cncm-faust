@@ -11,7 +11,7 @@ system := $(shell echo $(system) | grep MINGW > /dev/null && echo MINGW || echo 
 # output directories
 FAUSTDIR ?= faustdir
 IOSDIR   := iosdir
-VERSION := 2.37.3
+VERSION := 2.40.0
 
 #===============================================================
 # current generator and backends
@@ -134,8 +134,8 @@ help:
 	@echo
 	@echo "Utilities targets:"
 	@echo " 'cmake'      : regenerate the project using the current config"
-	@echo " 'universal'  : [MacOSX] set the universal binaries option ON."
-	@echo " 'native'     : [MacOSX] set the universal binaries option OFF."
+	@echo " 'universal'  : [macOS] set the universal binaries option ON (x86_64 and arm64)."
+	@echo " 'native'     : [macOS] set the universal binaries option OFF."
 	@echo " 'verbose'    : turn the verbose makefile option ON."
 	@echo " 'silent'     : turn the verbose makefile option OFF."
 	@echo " 'jsscripts'  : to rebuild javascript resources (from architecture/httpdlib)."
@@ -151,7 +151,7 @@ help:
 	@echo
 	@echo "Packaging targets:"
 	@echo " 'package'    : build a Faust package for the current platform"
-	@echo " 'release'    : build a Faust release (MacOS only)"
+	@echo " 'release'    : build a Faust release (macOS only)"
 	@echo "                includes faust, faustgen and dist packages"
 
 	

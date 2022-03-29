@@ -1,38 +1,38 @@
 /************************************************************************
-
-    IMPORTANT NOTE : this file contains two clearly delimited sections :
-    the ARCHITECTURE section (in two parts) and the USER section. Each section
-    is governed by its own copyright and license. Please check individually
-    each section for license and copyright information.
-*************************************************************************/
+ 
+ IMPORTANT NOTE : this file contains two clearly delimited sections :
+ the ARCHITECTURE section (in two parts) and the USER section. Each section
+ is governed by its own copyright and license. Please check individually
+ each section for license and copyright information.
+ *************************************************************************/
 
 /******************* BEGIN max-msp.cpp ****************/
 /************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2004-2018 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
-    This Architecture section is free software; you can redistribute it
-    and/or modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either version 3
-    of the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Lesser General Public License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program; If not, see <http://www.gnu.org/licenses/>.
-
-    EXCEPTION : As a special exception, you may create a larger work
-    that contains this FAUST architecture section and distribute
-    that work under terms of your choice, so long as this FAUST
-    architecture section is not modified.
-
-    MAX MSP SDK : in order to compile a MaxMSP external with this
-    architecture file you will need the official MaxMSP SDK from
-    cycling'74. Please check the corresponding license.
-
+ FAUST Architecture File
+ Copyright (C) 2004-2018 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either version 3
+ of the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU Lesser General Public License for more details.
+ 
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
+ MAX MSP SDK : in order to compile a MaxMSP external with this
+ architecture file you will need the official MaxMSP SDK from
+ cycling'74. Please check the corresponding license.
+ 
  ************************************************************************
  ************************************************************************/
 
@@ -131,7 +131,7 @@ using namespace std;
 #define ASSIST_INLET 	1
 #define ASSIST_OUTLET 	2
 
-#define EXTERNAL_VERSION    "0.84"
+#define EXTERNAL_VERSION    "0.85"
 #define STR_SIZE            512
 
 #include "faust/gui/GUI.h"
@@ -383,7 +383,7 @@ void* faust_new(t_symbol* s, short ac, t_atom* av)
     if (bundle_path_str == "") {
         post("Bundle_path '%s' cannot be found!", meta3.fName.c_str());
     }
-    x->m_soundInterface = new SoundUI(bundle_path_str);
+    x->m_soundInterface = new SoundUI(bundle_path_str, -1, nullptr, sizeof(FAUSTFLOAT) == 8);
 #endif
     delete tmp_dsp;
     
@@ -708,7 +708,7 @@ void ext_main(void* r)
     faust_class = c;
     
     post((char*)"Faust DSP object v%s (sample = 32 bits code = 32 bits)", EXTERNAL_VERSION);
-    post((char*)"Copyright (c) 2012-2021 Grame");
+    post((char*)"Copyright (c) 2012-2022 Grame");
    
     Max_Meta1 meta1;
     tmp_dsp->metadata(&meta1);
