@@ -28,7 +28,6 @@
 #include "code_loop.hh"
 #include "description.hh"
 #include "dsp_factory.hh"
-#include "export.hh"
 #include "floats.hh"
 #include "garbageable.hh"
 #include "instructions.hh"
@@ -355,7 +354,6 @@ class CodeContainer : public virtual Garbageable {
                       gGlobal->gImportDirList,
                       -1, std::map<std::string, int>(),
                       fMemoryLayout);
-        
         generateUserInterface(visitor);
         generateMetaData(visitor);
     }
@@ -366,6 +364,15 @@ class CodeContainer : public virtual Garbageable {
         JSONInstVisitor<REAL> visitor;
         generateJSON(&visitor);
         return visitor.JSON(true);
+    }
+    
+    string generateJSONAux()
+    {
+        if (gGlobal->gFloatSize == 1) {
+            return generateJSON<float>();
+        } else {
+            return generateJSON<double>();
+        }
     }
 
     /* Can be overridden by subclasses to transform the FIR before the actual code generation */
@@ -394,7 +401,7 @@ class CodeContainer : public virtual Garbageable {
     }
 
     ValueInst* pushFunction(const string& name, Typed::VarType result, vector<Typed::VarType>& types,
-                            const list<ValueInst*>& args);
+                            const Values& args);
 
     void generateExtGlobalDeclarations(InstVisitor* visitor)
     {

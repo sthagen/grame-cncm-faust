@@ -118,7 +118,7 @@ class soulpatch_dsp : public dsp {
         soul::patch::Parameter::Ptr fInstanceConstants;
         soul::patch::Parameter::Ptr fInstanceResetUserInterface;
         soul::patch::Parameter::Ptr fInstanceClear;
-        JSONUITemplatedDecoder* fDecoder;
+        JSONUIDecoderBase* fDecoder;
     
         // MIDI handling
         midi_handler* fMIDIHander;
@@ -536,7 +536,7 @@ bool deleteSOULDSPFactory(soul_dsp_factory* factory)
  * Faust/SOUL hybrid file parser
  */
 
-class faust_soul_parser  {
+class faust_soul_parser {
     
     private:
         

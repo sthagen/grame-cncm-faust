@@ -250,6 +250,8 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gErrorCount = 0;
 
     gFileNum = 0;
+    
+    gExpCounter = 0;
 
     gCountInferences = 0;
     gCountMaximal    = 0;
@@ -265,7 +267,7 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gOccurrences = nullptr;
     gFoldingFlag = false;
     gDevSuffix   = nullptr;
-
+   
     gAbsPrim       = new AbsPrim();
     gAcosPrim      = new AcosPrim();
     gTanPrim       = new TanPrim();
@@ -458,6 +460,9 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gDrawSVGSwitch    = false;
     gVHDLSwitch       = false;
     gVHDLTrace        = false;
+    gVHDLFloatType    = 0; //sfixed
+    gVHDLFloatMSB     = 8;
+    gVHDLFloatLSB     = -23;
     gElementarySwitch = false;
     gPrintXMLSwitch   = false;
     gPrintJSONSwitch  = false;
@@ -571,11 +576,13 @@ void global::init()
     // Create type declaration for external 'soundfile' type
     vector<NamedTyped*> sf_type_fields;
     sf_type_fields.push_back(
-        InstBuilder::genNamedTyped("fBuffers", InstBuilder::genBasicTyped(Typed::kFloatMacro_ptr_ptr)));
+        InstBuilder::genNamedTyped("fBuffers", InstBuilder::genBasicTyped(Typed::kVoid_ptr)));
     sf_type_fields.push_back(InstBuilder::genNamedTyped("fLength", InstBuilder::genBasicTyped(Typed::kInt32_ptr)));
     sf_type_fields.push_back(InstBuilder::genNamedTyped("fSR", InstBuilder::genBasicTyped(Typed::kInt32_ptr)));
     sf_type_fields.push_back(InstBuilder::genNamedTyped("fOffset", InstBuilder::genBasicTyped(Typed::kInt32_ptr)));
     sf_type_fields.push_back(InstBuilder::genNamedTyped("fChannels", InstBuilder::genInt32Typed()));
+    sf_type_fields.push_back(InstBuilder::genNamedTyped("fParts", InstBuilder::genInt32Typed()));
+    sf_type_fields.push_back(InstBuilder::genNamedTyped("fIsDouble", InstBuilder::genInt32Typed()));
     gExternalStructTypes[Typed::kSound] =
         InstBuilder::genDeclareStructTypeInst(InstBuilder::genStructTyped("Soundfile", sf_type_fields));
 
@@ -616,6 +623,14 @@ void global::init()
     gMathForeignFunctions["copysignf"] = true;
     gMathForeignFunctions["copysign"]  = true;
     gMathForeignFunctions["copysignl"] = true;
+    
+    // internal state during drawing
+    gInverter[0] = boxSeq(boxPar(boxWire(), boxInt(-1)), boxPrim2(sigMul));
+    gInverter[1] = boxSeq(boxPar(boxInt(-1), boxWire()), boxPrim2(sigMul));
+    gInverter[2] = boxSeq(boxPar(boxWire(), boxReal(-1.0)), boxPrim2(sigMul));
+    gInverter[3] = boxSeq(boxPar(boxReal(-1.0), boxWire()), boxPrim2(sigMul));
+    gInverter[4] = boxSeq(boxPar(boxInt(0), boxWire()), boxPrim2(sigSub));
+    gInverter[5] = boxSeq(boxPar(boxReal(0.0), boxWire()), boxPrim2(sigSub));
 }
 
 string global::printFloat()
@@ -736,8 +751,7 @@ void global::initTypeSizeMap()
     gTypeSizeMap[Typed::kFloatMacro_ptr_ptr] = gMachinePtrSize;
 
     gTypeSizeMap[Typed::kVoid_ptr]     = gMachinePtrSize;
-    gTypeSizeMap[Typed::kVoid_ptr_ptr] = gMachinePtrSize;
-
+  
     gTypeSizeMap[Typed::kObj_ptr]   = gMachinePtrSize;
     gTypeSizeMap[Typed::kSound_ptr] = gMachinePtrSize;
     gTypeSizeMap[Typed::kUint_ptr]  = gMachinePtrSize;

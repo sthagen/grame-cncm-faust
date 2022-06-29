@@ -222,6 +222,15 @@ struct global {
     list<string> gInputFiles;
 
     int gFileNum;
+    
+    // ------------
+    // boxppShared
+    // ------------
+    
+    // Tree is used to identify the same nodes during tree traversal,
+    // but gExpCounter is then used to generate unique IDs
+    std::map<Tree, std::pair<int, std::string>> gExpTable;
+    int gExpCounter;
 
     int gCountInferences;
     int gCountMaximal;
@@ -483,6 +492,7 @@ struct global {
     set<Tree>         gDrawnExp;        // Expressions drawn or scheduled so far
     const char*       gDevSuffix;       // .svg or .ps used to choose output device
     string            gSchemaFileName;  // name of schema file beeing generated
+    Tree              gInverter[6];
     map<Tree, string> gBackLink;        // link to enclosing file for sub schema
 
     // FIR
@@ -539,6 +549,9 @@ struct global {
     bool   gDrawSVGSwitch;
     bool   gVHDLSwitch;
     bool   gVHDLTrace;
+    int    gVHDLFloatType; //sfixed(msb downto lsb) or float(msb downto lsb)
+    int    gVHDLFloatMSB;
+    int    gVHDLFloatLSB;
     bool   gElementarySwitch;
     bool   gPrintXMLSwitch;
     bool   gPrintJSONSwitch;
