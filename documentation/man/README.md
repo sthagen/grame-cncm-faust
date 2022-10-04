@@ -1,4 +1,4 @@
-% man(1) Version 2.41.1 (16-June-2022) | Faust man page
+% man(1) Version 2.50.6 (01-October-2022) | Faust man page
 
 NAME
 ====
@@ -74,6 +74,7 @@ Code generation options:
 
   **-nvi**        **--no-virtual**                when compiled with the C++ backend, does not add the 'virtual' keyword.
 
+  **-fp**         **--full-parentheses**          always add parentheses around binops 
   **-exp10**      **--generate-exp10**            pow(10,x) replaced by possibly faster exp10(x).
 
   **-os**         **--one-sample**                generate one sample computation (same as -os0).
@@ -138,15 +139,15 @@ Code generation options:
 
   **-ns** \<name>  **--namespace** \<name>          generate C++ or D code in a namespace \<name>.
 
-  **-vhdl**       **--vhdl**                      output vhdl file.
+  **-vhdl**          **--vhdl**                   output vhdl file.
 
-  **-vhdl**-trace **--vhdl-trace**                activate trace.
+  **-vhdl**-trace    **--vhdl-trace**             activate trace.
 
-  **-vhdl**-type 0|1 **--vhdl-format** 0|1        sample format 0 = sfixed (default), 1 = float.
+  **-vhdl**-type 0|1 **--vhdl-type** 0|1          sample format 0 = sfixed (default), 1 = float.
 
-  **-vhdl**-msb \<n>                           MSB number of bits.
+  **-vhdl**-msb \<n>  **--vhdl-msb** \<n>           MSB number of bits.
 
-  **-vhdl**-lsm \<n>                           LSB number of bits.
+  **-vhdl**-lsb \<n>  **--vhdl-lsb** \<n>           LSB number of bits.
 
   **-wi** \<n>     **--widening-iterations** \<n>   number of iterations before widening in signal bounding.
 

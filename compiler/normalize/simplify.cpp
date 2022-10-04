@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -109,13 +109,19 @@ static Tree simplification(Tree sig)
 
         else if (opnum == kSub && isZero(n1))
             return sigBinOp(kMul, sigInt(-1), t2);
-
+       
         else if (op->isLeftNeutral(n1))
             return t2;
-
+        
+        else if (op->isLeftAbsorbing(n1)) 
+            return t1;
+     
         else if (op->isRightNeutral(n2))
             return t1;
-
+        
+        else if (op->isRightAbsorbing(n2))
+            return t2;
+      
         else
             return normalizeAddTerm(sig);
 
@@ -126,27 +132,23 @@ static Tree simplification(Tree sig)
         return normalizeDelayTerm(t1, t2);
 
     } else if (isSigIntCast(sig, t1)) {
-        Tree   tx;
         int    i;
         double x;
         Node   n1 = t1->node();
 
         if (isInt(n1, &i)) return t1;
         if (isDouble(n1, &x)) return tree(int(x));
-        if (isSigIntCast(t1, tx)) return t1;
-
+   
         return sig;
 
     } else if (isSigFloatCast(sig, t1)) {
-        Tree   tx;
         int    i;
         double x;
         Node   n1 = t1->node();
 
         if (isInt(n1, &i)) return tree(double(i));
         if (isDouble(n1, &x)) return t1;
-        if (isSigFloatCast(t1, tx)) return t1;
-
+    
         return sig;
 
     } else if (isSigSelect2(sig, t1, t2, t3)) {
@@ -209,7 +211,7 @@ static Tree sigMap(Tree key, tfun f, Tree t)
     Tree p, id, body;
 
     if (getProperty(t, key, p)) {
-        return (isNil(p)) ? t : p;  // truc pour eviter les boucles
+        return (isNil(p)) ? t : p;  // trick to avoid loops
 
     } else if (isRec(t, id, body)) {
         setProperty(t, key, gGlobal->nil);  // avoid infinite loop
@@ -281,7 +283,7 @@ static Tree sigMapRename(Tree key, Tree env, tfun f, Tree t)
 }
 
 #if 0
-static void eraseProperties (Tree key, Tree t)
+static void eraseProperties(Tree key, Tree t)
 {
 	//printf("start sigMap\n");
 	Tree p,id,body;
@@ -291,14 +293,14 @@ static void eraseProperties (Tree key, Tree t)
 
 	} else if (isRec(t, id, body)) {
 		t->clearProperties();
-        Tree r=rec(id, body);
+        Tree r = rec(id, body);
         faustassert(r==t);
 		setProperty(t, key, gGlobal->nil);	// avoid infinite loop
 		eraseProperties(key, body);
 
 	} else {
 
-		for (int i=0; i<t->arity(); i++) {
+		for (int i = 0; i < t->arity(); i++) {
 			eraseProperties(key,t->branch(i));
 		}
 	}

@@ -4,16 +4,16 @@
     Copyright (C) 2003-2017 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -50,21 +50,21 @@
 #include "global.hh"
 #include "instructions_compiler.hh"
 #include "instructions_compiler1.hh"
+#include "labels.hh"
 #include "libfaust.h"
+#include "normalform.hh"
 #include "ppbox.hh"
 #include "ppsig.hh"
 #include "privatise.hh"
 #include "propagate.hh"
 #include "recursivness.hh"
 #include "schema.h"
+#include "signalVisitor.hh"
 #include "signals.hh"
 #include "sigprint.hh"
 #include "sigtype.hh"
-#include "sigtyperules.hh"
-#include "simplify.hh"
 #include "sourcereader.hh"
 #include "timing.hh"
-#include "labels.hh"
 #include "xtended.hh"
 
 #ifdef C_BUILD
@@ -132,7 +132,7 @@ using namespace std;
 
 static unique_ptr<ifstream> injcode;
 static unique_ptr<ifstream> enrobage;
-static unique_ptr<ostream> helpers;
+static unique_ptr<ostream>  helpers;
 
 // Old CPP compiler
 #ifdef OCPP_BUILD
@@ -181,7 +181,7 @@ static void enumBackends(ostream& out)
 #ifdef JAVA_BUILD
     out << dspto << "Java" << endl;
 #endif
-    
+
 #ifdef JULIA_BUILD
     out << dspto << "Julia" << endl;
 #endif
@@ -282,7 +282,7 @@ static bool processCmdline(int argc, const char* argv[])
         cout << "processCmdline i = " << i << " cmd = " << argv[i] << "\n";
     }
     */
-    
+
     while (i < argc) {
         if (isCmd(argv[i], "-h", "--help")) {
             gGlobal->gHelpSwitch = true;
@@ -334,11 +334,11 @@ static bool processCmdline(int argc, const char* argv[])
             i += 2;
 
         } else if (isCmd(argv[i], "-wi", "--widening-iterations") && (i + 1 < argc)) {
-            gGlobal->gWideningLimit = std::atoi(argv[i+1]);
+            gGlobal->gWideningLimit = std::atoi(argv[i + 1]);
             i += 2;
-            
-        } else if (isCmd(argv[i], "-ni", "--narrowing-iterations") && (i + 1 < argc)){
-            gGlobal->gNarrowingLimit = std::atoi(argv[i+1]);
+
+        } else if (isCmd(argv[i], "-ni", "--narrowing-iterations") && (i + 1 < argc)) {
+            gGlobal->gNarrowingLimit = std::atoi(argv[i + 1]);
             i += 2;
 
         } else if (isCmd(argv[i], "-ps", "--postscript")) {
@@ -384,19 +384,19 @@ static bool processCmdline(int argc, const char* argv[])
         } else if (isCmd(argv[i], "-vhdl-trace", "--vhdl-trace")) {
             gGlobal->gVHDLTrace = true;
             i += 1;
-            
+
         } else if (isCmd(argv[i], "-vhdl-type", "--vhdl-type") && (i + 1 < argc)) {
             gGlobal->gVHDLFloatType = std::atoi(argv[i + 1]);
             i += 2;
-            
+
         } else if (isCmd(argv[i], "-vhdl-msb", "--vhdl-msb") && (i + 1 < argc)) {
             gGlobal->gVHDLFloatMSB = std::atoi(argv[i + 1]);
             i += 2;
-            
+
         } else if (isCmd(argv[i], "-vhdl-lsb", "--vhdl-lsb") && (i + 1 < argc)) {
             gGlobal->gVHDLFloatLSB = std::atoi(argv[i + 1]);
             i += 2;
-            
+
         } else if (isCmd(argv[i], "-elm", "--elementary")) {
             gGlobal->gElementarySwitch = true;
             i += 1;
@@ -547,7 +547,11 @@ static bool processCmdline(int argc, const char* argv[])
             i += 1;
 
         } else if (isCmd(argv[i], "-norm", "--normalized-form")) {
-            gGlobal->gDumpNorm = true;
+            gGlobal->gDumpNorm = 0;
+            i += 1;
+
+        } else if (isCmd(argv[i], "-norm1", "--normalized-form1")) {
+            gGlobal->gDumpNorm = 1;
             i += 1;
 
         } else if (isCmd(argv[i], "-cn", "--class-name") && (i + 1 < argc)) {
@@ -578,15 +582,15 @@ static bool processCmdline(int argc, const char* argv[])
         } else if (isCmd(argv[i], "-os", "--one-sample") || isCmd(argv[i], "-os0", "--one-sample0")) {
             gGlobal->gOneSample = 0;
             i += 1;
-            
+
         } else if (isCmd(argv[i], "-os1", "--one-sample1")) {
             gGlobal->gOneSample = 1;
             i += 1;
-            
+
         } else if (isCmd(argv[i], "-os2", "--one-sample2")) {
             gGlobal->gOneSample = 2;
             i += 1;
-            
+
         } else if (isCmd(argv[i], "-os3", "--one-sample3")) {
             gGlobal->gOneSample = 3;
             i += 1;
@@ -620,6 +624,10 @@ static bool processCmdline(int argc, const char* argv[])
         } else if (isCmd(argv[i], "-ns", "--namespace")) {
             gGlobal->gNameSpace = argv[i + 1];
             i += 2;
+
+        } else if (isCmd(argv[i], "-fp", "--full-parentheses")) {
+            gGlobal->gFullParentheses = true;
+            i += 1;
 
         } else if (isCmd(argv[i], "-I", "--import-dir") && (i + 1 < argc)) {
             if ((strstr(argv[i + 1], "http://") != 0) || (strstr(argv[i + 1], "https://") != 0)) {
@@ -682,7 +690,7 @@ static bool processCmdline(int argc, const char* argv[])
         } else if (isCmd(argv[i], "-clang", "--clang")) {
             gGlobal->gClang = true;
             i += 1;
-            
+
         } else if (isCmd(argv[i], "-nvi", "--no-virtual")) {
             gGlobal->gNoVirtual = true;
             i += 1;
@@ -694,7 +702,7 @@ static bool processCmdline(int argc, const char* argv[])
         } else if (isCmd(argv[i], "-cat", "--check-all-table")) {
             gGlobal->gCheckTable = "cat";
             i += 1;
-            
+
         } else if (isCmd(argv[i], "-me", "--math-exceptions")) {
             gGlobal->gMathExceptions = true;
             i += 1;
@@ -736,8 +744,8 @@ static bool processCmdline(int argc, const char* argv[])
         throw faustexception("ERROR : 'ocpp' backend can only be used in scalar mode\n");
     }
 #endif
-    if (gGlobal->gOneSample >= 0 && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "c" && gGlobal->gOutputLang != "dlang" &&
-        !startWith(gGlobal->gOutputLang, "soul") && gGlobal->gOutputLang != "fir") {
+    if (gGlobal->gOneSample >= 0 && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "c" &&
+        gGlobal->gOutputLang != "dlang" && !startWith(gGlobal->gOutputLang, "soul") && gGlobal->gOutputLang != "fir") {
         throw faustexception("ERROR : '-os' option cannot only be used with 'cpp', 'c', 'fir' or 'soul' backends\n");
     }
 
@@ -799,27 +807,31 @@ static bool processCmdline(int argc, const char* argv[])
 
     if (gGlobal->gFloatSize == 4 && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "ocpp" &&
         gGlobal->gOutputLang != "c") {
-        throw faustexception("ERROR : -fx can ony be used with 'c', 'cpp' or 'ocpp' backends\n");
+        throw faustexception("ERROR : -fx can only be used with 'c', 'cpp' or 'ocpp' backends\n");
     }
-    
+
     if (gGlobal->gClang && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "ocpp" &&
         gGlobal->gOutputLang != "c") {
-        throw faustexception("ERROR : -clang can ony be used with 'c', 'cpp' or 'ocpp' backends\n");
+        throw faustexception("ERROR : -clang can only be used with 'c', 'cpp' or 'ocpp' backends\n");
     }
-    
+
     if (gGlobal->gNoVirtual && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "ocpp" &&
         gGlobal->gOutputLang != "c") {
-        throw faustexception("ERROR : -nvi can ony be used with 'c', 'cpp' or 'ocpp' backends\n");
+        throw faustexception("ERROR : -nvi can only be used with 'c', 'cpp' or 'ocpp' backends\n");
     }
 
     if (gGlobal->gMemoryManager && gGlobal->gOutputLang != "cpp" && gGlobal->gOutputLang != "ocpp") {
-        throw faustexception("ERROR : -mem can ony be used with 'cpp' or 'ocpp' backends\n");
+        throw faustexception("ERROR : -mem can only be used with 'cpp' or 'ocpp' backends\n");
     }
 
     if (gGlobal->gArchFile != "" &&
         ((gGlobal->gOutputLang == "wast") || (gGlobal->gOutputLang == "wasm") || (gGlobal->gOutputLang == "interp") ||
          (gGlobal->gOutputLang == "llvm") || (gGlobal->gOutputLang == "fir"))) {
         throw faustexception("ERROR : -a can only be used with 'c', 'cpp', 'ocpp', 'rust' and 'soul' backends\n");
+    }
+
+    if (gGlobal->gClassName == "") {
+        throw faustexception("ERROR : -cn used with empty string \n");
     }
 
     if (err != 0) {
@@ -899,7 +911,8 @@ static void printHelp()
     cout << tab << "-i        --inline-architecture-files   inline architecture files." << endl;
     cout << tab << "-A <dir>  --architecture-dir <dir>      add the directory <dir> to the architecture search path."
          << endl;
-    cout << tab << "-I <dir>  --import-dir <dir>            add the directory <dir> to the libraries search path." << endl;
+    cout << tab << "-I <dir>  --import-dir <dir>            add the directory <dir> to the libraries search path."
+         << endl;
     cout << tab << "-L <file> --library <file>              link with the LLVM module <file>." << endl;
 
     cout << tab << "-t <sec>  --timeout <sec>               abort compilation after <sec> seconds (default 120)."
@@ -920,7 +933,8 @@ static void printHelp()
     cout << endl << "Code generation options:" << line;
     cout << tab << "-lang <lang> --language                 select output language," << endl;
     cout << tab
-         << "                                        'lang' should be c, cpp (default), csharp, dlang, fir, interp, java, julia, llvm, "
+         << "                                        'lang' should be c, cpp (default), csharp, dlang, fir, interp, "
+            "java, julia, llvm, "
             "ocpp, rust, soul or wast/wasm."
          << endl;
     cout << tab
@@ -942,14 +956,27 @@ static void printHelp()
             "auto-vectorization."
          << endl;
     cout << tab
-         << "-nvi        --no-virtual                when compiled with the C++ backend, does not add the 'virtual' keyword." << endl;
+         << "-nvi        --no-virtual                when compiled with the C++ backend, does not add the 'virtual' "
+            "keyword."
+         << endl;
+    cout << tab << "-fp         --full-parentheses          always add parentheses around binops " << endl;
     cout << tab << "-exp10      --generate-exp10            pow(10,x) replaced by possibly faster exp10(x)." << endl;
     cout << tab << "-os         --one-sample                generate one sample computation (same as -os0)." << endl;
-    cout << tab << "-os0        --one-sample0               generate one sample computation (0 = separated control)." << endl;
-    cout << tab << "-os1        --one-sample1               generate one sample computation (1 = separated control and DSP struct)." << endl;
-    cout << tab << "-os2        --one-sample2               generate one sample computation (2 = separated control and DSP struct. Separation in short and long delay lines)." << endl;
-    cout << tab << "-os3        --one-sample3               generate one sample computation (3 = like 2 but with external memory pointers kept in the DSP struct)." << endl;
-    
+    cout << tab << "-os0        --one-sample0               generate one sample computation (0 = separated control)."
+         << endl;
+    cout << tab
+         << "-os1        --one-sample1               generate one sample computation (1 = separated control and DSP "
+            "struct)."
+         << endl;
+    cout << tab
+         << "-os2        --one-sample2               generate one sample computation (2 = separated control and DSP "
+            "struct. Separation in short and long delay lines)."
+         << endl;
+    cout << tab
+         << "-os3        --one-sample3               generate one sample computation (3 = like 2 but with external "
+            "memory pointers kept in the DSP struct)."
+         << endl;
+
     cout << tab << "-cm         --compute-mix               mix in outputs buffers." << endl;
     cout << tab
          << "-cn <name>  --class-name <name>         specify the name of the dsp class to be used instead of mydsp."
@@ -1016,18 +1043,17 @@ static void printHelp()
          << endl;
     cout << tab
 
-         << "-mapp       --math-approximation        simpler/faster versions of 'floor/ceil/fmod/remainder' functions." << endl;
-    cout << tab
-         << "-ns <name>  --namespace <name>          generate C++ or D code in a namespace <name>." << endl;
+         << "-mapp       --math-approximation        simpler/faster versions of 'floor/ceil/fmod/remainder' functions."
+         << endl;
+    cout << tab << "-ns <name>  --namespace <name>          generate C++ or D code in a namespace <name>." << endl;
 
-    cout << tab << "-vhdl       --vhdl                      output vhdl file." << endl;
-    cout << tab << "-vhdl-trace --vhdl-trace                activate trace." << endl;
+    cout << tab << "-vhdl          --vhdl                   output vhdl file." << endl;
+    cout << tab << "-vhdl-trace    --vhdl-trace             activate trace." << endl;
     cout << tab << "-vhdl-type 0|1 --vhdl-type 0|1          sample format 0 = sfixed (default), 1 = float." << endl;
-    cout << tab << "-vhdl-msb <n>                           MSB number of bits." << endl;
-    cout << tab << "-vhdl-lsb <n>                           LSB number of bits." << endl;
-        
-    cout << tab
-         << "-wi <n>     --widening-iterations <n>   number of iterations before widening in signal bounding."
+    cout << tab << "-vhdl-msb <n>  --vhdl-msb <n>           MSB number of bits." << endl;
+    cout << tab << "-vhdl-lsb <n>  --vhdl-lsb <n>           LSB number of bits." << endl;
+
+    cout << tab << "-wi <n>     --widening-iterations <n>   number of iterations before widening in signal bounding."
          << endl;
 
     cout << tab
@@ -1075,7 +1101,10 @@ static void printHelp()
     cout << tab << "-norm       --normalized-form           print signals in normalized form and exit." << endl;
     cout << tab << "-ct         --check-table               check table index range and exit at first failure." << endl;
     cout << tab << "-cat        --check-all-table           check all table index range." << endl;
-    cout << tab << "-me         --math-exceptions           check / for 0 as denominator and remainder, fmod, sqrt, log10, log, acos, asin functions domain." << endl;
+    cout << tab
+         << "-me         --math-exceptions           check / for 0 as denominator and remainder, fmod, sqrt, log10, "
+            "log, acos, asin functions domain."
+         << endl;
 
     cout << endl << "Information options:" << line;
     cout << tab << "-h          --help                      print this help message." << endl;
@@ -1113,6 +1142,20 @@ static void printDeclareHeader(ostream& dst)
             }
         }
     }
+}
+
+LIBFAUST_API const char* xtendedName(Tree tree)
+{
+    void* userData = getUserData(tree);
+    faustassert(userData != nullptr);
+    return ((xtended*)userData)->name();
+}
+
+LIBFAUST_API unsigned int xtendedArity(Tree tree)
+{
+    void* userData = getUserData(tree);
+    faustassert(userData != nullptr);
+    return ((xtended*)userData)->arity();
 }
 
 /****************************************************************
@@ -1224,6 +1267,7 @@ static void parseSourceFiles()
 
     list<string>::iterator s;
     gGlobal->gResult2 = gGlobal->nil;
+    gGlobal->gReader.init();
 
     if (!gGlobal->gInjectFlag && gGlobal->gInputFiles.begin() == gGlobal->gInputFiles.end()) {
         throw faustexception("ERROR : no files specified; for help type \"faust --help\"\n");
@@ -1265,11 +1309,11 @@ static Tree evaluateBlockDiagram(Tree expandedDefList, int& numInputs, int& numO
     if (gGlobal->gDrawPSSwitch) {
         drawSchema(process, subst("$0-ps", gGlobal->makeDrawPathNoExt()).c_str(), "ps");
     }
-    
+
     if (gGlobal->gDrawSVGSwitch) {
         drawSchema(process, subst("$0-svg", gGlobal->makeDrawPathNoExt()).c_str(), "svg");
     }
- 
+
     if (gGlobal->gDetailsSwitch) {
         cout << "process has " << numInputs << " inputs, and " << numOutputs << " outputs" << endl;
     }
@@ -1328,7 +1372,7 @@ static void compileCLLVM(Tree signals, int numInputs, int numOutputs)
     gGlobal->gFAUSTFLOAT2Internal = true;
 
     container = ClangCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs);
-    
+
     // To trigger 'sig.dot' generation
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
@@ -1345,21 +1389,21 @@ static void compileLLVM(Tree signals, int numInputs, int numOutputs, bool genera
 {
 #ifdef LLVM_BUILD
     container = LLVMCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs);
-    
+
     // libc functions will be found by the LLVM linker, but not user defined ones...
     gGlobal->gAllowForeignFunction = false;
     // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
     gGlobal->gFAUSTFLOAT2Internal = true;
-    gGlobal->gUseDefaultSound = false;
-    
+    gGlobal->gUseDefaultSound     = false;
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
         new_comp = new InstructionsCompiler(container);
     }
-    
+
     if (gGlobal->gPrintXMLSwitch || gGlobal->gPrintDocSwitch) new_comp->setDescription(new Description());
-    
+
     if (generate) {
         new_comp->compileMultiSignal(signals);
     } else {
@@ -1385,18 +1429,18 @@ static void compileInterp(Tree signals, int numInputs, int numOutputs)
     gGlobal->gAllowForeignConstant = false;  // No foreign constant
     gGlobal->gAllowForeignVar      = false;  // No foreign variable
     // gGlobal->gComputeIOTA       = true;   // Ensure IOTA base fixed delays are computed once
-    
+
     // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
     gGlobal->gFAUSTFLOAT2Internal = true;
     gGlobal->gNeedManualPow       = false;  // Standard pow function will be used in pow(x,y) when Y in an integer
     gGlobal->gRemoveVarAddress    = true;   // To be used in -vec mode
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
         new_comp = new InterpreterInstructionsCompiler(container);
     }
-    
+
     if (gGlobal->gPrintXMLSwitch || gGlobal->gPrintDocSwitch) new_comp->setDescription(new Description());
     new_comp->compileMultiSignal(signals);
 #else
@@ -1408,13 +1452,13 @@ static void compileFIR(Tree signals, int numInputs, int numOutputs, ostream* out
 {
 #ifdef FIR_BUILD
     container = FIRCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out, true);
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
         new_comp = new InstructionsCompiler(container);
     }
-    
+
     new_comp->compileMultiSignal(signals);
 #else
     throw faustexception("ERROR : -lang fir not supported since FIR backend is not built\n");
@@ -1425,7 +1469,7 @@ static void compileC(Tree signals, int numInputs, int numOutputs, ostream* out)
 {
 #ifdef C_BUILD
     container = CCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out);
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1442,8 +1486,9 @@ static void compileC(Tree signals, int numInputs, int numOutputs, ostream* out)
 static void compileCPP(Tree signals, int numInputs, int numOutputs, ostream* out)
 {
 #ifdef CPP_BUILD
-    container = CPPCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
-    
+    container =
+        CPPCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1467,7 +1512,7 @@ static void compileOCPP(Tree signals, int numInputs, int numOutputs)
     } else {
         old_comp = new ScalarCompiler(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs);
     }
-    
+
     if (gGlobal->gPrintXMLSwitch || gGlobal->gPrintDocSwitch) old_comp->setDescription(new Description());
     old_comp->compileMultiSignal(signals);
 #else
@@ -1480,8 +1525,8 @@ static void compileRust(Tree signals, int numInputs, int numOutputs, ostream* ou
 #ifdef RUST_BUILD
     // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
     gGlobal->gFAUSTFLOAT2Internal = true;
-    container = RustCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out);
-    
+    container                     = RustCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out);
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1499,8 +1544,9 @@ static void compileJava(Tree signals, int numInputs, int numOutputs, ostream* ou
 {
 #ifdef JAVA_BUILD
     gGlobal->gAllowForeignFunction = false;  // No foreign functions
-    container = JAVACodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
-    
+    container =
+        JAVACodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1519,7 +1565,7 @@ static void compileJulia(Tree signals, int numInputs, int numOutputs, ostream* o
 #ifdef JULIA_BUILD
     gGlobal->gAllowForeignFunction = false;  // No foreign functions
     container = JuliaCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out);
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1537,8 +1583,9 @@ static void compileCSharp(Tree signals, int numInputs, int numOutputs, ostream* 
 {
 #ifdef CSHARP_BUILD
     gGlobal->gAllowForeignFunction = false;  // No foreign functions
-    container = CSharpCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
-    
+    container =
+        CSharpCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1558,16 +1605,16 @@ static void compileSOUL(Tree signals, int numInputs, int numOutputs, ostream* ou
     gGlobal->gAllowForeignFunction = false;  // No foreign functions
     gGlobal->gAllowForeignConstant = false;  // No foreign constant
     gGlobal->gAllowForeignVar      = false;  // No foreign variable
-    
+
     // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
     gGlobal->gFAUSTFLOAT2Internal = true;
-    
+
     // "one sample control" model by default;
     gGlobal->gOneSampleControl = true;
     gGlobal->gNeedManualPow    = false;  // Standard pow function will be used in pow(x,y) when Y in an integer
-    
+
     container = SOULCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out);
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1585,7 +1632,7 @@ static void createHelperFile(const string& outpath)
 {
     // Additional file with JS code
     if (gGlobal->gOutputFile == "binary") {
-    // Nothing
+        // Nothing
     } else if (gGlobal->gOutputFile != "") {
         string outpath_js;
         bool   res = replaceExtension(outpath, ".js", outpath_js);
@@ -1605,7 +1652,7 @@ static void compileWAST(Tree signals, int numInputs, int numOutputs, ostream* ou
     gGlobal->gAllowForeignFunction = false;  // No foreign functions
     gGlobal->gAllowForeignConstant = false;  // No foreign constant
     gGlobal->gAllowForeignVar      = false;  // No foreign variable
-    
+
     // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
     gGlobal->gFAUSTFLOAT2Internal = true;
     // the 'i' variable used in the scalar loop moves by bytes instead of frames
@@ -1615,16 +1662,17 @@ static void compileWAST(Tree signals, int numInputs, int numOutputs, ostream* ou
     gGlobal->gNeedManualPow    = false;  // Standard pow function will be used in pow(x,y) when Y in an integer
     gGlobal->gRemoveVarAddress = true;   // To be used in -vec mode
                                          // gGlobal->gHasTeeLocal = true;     // combined store/load
-    
+
     gGlobal->gUseDefaultSound = false;
-    
+
     // This speedup (freeverb for instance) ==> to be done at signal level
     // gGlobal->gComputeIOTA = true;     // Ensure IOTA base fixed delays are computed once
-    
-    container = WASTCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out,
-                                                   ((gGlobal->gOutputLang == "wast") || (gGlobal->gOutputLang == "wast-i")));
+
+    container =
+        WASTCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out,
+                                           ((gGlobal->gOutputLang == "wast") || (gGlobal->gOutputLang == "wast-i")));
     createHelperFile(outpath);
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1644,7 +1692,7 @@ static void compileWASM(Tree signals, int numInputs, int numOutputs, ostream* ou
     gGlobal->gAllowForeignFunction = false;  // No foreign functions
     gGlobal->gAllowForeignConstant = false;  // No foreign constant
     gGlobal->gAllowForeignVar      = false;  // No foreign variable
-    
+
     // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
     gGlobal->gFAUSTFLOAT2Internal = true;
     // the 'i' variable used in the scalar loop moves by bytes instead of frames
@@ -1654,18 +1702,18 @@ static void compileWASM(Tree signals, int numInputs, int numOutputs, ostream* ou
     gGlobal->gNeedManualPow    = false;  // Standard pow function will be used in pow(x,y) when Y in an integer
     gGlobal->gRemoveVarAddress = true;   // To be used in -vec mode
                                          // gGlobal->gHasTeeLocal = true;     // combined store/load
-    
+
     gGlobal->gUseDefaultSound = false;
-    
+
     // This speedup (freeverb for instance) ==> to be done at signal level
     // gGlobal->gComputeIOTA = true;     // Ensure IOTA base fixed delays are computed once
-    
-    container = WASMCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out,
-                                                   ((gGlobal->gOutputLang == "wasm")
-                                                    || (gGlobal->gOutputLang == "wasm-i")
-                                                    || (gGlobal->gOutputLang == "wasm-ib")));
+
+    container =
+        WASMCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, out,
+                                           ((gGlobal->gOutputLang == "wasm") || (gGlobal->gOutputLang == "wasm-i") ||
+                                            (gGlobal->gOutputLang == "wasm-ib")));
     createHelperFile(outpath);
-    
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1682,8 +1730,9 @@ static void compileWASM(Tree signals, int numInputs, int numOutputs, ostream* ou
 static void compileDlang(Tree signals, int numInputs, int numOutputs, ostream* out)
 {
 #ifdef DLANG_BUILD
-    container = DLangCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
-    
+    container =
+        DLangCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs, numOutputs, out);
+
     if (gGlobal->gVectorSwitch) {
         new_comp = new DAGInstructionsCompiler(container);
     } else {
@@ -1700,44 +1749,42 @@ static void compileDlang(Tree signals, int numInputs, int numOutputs, ostream* o
 static void generateCodeAux1(unique_ptr<ostream>& dst)
 {
     if (gGlobal->gArchFile != "") {
-        
         if ((enrobage = openArchStream(gGlobal->gArchFile.c_str()))) {
-            
             if (gGlobal->gNameSpace != "" && gGlobal->gOutputLang == "cpp")
                 *dst.get() << "namespace " << gGlobal->gNameSpace << " {" << endl;
-        #ifdef DLANG_BUILD
+#ifdef DLANG_BUILD
             else if (gGlobal->gOutputLang == "dlang") {
                 DLangCodeContainer::printDRecipeComment(*dst.get(), container->getClassName());
                 DLangCodeContainer::printDModuleStmt(*dst.get(), container->getClassName());
             }
-        #endif
-            
+#endif
+
             // Possibly inject code
             injectCode(enrobage, *dst.get());
-            
+
             container->printHeader();
-            
+
             streamCopyUntil(*enrobage.get(), *dst.get(), "<<includeIntrinsic>>");
             streamCopyUntil(*enrobage.get(), *dst.get(), "<<includeclass>>");
-            
+
             if (gGlobal->gOpenCLSwitch || gGlobal->gCUDASwitch) {
                 includeFile("thread.h", *dst.get());
             }
-            
+
             container->printFloatDef();
             container->produceClass();
-            
+
             streamCopyUntilEnd(*enrobage.get(), *dst.get());
-            
+
             if (gGlobal->gSchedulerSwitch) {
                 includeFile("scheduler.cpp", *dst.get());
             }
-            
+
             container->printFooter();
-            
+
             // Generate factory
             gGlobal->gDSPFactory = container->produceFactory();
-            
+
             if (gGlobal->gOutputFile == "string") {
                 gGlobal->gDSPFactory->write(dst.get(), false, false);
             } else if (gGlobal->gOutputFile == "binary") {
@@ -1748,26 +1795,26 @@ static void generateCodeAux1(unique_ptr<ostream>& dst)
             } else {
                 gGlobal->gDSPFactory->write(&cout, false, false);
             }
-            
+
             if (gGlobal->gNameSpace != "" && gGlobal->gOutputLang == "cpp") {
                 *dst.get() << "} // namespace " << gGlobal->gNameSpace << endl;
             }
-            
+
         } else {
             stringstream error;
             error << "ERROR : can't open architecture file " << gGlobal->gArchFile << endl;
             throw faustexception(error.str());
         }
-        
+
     } else {
         container->printHeader();
         container->printFloatDef();
         container->produceClass();
         container->printFooter();
-        
+
         // Generate factory
         gGlobal->gDSPFactory = container->produceFactory();
-        
+
         if (gGlobal->gOutputFile == "string") {
             gGlobal->gDSPFactory->write(dst.get(), false, false);
             if (helpers) gGlobal->gDSPFactory->writeHelper(helpers.get(), false, false);
@@ -1796,7 +1843,7 @@ static void printHeader(ostream& dst)
     selectedKeys.insert(tree("copyright"));
     selectedKeys.insert(tree("license"));
     selectedKeys.insert(tree("version"));
-    
+
     dst << "//----------------------------------------------------------" << endl;
     for (const auto& i : gGlobal->gMetaDataSet) {
         if (selectedKeys.count(i.first)) {
@@ -1809,7 +1856,7 @@ static void printHeader(ostream& dst)
             dst << endl;
         }
     }
-    
+
     dst << "//" << endl;
     dst << "// Code generated with Faust " << FAUSTVERSION << " (https://faust.grame.fr)" << endl;
     dst << "//----------------------------------------------------------" << endl << endl;
@@ -1825,18 +1872,18 @@ static void generateCodeAux2(unique_ptr<ostream>& dst)
             throw faustexception(error.str());
         }
     }
-    
+
     // Possibly inject code
     injectCode(enrobage, *dst.get());
-    
+
     printHeader(*dst);
     old_comp->getClass()->printLibrary(*dst.get());
     old_comp->getClass()->printIncludeFile(*dst.get());
     old_comp->getClass()->printAdditionalCode(*dst.get());
-    
+
     if (gGlobal->gArchFile != "") {
         streamCopyUntil(*enrobage.get(), *dst.get(), "<<includeIntrinsic>>");
-        
+
         if (gGlobal->gSchedulerSwitch) {
             unique_ptr<ifstream> scheduler_include = openArchStream("old-scheduler.cpp");
             if (scheduler_include) {
@@ -1845,26 +1892,26 @@ static void generateCodeAux2(unique_ptr<ostream>& dst)
                 throw("ERROR : can't include \"old-scheduler.cpp\", file not found>\n");
             }
         }
-        
+
         streamCopyUntil(*enrobage.get(), *dst.get(), "<<includeclass>>");
         printfloatdef(*dst.get());
         old_comp->getClass()->println(0, *dst.get());
         streamCopyUntilEnd(*enrobage.get(), *dst.get());
-        
+
     } else {
         printfloatdef(*dst.get());
         old_comp->getClass()->println(0, *dst.get());
     }
-    
+
     /****************************************************************
      9 - generate the task graph file in dot format
      *****************************************************************/
-    
+
     if (gGlobal->gGraphSwitch) {
         ofstream dotfile(subst("$0.dot", gGlobal->makeDrawPath()).c_str());
         old_comp->getClass()->printGraphDotFormat(dotfile);
     }
-    
+
     if (gGlobal->gOutputFile == "") {
         cout << dynamic_cast<ostringstream*>(dst.get())->str();
     }
@@ -1878,17 +1925,17 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
      MANDATORY: use ostringstream which is indeed a subclass of ostream
      (otherwise subtle dynamic_cast related crash can occur...)
     *******************************************************************/
-    
+
     unique_ptr<ostream> dst;
     string              outpath;
-   
+
     if (gGlobal->gOutputFile == "string") {
         dst = unique_ptr<ostream>(new ostringstream());
     } else if (gGlobal->gOutputFile == "binary") {
         dst = unique_ptr<ostream>(new ostringstream(ostringstream::out | ostringstream::binary));
     } else if (gGlobal->gOutputFile != "") {
-        outpath = (gGlobal->gOutputDir != "")
-            ? (gGlobal->gOutputDir + "/" + gGlobal->gOutputFile) : gGlobal->gOutputFile;
+        outpath =
+            (gGlobal->gOutputDir != "") ? (gGlobal->gOutputDir + "/" + gGlobal->gOutputFile) : gGlobal->gOutputFile;
 
         unique_ptr<ofstream> fdst = unique_ptr<ofstream>(new ofstream(outpath.c_str()));
         if (!fdst->is_open()) {
@@ -1904,7 +1951,7 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
     }
 
     startTiming("generateCode");
-    
+
     /****************************************************************
      * create container
      ****************************************************************/
@@ -1945,7 +1992,7 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
               << "\"" << gGlobal->gOutputLang << "\"" << endl;
         throw faustexception(error.str());
     }
-    
+
     /****************************************************************
      * generate output file
      ****************************************************************/
@@ -1961,7 +2008,7 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
     else {
         faustassert(false);
     }
-    
+
     endTiming("generateCode");
 }
 
@@ -1969,7 +2016,7 @@ static void printXML(Description* D, int inputs, int outputs)
 {
     faustassert(D);
     ofstream xout(subst("$0.xml", gGlobal->makeDrawPath()).c_str());
-    
+
     MetaDataSet::const_iterator it1;
     set<Tree>::const_iterator   it2;
     for (const auto& it1 : gGlobal->gMetaDataSet) {
@@ -1991,7 +2038,7 @@ static void printXML(Description* D, int inputs, int outputs)
             }
         }
     }
-    
+
     D->className(gGlobal->gClassName);
     D->inputs(inputs);
     D->outputs(outputs);
@@ -2046,6 +2093,25 @@ static void generateOutputFiles()
     }
 }
 
+static void expandDSPInternalAux(int argc, const char* argv[], ostream& out)
+{
+    // Encode compilation options as a 'declare' : has to be located first in the string
+    out << "declare version \"" << FAUSTVERSION << "\";" << endl;
+    out << COMPILATION_OPTIONS << reorganizeCompilationOptions(argc, argv) << ';' << endl;
+
+    // Encode all libraries paths as 'declare'
+    vector<string> pathnames = gGlobal->gReader.listSrcFiles();
+    // Remove DSP filename
+    pathnames.erase(pathnames.begin());
+    int i = 0;
+    for (const auto& it : pathnames) {
+        out << "declare library_path" << to_string(i++) << " \"" << it << "\";" << endl;
+    }
+
+    printDeclareHeader(out);
+    boxppShared(gGlobal->gProcessTree, out);
+}
+
 static string expandDSPInternal(int argc, const char* argv[], const char* name, const char* dsp_content)
 {
     /****************************************************************
@@ -2074,30 +2140,61 @@ static string expandDSPInternal(int argc, const char* argv[], const char* name, 
         throw faustexception(gGlobal->gErrorMessage);
     }
 
-    // Encode compilation options as a 'declare' : has to be located first in the string
     stringstream out;
-    out << "declare version \"" << FAUSTVERSION << "\";" << endl;
-    out << COMPILATION_OPTIONS << reorganizeCompilationOptions(argc, argv) << ';' << endl;
+    expandDSPInternalAux(argc, argv, out);
+    return out.str();
+}
 
-    // Encode all libraries paths as 'declare'
-    vector<string> pathnames = gGlobal->gReader.listSrcFiles();
-    // Remove DSP filename
-    pathnames.erase(pathnames.begin());
-    int i = 0;
-    for (const auto& it : pathnames) {
-        out << "declare library_path" << to_string(i++) << " \"" << it << "\";" << endl;
+LIBFAUST_API Tree DSPToBoxes(const std::string& name_app, const std::string& dsp_content, int argc, const char* argv[], int* inputs, int* outputs, std::string& error_msg)
+{
+    int argc1 = 0;
+    const char* argv1[64];
+    argv1[argc1++] = "faust";
+    
+    // Copy arguments
+    for (int i = 0; i < argc; i++) {
+        argv1[argc1++] = argv[i];
+    }
+    argv1[argc1] = nullptr;  // NULL terminated argv
+    
+    /****************************************************************
+     1 - process command line
+     *****************************************************************/
+    initFaustDirectories(argc1, argv1);
+    processCmdline(argc1, argv1);
+
+    faust_alarm(gGlobal->gTimeout);
+
+    /****************************************************************
+     2 - parse source files
+     *****************************************************************/
+    if (dsp_content.c_str()) {
+        gGlobal->gInputString = dsp_content.c_str();
+        gGlobal->gInputFiles.push_back(name_app.c_str());
+    }
+    initDocumentNames();
+    initFaustFloat();
+
+    try {
+        parseSourceFiles();
+    } catch (faustexception& e) {
+        error_msg = e.what();
+        return nullptr;
     }
 
-    printDeclareHeader(out);
-    
-    // Create a map of <ID, expression>
-    stringstream s;
-    s << boxppShared(gGlobal->gProcessTree);
-    // Print the <ID, expression> list
-    boxppShared::printIDs(out);
-    out << "process = " << s.str() << ';' << endl;
-    
-    return out.str();
+    /****************************************************************
+     3 - evaluate 'process' definition
+     *****************************************************************/
+
+    callFun(threadEvaluateBlockDiagram);  // In a thread with more stack size...
+    if (gGlobal->gProcessTree) {
+        *inputs  = gGlobal->gNumInputs;
+        *outputs = gGlobal->gNumOutputs;
+        return gGlobal->gProcessTree;
+    } else {
+        error_msg = gGlobal->gErrorMessage;
+        return nullptr;
+    }
 }
 
 static void createFactoryAux(const char* name, const char* dsp_content, int argc, const char* argv[], bool generate)
@@ -2144,12 +2241,10 @@ static void createFactoryAux(const char* name, const char* dsp_content, int argc
     *****************************************************************/
     // Check for injected code (before checking for architectures)
     if (gGlobal->gInjectFlag) {
-        injcode = unique_ptr<ifstream>(new ifstream());
-        injcode->open(gGlobal->gInjectFile.c_str(), ifstream::in);
-        if (!injcode->is_open()) {
+        injcode = openArchStream(gGlobal->gInjectFile.c_str());
+        if (!injcode) {
             stringstream error;
-            error << "ERROR : can't inject \"" << gGlobal->gInjectFile << "\" external code file, file not found"
-                  << endl;
+            error << "ERROR : can't inject \"" << gGlobal->gInjectFile << "\" external code file, file not found\n";
             throw faustexception(error.str());
         }
     }
@@ -2174,37 +2269,16 @@ static void createFactoryAux(const char* name, const char* dsp_content, int argc
     if (!gGlobal->gProcessTree) {
         throw faustexception(gGlobal->gErrorMessage);
     }
-    Tree process    = gGlobal->gProcessTree;
-    int  numInputs  = gGlobal->gNumInputs;
-    int  numOutputs = gGlobal->gNumOutputs;
+
+    /****************************************************************
+     3.1 - possibly expand the DSP and return
+     *****************************************************************/
 
     if (gGlobal->gExportDSP) {
         string outpath =
             (gGlobal->gOutputDir != "") ? (gGlobal->gOutputDir + "/" + gGlobal->gOutputFile) : gGlobal->gOutputFile;
         ofstream out(outpath.c_str());
-   
-        // Encode compilation options as a 'declare' : has to be located first in the string
-        out << "declare version \"" << FAUSTVERSION << "\";" << endl;
-        out << COMPILATION_OPTIONS << reorganizeCompilationOptions(argc, argv) << ';' << endl;
-    
-        // Encode all libraries paths as 'declare'
-        vector<string> pathnames = gGlobal->gReader.listSrcFiles();
-        // Remove DSP filename
-        pathnames.erase(pathnames.begin());
-        int i = 0;
-        for (const auto& it : pathnames) {
-            out << "declare library_path" << to_string(i++) << " \"" << it << "\";" << endl;
-        }
-
-        printDeclareHeader(out);
-        
-        // Create a map of <ID, expression>
-        stringstream s;
-        s << boxppShared(process);
-        // Print the <ID, expression> list
-        boxppShared::printIDs(out);
-        out << "process = " << s.str() << ';' << endl;
-        
+        expandDSPInternalAux(argc, argv, out);
         return;
     }
 
@@ -2222,6 +2296,7 @@ static void createFactoryAux(const char* name, const char* dsp_content, int argc
     if (gGlobal->gDetailsSwitch) {
         cout << "output signals are : " << endl;
         printSignal(lsignals, stdout);
+        cout << std::endl << ppsig(lsignals) << std::endl;
         cout << "\n\n";
     }
 
@@ -2230,6 +2305,11 @@ static void createFactoryAux(const char* name, const char* dsp_content, int argc
     /*************************************************************************
     5 - preparation of the signal tree and translate output signals
     **************************************************************************/
+    int numInputs  = gGlobal->gNumInputs;
+    int numOutputs = gGlobal->gNumOutputs;
+    if (numOutputs == 0) {
+        throw faustexception("ERROR : the Faust program has no output signal\n");
+    }
     generateCode(lsignals, numInputs, numOutputs, generate);
 
     /****************************************************************
@@ -2238,21 +2318,22 @@ static void createFactoryAux(const char* name, const char* dsp_content, int argc
     generateOutputFiles();
 }
 
-static void createFactoryAux(const char* name, Tree signals, int argc, const char* argv[], int numInputs, int numOutputs, bool generate)
+static void createFactoryAux(const char* name, Tree signals, int argc, const char* argv[], int numInputs,
+                             int numOutputs, bool generate)
 {
     /****************************************************************
      1 - process command line
      *****************************************************************/
     initFaustDirectories(argc, argv);
     processCmdline(argc, argv);
-    
+
     initDocumentNames();
     initFaustFloat();
-    
+
     /*************************************************************************
      5 - preparation of the signal tree and translate output signals
      **************************************************************************/
-    
+
     gGlobal->gMetaDataSet[tree("name")].insert(tree(quote(name)));
     generateCode(signals, numInputs, numOutputs, generate);
 }
@@ -2261,13 +2342,36 @@ static void createFactoryAux(const char* name, Tree signals, int argc, const cha
 // Backend API
 // ============
 
-dsp_factory_base* createFactory(const char* name, const char* dsp_content,
-                                int argc, const char* argv[],
+// Keep the maximum index of inputs signals
+struct MaxInputsCounter : public SignalVisitor {
+    int fMaxInputs = 0;
+
+    MaxInputsCounter(Tree L)
+    {
+        // L is in normal form
+        while (!isNil(L)) {
+            self(hd(L));
+            L = tl(L);
+        }
+    }
+
+    void visit(Tree sig)
+    {
+        int input;
+        if (isSigInput(sig, &input)) {
+            fMaxInputs = std::max(fMaxInputs, input + 1);
+        } else {
+            SignalVisitor::visit(sig);
+        }
+    }
+};
+
+dsp_factory_base* createFactory(const char* name, const char* dsp_content, int argc, const char* argv[],
                                 string& error_msg, bool generate)
 {
     gGlobal                   = nullptr;
     dsp_factory_base* factory = nullptr;
-    
+
     try {
         global::allocate();
         createFactoryAux(name, dsp_content, argc, argv, generate);
@@ -2276,25 +2380,26 @@ dsp_factory_base* createFactory(const char* name, const char* dsp_content,
     } catch (faustexception& e) {
         error_msg = e.Message();
     }
-    
+
     global::destroy();
     return factory;
 }
 
-dsp_factory_base* createFactory(const char* name, tvec signals,
-                                int argc, const char* argv[],
-                                std::string& error_msg)
+dsp_factory_base* createFactory(const char* name, tvec signals, int argc, const char* argv[], std::string& error_msg)
 {
     dsp_factory_base* factory = nullptr;
-    
+
     try {
-        createFactoryAux(name, listConvert(signals), argc, argv, gGlobal->gMaxInputs, signals.size(), true);
+        Tree             outputs    = listConvert(signals);
+        Tree             outputs_nf = simplifyToNormalForm(outputs);
+        MaxInputsCounter counter(outputs_nf);
+        createFactoryAux(name, outputs_nf, argc, argv, counter.fMaxInputs, signals.size(), true);
         error_msg = gGlobal->gErrorMsg;
         factory   = gGlobal->gDSPFactory;
     } catch (faustexception& e) {
         error_msg = e.Message();
     }
-    
+
     return factory;
 }
 
@@ -2303,7 +2408,7 @@ string expandDSP(int argc, const char* argv[], const char* name, const char* dsp
 {
     gGlobal    = nullptr;
     string res = "";
-    
+
     try {
         global::allocate();
         res       = expandDSPInternal(argc, argv, name, dsp_content);
@@ -2312,7 +2417,7 @@ string expandDSP(int argc, const char* argv[], const char* name, const char* dsp
     } catch (faustexception& e) {
         error_msg = e.Message();
     }
-    
+
     global::destroy();
     return res;
 }
@@ -2321,15 +2426,16 @@ string expandDSP(int argc, const char* argv[], const char* name, const char* dsp
 // Signal C++ API
 // ===============
 
-LIBFAUST_API dsp_factory_base* createCPPDSPFactoryFromSignals(const std::string& name_app, tvec signals,
-                                                        int argc, const char* argv[],
-                                                        std::string& error_msg)
+LIBFAUST_API std::string createSourceFromSignals(const std::string& name_app, tvec signals,
+                                                 const std::string& lang,
+                                                 int argc, const char* argv[],
+                                                 std::string& error_msg)
 {
-    dsp_factory_base* factory = nullptr;
-    
     int         argc1 = 0;
     const char* argv1[64];
     argv1[argc1++] = "faust";
+    argv1[argc1++] = "-lang";
+    argv1[argc1++] = lang.c_str();
     argv1[argc1++] = "-o";
     argv1[argc1++] = "string";
     
@@ -2338,16 +2444,18 @@ LIBFAUST_API dsp_factory_base* createCPPDSPFactoryFromSignals(const std::string&
         argv1[argc1++] = argv[i];
     }
     argv1[argc1] = nullptr;  // NULL terminated argv
-  
-    try {
-        createFactoryAux(name_app.c_str(), listConvert(signals), argc1, argv1, gGlobal->gMaxInputs, signals.size(), true);
-        error_msg = gGlobal->gErrorMsg;
-        factory   = gGlobal->gDSPFactory;
-    } catch (faustexception& e) {
-        error_msg = e.Message();
-    }
     
-    return factory;
+    dsp_factory_base* factory = createFactory(name_app.c_str(), signals, argc1, argv1, error_msg);
+    if (factory) {
+        // Print the textual class
+        stringstream str;
+        factory->write(&str);
+        delete factory;
+        return str.str();
+    } else {
+        // the caller of this function should check that error_msg is blank.
+        return "";
+    }
 }
 
 // Foreign
@@ -2416,11 +2524,11 @@ LIBFAUST_API Tree sigSelf()
     return sigDelay1(sigProj(0, ref(1)));
 }
 
-//Tree liftn(Tree t, int threshold);
+// Tree liftn(Tree t, int threshold);
 
 LIBFAUST_API Tree sigRecursion(Tree s)
 {
-    //return sigDelay0(sigProj(0, rec(cons(liftn(s, 0), gGlobal->nil))));
+    // return sigDelay0(sigProj(0, rec(cons(liftn(s, 0), gGlobal->nil))));
     return sigDelay0(sigProj(0, rec(cons(s, gGlobal->nil))));
 }
 
@@ -2442,310 +2550,806 @@ extern "C" LIBFAUST_API void destroyLibContext()
 // =============
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
-    
-    LIBFAUST_API Tree CsigInt(int n)
-    {
-        return sigInt(n);
-    }
-    
-    LIBFAUST_API Tree CsigReal(double n)
-    {
-        return sigReal(n);
-    }
-    
-    LIBFAUST_API Tree CsigInput(int idx)
-    {
-        return sigInput(idx);
-    }
-    
-    LIBFAUST_API Tree CsigDelay(Tree t0, Tree del)
-    {
-        return sigDelay(t0, del);
-    }
-    
-    LIBFAUST_API Tree CsigIntCast(Tree s)
-    {
-        return sigIntCast(s);
-    }
-    
-    LIBFAUST_API Tree CsigFloatCast(Tree s)
-    {
-        return sigFloatCast(s);
-    }
-    
-    LIBFAUST_API Tree CsigReadOnlyTable(Tree n, Tree init, Tree ridx)
-    {
-        return sigReadOnlyTable(n, init, ridx);
-    }
-    
-    LIBFAUST_API Tree CsigWriteReadTable(Tree n, Tree init, Tree widx, Tree wsig, Tree ridx)
-    {
-        return sigWriteReadTable(n, init, widx, wsig,ridx);
-    }
-    
-    LIBFAUST_API Tree CsigWaveform(Tree* wf_aux)
-    {
-        tvec wf;
-        int i = 0;
-        while (wf_aux[i]) { wf.push_back(wf_aux[i]); i++; }
-        return sigWaveform(wf);
-    }
-    
-    LIBFAUST_API Tree CsigSoundfile(const char* label)
-    {
-        return sigSoundfile(label);
-    }
-    
-    LIBFAUST_API Tree CsigSoundfileLength(Tree sf, Tree part)
-    {
-        return sigSoundfileLength(sf, part);
-    }
-    
-    LIBFAUST_API Tree CsigSoundfileRate(Tree sf, Tree part)
-    {
-        return sigSoundfileRate(sf, part);
-    }
-    
-    LIBFAUST_API Tree CsigSoundfileBuffer(Tree sf, Tree chan, Tree part, Tree ridx)
-    {
-        return sigSoundfileBuffer(sf, chan, part, ridx);
-    }
-    
-    LIBFAUST_API Tree CsigSelect2(Tree selector, Tree s1, Tree s2)
-    {
-        return sigSelect2(selector, s1, s2);
-    }
-    
-    LIBFAUST_API Tree CsigSelect3(Tree selector, Tree s1, Tree s2, Tree s3)
-    {
-        return sigSelect3(selector, s1, s2, s3);
-    }
-    
-    LIBFAUST_API Tree CsigFConst(SType type, const char* name, const char* file)
-    {
-        return sigFConst(type, name, file);
-    }
-    
-    LIBFAUST_API Tree CsigFVar(SType type, const char* name, const char* file)
-    {
-        return sigFVar(type, name, file);
-    }
- 
-    LIBFAUST_API Tree CsigBinOp(SOperator op, Tree x, Tree y)
-    {
-        return sigBinOp(op, x, y);
-    }
-    
-    LIBFAUST_API Tree CsigAdd(Tree x, Tree y)
-    {
-        return sigAdd(x, y);
-    }
-    LIBFAUST_API Tree CsigSub(Tree x, Tree y)
-    {
-        return sigSub(x, y);
-    }
-    LIBFAUST_API Tree CsigMul(Tree x, Tree y)
-    {
-        return sigMul(x, y);
-    }
-    LIBFAUST_API Tree CsigDiv(Tree x, Tree y)
-    {
-        return sigDiv(x, y);
-    }
-    LIBFAUST_API Tree CsigRem(Tree x, Tree y)
-    {
-        return sigRem(x, y);
-    }
-    
-    LIBFAUST_API Tree CsigLeftShift(Tree x, Tree y)
-    {
-        return sigLeftShift(x, y);
-    }
-    LIBFAUST_API Tree CsigLRightShift(Tree x, Tree y)
-    {
-        return sigLRightShift(x, y);
-    }
-    LIBFAUST_API Tree CsigARightShift(Tree x, Tree y)
-    {
-        return sigARightShift(x, y);
-    }
-    
-    LIBFAUST_API Tree CsigGT(Tree x, Tree y)
-    {
-        return sigGT(x, y);
-    }
-    LIBFAUST_API Tree CsigLT(Tree x, Tree y)
-    {
-        return sigLT(x, y);
-    }
-    LIBFAUST_API Tree CsigGE(Tree x, Tree y)
-    {
-        return sigGE(x, y);
-    }
-    LIBFAUST_API Tree CsigLE(Tree x, Tree y)
-    {
-        return sigLE(x, y);
-    }
-    LIBFAUST_API Tree CsigEQ(Tree x, Tree y)
-    {
-        return sigEQ(x, y);
-    }
-    LIBFAUST_API Tree CsigNE(Tree x, Tree y)
-    {
-        return sigNE(x, y);
-    }
-    
-    LIBFAUST_API Tree CsigAND(Tree x, Tree y)
-    {
-        return sigAND(x, y);
-    }
-    LIBFAUST_API Tree CsigOR(Tree x, Tree y)
-    {
-        return sigOR(x, y);
-    }
-    LIBFAUST_API Tree CsigXOR(Tree x, Tree y)
-    {
-        return sigXOR(x, y);
-    }
-    
-    LIBFAUST_API Tree CsigAbs(Tree x)
-    {
-        return sigAbs(x);
-    }
-    LIBFAUST_API Tree CsigAcos(Tree x)
-    {
-        return sigAcos(x);
-    }
-    LIBFAUST_API Tree CsigTan(Tree x)
-    {
-        return sigTan(x);
-    }
-    LIBFAUST_API Tree CsigSqrt(Tree x)
-    {
-        return sigSqrt(x);
-    }
-    LIBFAUST_API Tree CsigSin(Tree x)
-    {
-        return sigSin(x);
-    }
-    LIBFAUST_API Tree CsigRint(Tree x)
-    {
-        return sigRint(x);
-    }
-    LIBFAUST_API Tree CsigRemainder(Tree x, Tree y)
-    {
-        return sigRemainder(x, y);
-    }
-    LIBFAUST_API Tree CsigPow(Tree x, Tree y)
-    {
-        return sigPow(x, y);
-    }
-    LIBFAUST_API Tree CsigMin(Tree x, Tree y)
-    {
-        return sigMin(x, y);
-    }
-    LIBFAUST_API Tree CsigMax(Tree x, Tree y)
-    {
-        return sigMax(x, y);
-    }
-    LIBFAUST_API Tree CsigLog(Tree x)
-    {
-        return sigLog(x);
-    }
-    LIBFAUST_API Tree CsigLog10(Tree x)
-    {
-        return sigLog10(x);
-    }
-    LIBFAUST_API Tree CsigFmod(Tree x, Tree y)
-    {
-        return sigFmod(x, y);
-    }
-    LIBFAUST_API Tree CsigFloor(Tree x)
-    {
-        return sigFloor(x);
-    }
-    LIBFAUST_API Tree CsigExp(Tree x)
-    {
-        return sigExp(x);
-    }
-    LIBFAUST_API Tree CsigExp10(Tree x)
-    {
-        return sigExp10(x);
-    }
-    LIBFAUST_API Tree CsigCos(Tree x)
-    {
-        return sigCos(x);
-    }
-    LIBFAUST_API Tree CsigCeil(Tree x)
-    {
-        return sigCeil(x);
-    }
-    LIBFAUST_API Tree CsigAtan(Tree x)
-    {
-        return sigAtan(x);
-    }
-    LIBFAUST_API Tree CsigAtan2(Tree x, Tree y)
-    {
-        return sigAtan2(x, y);
-    }
-    LIBFAUST_API Tree CsigAsin(Tree x)
-    {
-        return sigAsin(x);
-    }
-    
-    LIBFAUST_API Tree CsigSelf()
-    {
-        return sigSelf();
-    }
-    
-    LIBFAUST_API Tree CsigRecursion(Tree s1)
-    {
-        return sigRecursion(s1);
-    }
-    
-    LIBFAUST_API Tree CsigButton(const char* label)
-    {
-        return sigButton(label);
-    }
-    
-    LIBFAUST_API Tree CsigCheckbox(const char* label)
-    {
-        return sigCheckbox(label);
-    }
-    
-    LIBFAUST_API Tree CsigVSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
-    {
-        return sigVSlider(label, init, min, max, step);
-    }
-    
-    LIBFAUST_API Tree CsigHSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
-    {
-        return sigHSlider(label, init, min, max, step);
-    }
-    
-    LIBFAUST_API Tree CsigNumEntry(const char* label, Tree init, Tree min, Tree max, Tree step)
-    {
-        return sigNumEntry(label, init, min, max, step);
-    }
-    
-    LIBFAUST_API Tree CsigVBargraph(const char* label, Tree min, Tree max, Tree x)
-    {
-        return sigVBargraph(label, min, max, x);
-    }
-    
-    LIBFAUST_API Tree CsigHBargraph(const char* label, Tree min, Tree max, Tree x)
-    {
-        return sigHBargraph(label, min, max, x);
-    }
-    
-    LIBFAUST_API Tree CsigAttach(Tree x, Tree y)
-    {
-        return sigAttach(y, y);
-    }
-    
+
+LIBFAUST_API bool CisNil(Tree s)
+{
+    return isNil(s);
+}
+
+LIBFAUST_API const char* Ctree2str(Tree s)
+{
+    return tree2str(s);
+}
+
+LIBFAUST_API int Ctree2int(Tree s)
+{
+    return tree2int(s);
+}
+
+LIBFAUST_API void* CgetUserData(Tree s)
+{
+    return getUserData(s);
+}
+
+LIBFAUST_API Tree CsigInt(int n)
+{
+    return sigInt(n);
+}
+
+LIBFAUST_API Tree CsigReal(double n)
+{
+    return sigReal(n);
+}
+
+LIBFAUST_API Tree CsigInput(int idx)
+{
+    return sigInput(idx);
+}
+
+LIBFAUST_API Tree CsigDelay(Tree t0, Tree del)
+{
+    return sigDelay(t0, del);
+}
+
+LIBFAUST_API Tree CsigIntCast(Tree s)
+{
+    return sigIntCast(s);
+}
+
+LIBFAUST_API Tree CsigFloatCast(Tree s)
+{
+    return sigFloatCast(s);
+}
+
+LIBFAUST_API Tree CsigReadOnlyTable(Tree n, Tree init, Tree ridx)
+{
+    return sigReadOnlyTable(n, init, ridx);
+}
+
+LIBFAUST_API Tree CsigWriteReadTable(Tree n, Tree init, Tree widx, Tree wsig, Tree ridx)
+{
+    return sigWriteReadTable(n, init, widx, wsig, ridx);
+}
+
+LIBFAUST_API Tree CsigWaveform(Tree* wf_aux)
+{
+    tvec wf;
+    int  i = 0;
+    while (wf_aux[i]) {
+        wf.push_back(wf_aux[i]);
+        i++;
+    }
+    return sigWaveform(wf);
+}
+
+LIBFAUST_API Tree CsigSoundfile(const char* label)
+{
+    return sigSoundfile(label);
+}
+
+LIBFAUST_API Tree CsigSoundfileLength(Tree sf, Tree part)
+{
+    return sigSoundfileLength(sf, part);
+}
+
+LIBFAUST_API Tree CsigSoundfileRate(Tree sf, Tree part)
+{
+    return sigSoundfileRate(sf, part);
+}
+
+LIBFAUST_API Tree CsigSoundfileBuffer(Tree sf, Tree chan, Tree part, Tree ridx)
+{
+    return sigSoundfileBuffer(sf, chan, part, ridx);
+}
+
+LIBFAUST_API Tree CsigSelect2(Tree selector, Tree s1, Tree s2)
+{
+    return sigSelect2(selector, s1, s2);
+}
+
+LIBFAUST_API Tree CsigSelect3(Tree selector, Tree s1, Tree s2, Tree s3)
+{
+    return sigSelect3(selector, s1, s2, s3);
+}
+
+LIBFAUST_API Tree CsigFConst(SType type, const char* name, const char* file)
+{
+    return sigFConst(type, name, file);
+}
+
+LIBFAUST_API Tree CsigFVar(SType type, const char* name, const char* file)
+{
+    return sigFVar(type, name, file);
+}
+
+LIBFAUST_API Tree CsigBinOp(SOperator op, Tree x, Tree y)
+{
+    return sigBinOp(op, x, y);
+}
+
+LIBFAUST_API Tree CsigAdd(Tree x, Tree y)
+{
+    return sigAdd(x, y);
+}
+LIBFAUST_API Tree CsigSub(Tree x, Tree y)
+{
+    return sigSub(x, y);
+}
+LIBFAUST_API Tree CsigMul(Tree x, Tree y)
+{
+    return sigMul(x, y);
+}
+LIBFAUST_API Tree CsigDiv(Tree x, Tree y)
+{
+    return sigDiv(x, y);
+}
+LIBFAUST_API Tree CsigRem(Tree x, Tree y)
+{
+    return sigRem(x, y);
+}
+
+LIBFAUST_API Tree CsigLeftShift(Tree x, Tree y)
+{
+    return sigLeftShift(x, y);
+}
+LIBFAUST_API Tree CsigLRightShift(Tree x, Tree y)
+{
+    return sigLRightShift(x, y);
+}
+LIBFAUST_API Tree CsigARightShift(Tree x, Tree y)
+{
+    return sigARightShift(x, y);
+}
+
+LIBFAUST_API Tree CsigGT(Tree x, Tree y)
+{
+    return sigGT(x, y);
+}
+LIBFAUST_API Tree CsigLT(Tree x, Tree y)
+{
+    return sigLT(x, y);
+}
+LIBFAUST_API Tree CsigGE(Tree x, Tree y)
+{
+    return sigGE(x, y);
+}
+LIBFAUST_API Tree CsigLE(Tree x, Tree y)
+{
+    return sigLE(x, y);
+}
+LIBFAUST_API Tree CsigEQ(Tree x, Tree y)
+{
+    return sigEQ(x, y);
+}
+LIBFAUST_API Tree CsigNE(Tree x, Tree y)
+{
+    return sigNE(x, y);
+}
+
+LIBFAUST_API Tree CsigAND(Tree x, Tree y)
+{
+    return sigAND(x, y);
+}
+LIBFAUST_API Tree CsigOR(Tree x, Tree y)
+{
+    return sigOR(x, y);
+}
+LIBFAUST_API Tree CsigXOR(Tree x, Tree y)
+{
+    return sigXOR(x, y);
+}
+
+LIBFAUST_API Tree CsigAbs(Tree x)
+{
+    return sigAbs(x);
+}
+LIBFAUST_API Tree CsigAcos(Tree x)
+{
+    return sigAcos(x);
+}
+LIBFAUST_API Tree CsigTan(Tree x)
+{
+    return sigTan(x);
+}
+LIBFAUST_API Tree CsigSqrt(Tree x)
+{
+    return sigSqrt(x);
+}
+LIBFAUST_API Tree CsigSin(Tree x)
+{
+    return sigSin(x);
+}
+LIBFAUST_API Tree CsigRint(Tree x)
+{
+    return sigRint(x);
+}
+LIBFAUST_API Tree CsigRemainder(Tree x, Tree y)
+{
+    return sigRemainder(x, y);
+}
+LIBFAUST_API Tree CsigPow(Tree x, Tree y)
+{
+    return sigPow(x, y);
+}
+LIBFAUST_API Tree CsigMin(Tree x, Tree y)
+{
+    return sigMin(x, y);
+}
+LIBFAUST_API Tree CsigMax(Tree x, Tree y)
+{
+    return sigMax(x, y);
+}
+LIBFAUST_API Tree CsigLog(Tree x)
+{
+    return sigLog(x);
+}
+LIBFAUST_API Tree CsigLog10(Tree x)
+{
+    return sigLog10(x);
+}
+LIBFAUST_API Tree CsigFmod(Tree x, Tree y)
+{
+    return sigFmod(x, y);
+}
+LIBFAUST_API Tree CsigFloor(Tree x)
+{
+    return sigFloor(x);
+}
+LIBFAUST_API Tree CsigExp(Tree x)
+{
+    return sigExp(x);
+}
+LIBFAUST_API Tree CsigExp10(Tree x)
+{
+    return sigExp10(x);
+}
+LIBFAUST_API Tree CsigCos(Tree x)
+{
+    return sigCos(x);
+}
+LIBFAUST_API Tree CsigCeil(Tree x)
+{
+    return sigCeil(x);
+}
+LIBFAUST_API Tree CsigAtan(Tree x)
+{
+    return sigAtan(x);
+}
+LIBFAUST_API Tree CsigAtan2(Tree x, Tree y)
+{
+    return sigAtan2(x, y);
+}
+LIBFAUST_API Tree CsigAsin(Tree x)
+{
+    return sigAsin(x);
+}
+
+LIBFAUST_API Tree CsigSelf()
+{
+    return sigSelf();
+}
+
+LIBFAUST_API Tree CsigRecursion(Tree s1)
+{
+    return sigRecursion(s1);
+}
+
+LIBFAUST_API Tree CsigButton(const char* label)
+{
+    return sigButton(label);
+}
+
+LIBFAUST_API Tree CsigCheckbox(const char* label)
+{
+    return sigCheckbox(label);
+}
+
+LIBFAUST_API Tree CsigVSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
+{
+    return sigVSlider(label, init, min, max, step);
+}
+
+LIBFAUST_API Tree CsigHSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
+{
+    return sigHSlider(label, init, min, max, step);
+}
+
+LIBFAUST_API Tree CsigNumEntry(const char* label, Tree init, Tree min, Tree max, Tree step)
+{
+    return sigNumEntry(label, init, min, max, step);
+}
+
+LIBFAUST_API Tree CsigVBargraph(const char* label, Tree min, Tree max, Tree x)
+{
+    return sigVBargraph(label, min, max, x);
+}
+
+LIBFAUST_API Tree CsigHBargraph(const char* label, Tree min, Tree max, Tree x)
+{
+    return sigHBargraph(label, min, max, x);
+}
+
+LIBFAUST_API Tree CsigAttach(Tree x, Tree y)
+{
+    return sigAttach(y, y);
+}
+
+// Signal test API
+LIBFAUST_API bool CisSigInt(Tree t, int* i)
+{
+    return isSigInt(t, i);
+}
+LIBFAUST_API bool CisSigReal(Tree t, double* r)
+{
+    return isSigReal(t, r);
+}
+LIBFAUST_API bool CisSigInput(Tree t, int* i)
+{
+    return isSigInput(t, i);
+}
+LIBFAUST_API bool CisSigOutput(Tree t, int* i, Tree* t0_aux)
+{
+    Tree t0;
+    if (isSigOutput(t, i, t0)) {
+        *t0_aux = t0;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigDelay1(Tree t, Tree* t0_aux)
+{
+    Tree t0;
+    if (isSigDelay1(t, t0)) {
+        *t0_aux = t0;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigDelay(Tree t, Tree* t0_aux, Tree* t1_aux)
+{
+    Tree t0, t1;
+    if (isSigDelay(t, t0, t1)) {
+        *t0_aux = t0;
+        *t1_aux = t1;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigPrefix(Tree t, Tree* t0_aux, Tree* t1_aux)
+{
+    Tree t0, t1;
+    if (isSigPrefix(t, t0, t1)) {
+        *t0_aux = t0;
+        *t1_aux = t1;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigRDTbl(Tree s, Tree* t_aux, Tree* i_aux)
+{
+    Tree t, i;
+    if (isSigRDTbl(s, t, i)) {
+        *t_aux = t;
+        *i_aux = i;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigWRTbl(Tree u, Tree* id_aux, Tree* t_aux, Tree* i_aux, Tree* s_aux)
+{
+    Tree id, t, i, s;
+    if (isSigWRTbl(u, id, t, i, s)) {
+        *id_aux = id;
+        *t_aux  = t;
+        *i_aux  = i;
+        *s_aux  = s;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigTable(Tree t, Tree* id_aux, Tree* n_aux, Tree* sig_aux)
+{
+    Tree id, n, sig;
+    if (isSigTable(t, id, n, sig)) {
+        *id_aux  = id;
+        *n_aux   = n;
+        *sig_aux = sig;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigGen(Tree t, Tree* x_aux)
+{
+    Tree x;
+    if (isSigGen(t, x)) {
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigDocConstantTbl(Tree t, Tree* n_aux, Tree* sig_aux)
+{
+    Tree n, sig;
+    if (isSigDocConstantTbl(t, n, sig)) {
+        *n_aux   = n;
+        *sig_aux = sig;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigDocWriteTbl(Tree t, Tree* n_aux, Tree* sig_aux, Tree* widx_aux, Tree* wsig_aux)
+{
+    Tree n, sig, widx, wsig;
+    if (isSigDocWriteTbl(t, n, sig, widx, wsig)) {
+        *n_aux    = n;
+        *sig_aux  = sig;
+        *widx_aux = widx;
+        *wsig_aux = wsig;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigDocAccessTbl(Tree t, Tree* tbl_aux, Tree* ridx_aux)
+{
+    Tree tbl, ridx;
+    if (isSigDocAccessTbl(t, tbl, ridx)) {
+        *tbl_aux  = tbl;
+        *ridx_aux = ridx;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigSelect2(Tree t, Tree* selector_aux, Tree* s1_aux, Tree* s2_aux)
+{
+    Tree selector, s1, s2;
+    if (isSigSelect2(t, selector, s1, s2)) {
+        *selector_aux = selector;
+        *s1_aux       = s1;
+        *s2_aux       = s2;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigAssertBounds(Tree t, Tree* s1_aux, Tree* s2_aux, Tree* s3_aux)
+{
+    Tree s1, s2, s3;
+    if (isSigAssertBounds(t, s1, s2, s3)) {
+        *s1_aux = s1;
+        *s2_aux = s2;
+        *s2_aux = s2;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigHighest(Tree t, Tree* s_aux)
+{
+    Tree s;
+    if (isSigHighest(t, s)) {
+        *s_aux = s;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigLowest(Tree t, Tree* s_aux)
+{
+    Tree s;
+    if (isSigLowest(t, s)) {
+        *s_aux = s;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigBinOp(Tree s, int* op, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isSigBinOp(s, op, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigFFun(Tree s, Tree* ff_aux, Tree* largs_aux)
+{
+    Tree ff, largs;
+    if (isSigFFun(s, ff, largs)) {
+        *ff_aux    = ff;
+        *largs_aux = largs;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigFConst(Tree s, Tree* type_aux, Tree* name_aux, Tree* file_aux)
+{
+    Tree type, name, file;
+    if (isSigFConst(s, type, name, file)) {
+        *type_aux = type;
+        *name_aux = name;
+        *file_aux = file;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigFVar(Tree s, Tree* type_aux, Tree* name_aux, Tree* file_aux)
+{
+    Tree type, name, file;
+    if (isSigFVar(s, type, name, file)) {
+        *type_aux = type;
+        *name_aux = name;
+        *file_aux = file;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisProj(Tree s, int* i, Tree* rgroup_aux)
+{
+    Tree rgroup;
+    if (isProj(s, i, rgroup)) {
+        *rgroup_aux = rgroup;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisRec(Tree s, Tree* var_aux, Tree* body_aux)
+{
+    Tree var, body;
+    if (isRec(s, var, body)) {
+        *var_aux  = var;
+        *body_aux = body;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigIntCast(Tree s, Tree* x_aux)
+{
+    Tree x;
+    if (isSigIntCast(s, x)) {
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigFloatCast(Tree s, Tree* x_aux)
+{
+    Tree x;
+    if (isSigFloatCast(s, x)) {
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigButton(Tree s, Tree* lbl_aux)
+{
+    Tree lbl;
+    if (isSigButton(s, lbl)) {
+        *lbl_aux = lbl;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigCheckbox(Tree s, Tree* lbl_aux)
+{
+    Tree lbl;
+    if (isSigCheckbox(s, lbl)) {
+        *lbl_aux = lbl;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigWaveform(Tree s)
+{
+    return isSigWaveform(s);
+}
+
+LIBFAUST_API bool CisSigHSlider(Tree s, Tree* lbl_aux, Tree* init_aux, Tree* min_aux, Tree* max_aux, Tree* step_aux)
+{
+    Tree lbl, init, min, max, step;
+    if (isSigHSlider(s, lbl, init, min, max, step)) {
+        *lbl_aux  = lbl;
+        *init_aux = init;
+        *min_aux  = min;
+        *max_aux  = max;
+        *step_aux = step;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigVSlider(Tree s, Tree* lbl_aux, Tree* init_aux, Tree* min_aux, Tree* max_aux, Tree* step_aux)
+{
+    Tree lbl, init, min, max, step;
+    if (isSigVSlider(s, lbl, init, min, max, step)) {
+        *lbl_aux  = lbl;
+        *init_aux = init;
+        *min_aux  = min;
+        *max_aux  = max;
+        *step_aux = step;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigNumEntry(Tree s, Tree* lbl_aux, Tree* init_aux, Tree* min_aux, Tree* max_aux, Tree* step_aux)
+{
+    Tree lbl, init, min, max, step;
+    if (isSigNumEntry(s, lbl, init, min, max, step)) {
+        *lbl_aux  = lbl;
+        *init_aux = init;
+        *min_aux  = min;
+        *max_aux  = max;
+        *step_aux = step;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigHBargraph(Tree s, Tree* lbl_aux, Tree* min_aux, Tree* max_aux, Tree* x_aux)
+{
+    Tree lbl, min, max, x0;
+    if (isSigHBargraph(s, lbl, min, max, x0)) {
+        *lbl_aux = lbl;
+        *min_aux = min;
+        *max_aux = max;
+        *x_aux   = x0;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigVBargraph(Tree s, Tree* lbl_aux, Tree* min_aux, Tree* max_aux, Tree* x_aux)
+{
+    Tree lbl, min, max, x0;
+    if (isSigVBargraph(s, lbl, min, max, x0)) {
+        *lbl_aux = lbl;
+        *min_aux = min;
+        *max_aux = max;
+        *x_aux   = x0;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigAttach(Tree s, Tree* s0_aux, Tree* s1_aux)
+{
+    Tree s0, s1;
+    if (isSigAttach(s, s0, s1)) {
+        *s0_aux = s0;
+        *s1_aux = s1;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigEnable(Tree s, Tree* s0_aux, Tree* s1_aux)
+{
+    Tree s0, s1;
+    if (isSigEnable(s, s0, s1)) {
+        *s0_aux = s0;
+        *s1_aux = s1;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigControl(Tree s, Tree* s0_aux, Tree* s1_aux)
+{
+    Tree s0, s1;
+    if (isSigControl(s, s0, s1)) {
+        *s0_aux = s0;
+        *s1_aux = s1;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisSigSoundfile(Tree s, Tree* label_aux)
+{
+    Tree label;
+    if (isSigSoundfile(s, label)) {
+        *label_aux = label;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigSoundfileLength(Tree s, Tree* sf_aux, Tree* part_aux)
+{
+    Tree sf, part;
+    if (isSigSoundfileLength(s, sf, part)) {
+        *sf_aux   = sf;
+        *part_aux = part;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigSoundfileRate(Tree s, Tree* sf_aux, Tree* part_aux)
+{
+    Tree sf, part;
+    if (isSigSoundfileRate(s, sf, part)) {
+        *sf_aux   = sf;
+        *part_aux = part;
+        return true;
+    } else {
+        return false;
+    }
+}
+LIBFAUST_API bool CisSigSoundfileBuffer(Tree s, Tree* sf_aux, Tree* chan_aux, Tree* part_aux, Tree* ridx_aux)
+{
+    Tree sf, chan, part, ridx;
+    if (isSigSoundfileBuffer(s, sf, chan, part, ridx)) {
+        *sf_aux   = sf;
+        *chan_aux = chan;
+        *part_aux = part;
+        *ridx_aux = ridx;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API Tree CsimplifyToNormalForm(Tree s)
+{
+    return simplifyToNormalForm(s);
+}
+
+LIBFAUST_API Tree* CsimplifyToNormalForm2(Tree* s)
+{
+    tvec inputs;
+    int  in = 0;
+    while (s[in]) {
+        inputs.push_back(s[in]);
+        in++;
+    }
+    tvec outputs = simplifyToNormalForm2(inputs);
+    if (outputs.size() > 0) {
+        Tree*  res = (Tree*)malloc(sizeof(Tree) * (outputs.size() + 1));
+        size_t i;
+        for (i = 0; i < outputs.size(); i++) res[i] = outputs[i];
+        res[i] = nullptr;
+        return res;
+    } else {
+        return nullptr;
+    }
+}
+
 #ifdef __cplusplus
 }
 #endif
@@ -2754,7 +3358,7 @@ extern "C"
 // Box C++ API
 // ============
 
-// Can generate faustexception
+// Can generate faustexception, used in createDSPFactoryFromBoxes and createInterpreterDSPFactoryFromBoxes
 tvec boxesToSignalsAux(Tree box)
 {
     int numInputs, numOutputs;
@@ -2763,8 +3367,10 @@ tvec boxesToSignalsAux(Tree box)
         error << "ERROR during the evaluation of process : " << boxpp(box) << endl;
         throw faustexception(error.str());
     }
-     
-    return propagate(gGlobal->nil, gGlobal->nil, box, makeSigInputList(numInputs));
+
+    Tree outputs   = boxPropagateSig(gGlobal->nil, box, makeSigInputList(numInputs));
+    Tree ouputs_nf = simplifyToNormalForm(outputs);
+    return treeConvert(ouputs_nf);
 }
 
 LIBFAUST_API tvec boxesToSignals(Tree box, std::string& error_msg)
@@ -2777,17 +3383,16 @@ LIBFAUST_API tvec boxesToSignals(Tree box, std::string& error_msg)
     }
 }
 
-LIBFAUST_API dsp_factory_base* createCPPDSPFactoryFromBoxes(const std::string& name_app,
-                                                      Tree box,
-                                                      int argc, const char* argv[],
-                                                      std::string& error_msg)
+LIBFAUST_API std::string createSourceFromBoxes(const std::string& name_app, Tree box,
+                                               const std::string& lang,
+                                               int argc, const char* argv[],
+                                               std::string& error_msg)
 {
     try {
         tvec signals = boxesToSignalsAux(box);
-        return createCPPDSPFactoryFromSignals(name_app, signals, argc, argv, error_msg);
+        return createSourceFromSignals(name_app, signals, lang, argc, argv, error_msg);
     } catch (faustexception& e) {
-        error_msg = e.Message();
-        return nullptr;
+        return e.Message();
     }
 }
 
@@ -2843,12 +3448,8 @@ LIBFAUST_API Tree boxFVar(SType type, const std::string& name, const std::string
 
 LIBFAUST_API Tree boxBinOp(SOperator op)
 {
-    static sigFun fun [] = {
-        sigAdd, sigSub, sigMul, sigDiv, sigRem,
-        sigLeftShift, sigLRightShift, sigARightShift,
-        sigGT, sigLT, sigGE, sigLE, sigEQ, sigNE,
-        sigAND, sigOR, sigXOR
-    };
+    static sigFun fun[] = {sigAdd, sigSub, sigMul, sigDiv, sigRem, sigLeftShift, sigLRightShift, sigARightShift, sigGT,
+                           sigLT,  sigGE,  sigLE,  sigEQ,  sigNE,  sigAND,       sigOR,          sigXOR};
     faustassert(op >= kAdd && op <= kXOR);
     return boxPrim2(fun[op]);
 }
@@ -3310,7 +3911,7 @@ LIBFAUST_API Tree boxAtan2(Tree b1, Tree b2)
 
 LIBFAUST_API Tree boxVBargraph(const std::string& label, Tree min, Tree max, Tree x)
 {
-    return boxSeq( x, boxVBargraph(label, min, max));
+    return boxSeq(x, boxVBargraph(label, min, max));
 }
 
 LIBFAUST_API Tree boxHBargraph(const std::string& label, Tree min, Tree max, Tree x)
@@ -3328,608 +3929,1130 @@ LIBFAUST_API Tree boxAttach(Tree s1, Tree s2)
 // ==========
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
-    
-    LIBFAUST_API Tree* CboxesToSignals(Tree box, char* error_msg)
-    {
-        string error_msg_aux;
-        tvec signals = boxesToSignals(box, error_msg_aux);
-        strncpy(error_msg, error_msg_aux.c_str(), 4096);
-        if (signals.size() > 0) {
-            Tree* res = (Tree*)malloc(sizeof(Tree) * (signals.size() + 1));
-            size_t i;
-            for (i = 0; i < signals.size(); i++) res[i] = signals[i];
-            res[i] = NULL;
-            return res;
-        } else {
-            return NULL;
-        }
-    }
-    
-    LIBFAUST_API Tree CboxInt(int n)
-    {
-        return boxInt(n);
-    }
-    
-    LIBFAUST_API Tree CboxReal(double n)
-    {
-        return boxReal(n);
-    }
-    
-    LIBFAUST_API Tree CboxWire()
-    {
-        return boxWire();
-    }
-    
-    LIBFAUST_API Tree CboxCut()
-    {
-        return boxCut();
-    }
-    
-    LIBFAUST_API Tree CboxSeq(Tree x, Tree y)
-    {
-        return boxSeq(x, y);
-    }
-    
-    LIBFAUST_API Tree CboxPar(Tree x, Tree y)
-    {
-        return boxPar(x, y);
-    }
-    
-    LIBFAUST_API Tree CboxSplit(Tree x, Tree y)
-    {
-        return boxSplit(x, y);
-    }
-    
-    LIBFAUST_API Tree CboxMerge(Tree x, Tree y)
-    {
-        return boxMerge(x, y);
-    }
-    
-    LIBFAUST_API Tree CboxRec(Tree x, Tree y)
-    {
-        return boxRec(x, y);
-    }
-    
-    LIBFAUST_API Tree CboxRoute(Tree n, Tree m, Tree r)
-    {
-        return boxRoute(n, m, r);
-    }
-    
-    LIBFAUST_API Tree CboxDelay()
-    {
-        return boxDelay();
-    }
-    
-    LIBFAUST_API Tree CboxIntCast()
-    {
-        return boxIntCast();
-    }
-    
-    LIBFAUST_API Tree CboxFloatCast()
-    {
-        return boxFloatCast();
-    }
-    
-    LIBFAUST_API Tree CboxReadOnlyTable()
-    {
-        return boxReadOnlyTable();
-    }
-    
-    LIBFAUST_API Tree CboxWriteReadTable()
-    {
-        return boxWriteReadTable();
-    }
-    
-    LIBFAUST_API Tree CboxWaveform(Tree* wf_aux)
-    {
-        tvec wf;
-        int i = 0;
-        while (wf_aux[i]) { wf.push_back(wf_aux[i]); i++; }
-        return boxWaveform(wf);
-    }
-    
-    LIBFAUST_API Tree CboxSoundfile(const char* label, Tree chan)
-    {
-        return boxSoundfile(label, chan);
-    }
-    
-    LIBFAUST_API Tree CboxSelect2()
-    {
-        return boxSelect2();
-    }
-    
-    LIBFAUST_API Tree CboxSelect3()
-    {
-        return boxSelect3();
-    }
-    
-    LIBFAUST_API Tree CboxFConst(SType type, const char* name, const char* file)
-    {
-        return boxFConst(type, name, file);
-    }
-    
-    LIBFAUST_API Tree CboxFVar(SType type, const char* name, const char* file)
-    {
-        return boxFVar(type, name, file);
-    }
-    
-    LIBFAUST_API Tree CboxBinOp(SOperator op)
-    {
-        return boxBinOp(op);
-    }
-    
-    // Specific binary mathematical functions
-    
-    LIBFAUST_API Tree CboxAdd()
-    {
-        return boxAdd();
-    }
-    LIBFAUST_API Tree CboxSub()
-    {
-        return boxSub();
-    }
-    LIBFAUST_API Tree CboxMul()
-    {
-        return boxMul();
-    }
-    LIBFAUST_API Tree CboxDiv()
-    {
-        return boxDiv();
-    }
-    LIBFAUST_API Tree CboxRem()
-    {
-        return boxRem();
-    }
-    
-    LIBFAUST_API Tree CboxLeftShift()
-    {
-        return boxLeftShift();
-    }
-    LIBFAUST_API Tree CboxLRightShift()
-    {
-        return boxLRightShift();
-    }
-    LIBFAUST_API Tree CboxARightShift()
-    {
-        return boxARightShift();
-    }
-    
-    LIBFAUST_API Tree CboxGT()
-    {
-        return boxGT();
-    }
-    LIBFAUST_API Tree CboxLT()
-    {
-        return boxLT();
-    }
-    LIBFAUST_API Tree CboxGE()
-    {
-        return boxGE();
-    }
-    LIBFAUST_API Tree CboxLE()
-    {
-        return boxLE();
-    }
-    LIBFAUST_API Tree CboxEQ()
-    {
-        return boxEQ();
-    }
-    LIBFAUST_API Tree CboxNE()
-    {
-        return boxNE();
-    }
-    
-    LIBFAUST_API Tree CboxAND()
-    {
-        return boxAND();
-    }
-    LIBFAUST_API Tree CboxOR()
-    {
-        return boxOR();
-    }
-    LIBFAUST_API Tree CboxXOR()
-    {
-        return boxXOR();
-    }
-    
-    // Extended unary of binary mathematical functions
-    
-    LIBFAUST_API Tree CboxAbs()
-    {
-        return boxAbs();
-    }
-    LIBFAUST_API Tree CboxAcos()
-    {
-        return boxAcos();
-    }
-    LIBFAUST_API Tree CboxTan()
-    {
-        return boxTan();
-    }
-    LIBFAUST_API Tree CboxSqrt()
-    {
-        return boxSqrt();
-    }
-    LIBFAUST_API Tree CboxSin()
-    {
-        return boxSin();
-    }
-    LIBFAUST_API Tree CboxRint()
-    {
-        return boxRint();
-    }
-    LIBFAUST_API Tree CboxRemainder()
-    {
-        return boxRemainder();
-    }
-    LIBFAUST_API Tree CboxPow()
-    {
-        return boxPow();
-    }
-    LIBFAUST_API Tree CboxMin()
-    {
-        return boxMin();
-    }
-    LIBFAUST_API Tree CboxMax()
-    {
-        return boxMax();
-    }
-    LIBFAUST_API Tree CboxLog()
-    {
-        return boxLog();
-    }
-    LIBFAUST_API Tree CboxLog10()
-    {
-        return boxLog10();
-    }
-    LIBFAUST_API Tree CboxFmod()
-    {
-        return boxFmod();
-    }
-    LIBFAUST_API Tree CboxFloor()
-    {
-        return boxFloor();
-    }
-    LIBFAUST_API Tree CboxExp()
-    {
-        return boxExp();
-    }
-    LIBFAUST_API Tree CboxExp10()
-    {
-        return boxExp10();
-    }
-    LIBFAUST_API Tree CboxCos()
-    {
-        return boxCos();
-    }
-    LIBFAUST_API Tree CboxCeil()
-    {
-        return boxCeil();
-    }
-    LIBFAUST_API Tree CboxAtan()
-    {
-        return boxAtan();
-    }
-    LIBFAUST_API Tree CboxAtan2()
-    {
-        return boxAtan2();
-    }
-    LIBFAUST_API Tree CboxAsin()
-    {
-        return boxAsin();
-    }
-    
-    // User Interface
-    
-    LIBFAUST_API Tree CboxButton(const char* label)
-    {
-        return boxButton(label);
-    }
-    
-    LIBFAUST_API Tree CboxCheckbox(const char* label)
-    {
-        return boxButton(label);
-    }
-    
-    LIBFAUST_API Tree CboxVSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
-    {
-        return boxVSlider(label, init, min, max, step);
-    }
-    
-    LIBFAUST_API Tree CboxHSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
-    {
-        return boxHSlider(label, init, min, max, step);
-    }
-    
-    LIBFAUST_API Tree CboxNumEntry(const char* label, Tree init, Tree min, Tree max, Tree step)
-    {
-        return boxNumEntry(label, init, min, max, step);
-    }
-    
-    LIBFAUST_API Tree CboxVBargraph(const char* label, Tree min, Tree max)
-    {
-        return boxVBargraph(label, min, max);
-    }
-    
-    LIBFAUST_API Tree CboxHBargraph(const char* label, Tree min, Tree max)
-    {
-        return boxHBargraph(label, min, max);
-    }
-    
-    LIBFAUST_API Tree CboxAttach()
-    {
-        return boxAttach();
-    }
-    
-    // Helpers
-    
-    LIBFAUST_API Tree CboxPar3(Tree x, Tree y, Tree z)
-    {
-        return CboxPar(x, CboxPar(y, z));
-    }
-    
-    LIBFAUST_API Tree CboxPar4(Tree a, Tree b, Tree c, Tree d)
-    {
-        return CboxPar(a, CboxPar3(b, c, d));
-    }
-    
-    LIBFAUST_API Tree CboxPar5(Tree a, Tree b, Tree c, Tree d, Tree e)
-    {
-        return CboxPar(a, CboxPar4(b, c, d, e));
-    }
-    
-    LIBFAUST_API Tree CboxDelayAux(Tree s, Tree del)
-    {
-        return CboxSeq(CboxPar(s, del), CboxDelay());
-    }
-    
-    LIBFAUST_API Tree CboxIntCastAux(Tree s)
-    {
-        return CboxSeq(s, CboxIntCast());
-    }
-    
-    LIBFAUST_API Tree CboxFloatCastAux(Tree s)
-    {
-        return CboxSeq(s, CboxFloatCast());
-    }
-    
-    LIBFAUST_API Tree CboxReadOnlyTableAux(Tree n, Tree init, Tree ridx)
-    {
-        return CboxSeq(CboxPar3(n, init, ridx), CboxReadOnlyTable());
-    }
-    
-    LIBFAUST_API Tree CboxWriteReadTableAux(Tree n, Tree init, Tree widx, Tree wsig, Tree ridx)
-    {
-        return CboxSeq(boxPar5(n, init, widx, wsig, ridx), CboxWriteReadTable());
-    }
-    
-    LIBFAUST_API Tree CoxSoundfileAux(const char* label, Tree chan, Tree part, Tree ridx)
-    {
-        return CboxSeq(CboxPar(part, ridx), CboxSoundfile(label, chan));
-    }
-    
-    LIBFAUST_API Tree CboxSelect2Aux(Tree selector, Tree s1, Tree s2)
-    {
-        return CboxSeq(CboxPar3(selector, s1, s2), CboxSelect2());
-    }
-    
-    LIBFAUST_API Tree CboxSelect3Aux(Tree selector, Tree s1, Tree s2, Tree s3)
-    {
-        return CboxSeq(CboxPar4(selector, s1, s2, s3), CboxSelect3());
-    }
-    
-    LIBFAUST_API Tree CboxBinOpAux(SOperator op, Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxBinOp(op));
-    }
-    
-    LIBFAUST_API Tree CboxAddAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxAdd());
-    }
-    
-    LIBFAUST_API Tree CboxSubAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxSub());
-    }
-    
-    LIBFAUST_API Tree CboxMulAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxMul());
-    }
-    
-    LIBFAUST_API Tree CboxDivAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxDiv());
-    }
-    
-    LIBFAUST_API Tree CboxRemAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxRem());
-    }
-    
-    LIBFAUST_API Tree CboxLeftShiftAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxLeftShift());
-    }
-    
-    LIBFAUST_API Tree CboxLRightShiftAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxLRightShift());
-    }
-    
-    LIBFAUST_API Tree CboxARightShiftAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxARightShift());
-    }
-    
-    LIBFAUST_API Tree CboxGTAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxGT());
-    }
-    
-    LIBFAUST_API Tree CboxLTAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxLT());
-    }
-    
-    LIBFAUST_API Tree CboxGEAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxGE());
-    }
-    
-    LIBFAUST_API Tree CboxLEAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxLE());
-    }
-    
-    LIBFAUST_API Tree CboxEQAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxEQ());
-    }
-    
-    LIBFAUST_API Tree CboxNEAux(Tree b1, Tree b2)
-    {
+
+LIBFAUST_API Tree CDSPToBoxes(const char* name_app, const char* dsp_content, int argc, const char* argv[], int* inputs, int* outputs, char* error_msg)
+{
+    string error_msg_aux;
+    Tree   box = DSPToBoxes(name_app, dsp_content, argc, argv, inputs, outputs, error_msg_aux);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    return box;
+}
+
+LIBFAUST_API bool CgetBoxType(Tree box, int* inputs, int* outputs)
+{
+    return getBoxType(box, inputs, outputs);
+}
+
+LIBFAUST_API Tree* CboxesToSignals(Tree box, char* error_msg)
+{
+    string error_msg_aux;
+    tvec   signals = boxesToSignals(box, error_msg_aux);
+    strncpy(error_msg, error_msg_aux.c_str(), 4096);
+    if (signals.size() > 0) {
+        Tree*  res = (Tree*)malloc(sizeof(Tree) * (signals.size() + 1));
+        size_t i;
+        for (i = 0; i < signals.size(); i++) res[i] = signals[i];
+        res[i] = nullptr;
+        return res;
+    } else {
+        return nullptr;
+    }
+}
+
+LIBFAUST_API Tree CboxInt(int n)
+{
+    return boxInt(n);
+}
+
+LIBFAUST_API Tree CboxReal(double n)
+{
+    return boxReal(n);
+}
+
+LIBFAUST_API Tree CboxWire()
+{
+    return boxWire();
+}
+
+LIBFAUST_API Tree CboxCut()
+{
+    return boxCut();
+}
+
+LIBFAUST_API Tree CboxSeq(Tree x, Tree y)
+{
+    return boxSeq(x, y);
+}
+
+LIBFAUST_API Tree CboxPar(Tree x, Tree y)
+{
+    return boxPar(x, y);
+}
+
+LIBFAUST_API Tree CboxSplit(Tree x, Tree y)
+{
+    return boxSplit(x, y);
+}
+
+LIBFAUST_API Tree CboxMerge(Tree x, Tree y)
+{
+    return boxMerge(x, y);
+}
+
+LIBFAUST_API Tree CboxRec(Tree x, Tree y)
+{
+    return boxRec(x, y);
+}
+
+LIBFAUST_API Tree CboxRoute(Tree n, Tree m, Tree r)
+{
+    return boxRoute(n, m, r);
+}
+
+LIBFAUST_API Tree CboxDelay()
+{
+    return boxDelay();
+}
+
+LIBFAUST_API Tree CboxIntCast()
+{
+    return boxIntCast();
+}
+
+LIBFAUST_API Tree CboxFloatCast()
+{
+    return boxFloatCast();
+}
+
+LIBFAUST_API Tree CboxReadOnlyTable()
+{
+    return boxReadOnlyTable();
+}
+
+LIBFAUST_API Tree CboxWriteReadTable()
+{
+    return boxWriteReadTable();
+}
+
+LIBFAUST_API Tree CboxWaveform(Tree* wf_aux)
+{
+    tvec wf;
+    int  i = 0;
+    while (wf_aux[i]) {
+        wf.push_back(wf_aux[i]);
+        i++;
+    }
+    return boxWaveform(wf);
+}
+
+LIBFAUST_API Tree CboxSoundfile(const char* label, Tree chan)
+{
+    return boxSoundfile(label, chan);
+}
+
+LIBFAUST_API Tree CboxSelect2()
+{
+    return boxSelect2();
+}
+
+LIBFAUST_API Tree CboxSelect3()
+{
+    return boxSelect3();
+}
+
+LIBFAUST_API Tree CboxFConst(SType type, const char* name, const char* file)
+{
+    return boxFConst(type, name, file);
+}
+
+LIBFAUST_API Tree CboxFVar(SType type, const char* name, const char* file)
+{
+    return boxFVar(type, name, file);
+}
+
+LIBFAUST_API Tree CboxBinOp(SOperator op)
+{
+    return boxBinOp(op);
+}
+
+// Specific binary mathematical functions
+
+LIBFAUST_API Tree CboxAdd()
+{
+    return boxAdd();
+}
+LIBFAUST_API Tree CboxSub()
+{
+    return boxSub();
+}
+LIBFAUST_API Tree CboxMul()
+{
+    return boxMul();
+}
+LIBFAUST_API Tree CboxDiv()
+{
+    return boxDiv();
+}
+LIBFAUST_API Tree CboxRem()
+{
+    return boxRem();
+}
+
+LIBFAUST_API Tree CboxLeftShift()
+{
+    return boxLeftShift();
+}
+LIBFAUST_API Tree CboxLRightShift()
+{
+    return boxLRightShift();
+}
+LIBFAUST_API Tree CboxARightShift()
+{
+    return boxARightShift();
+}
+
+LIBFAUST_API Tree CboxGT()
+{
+    return boxGT();
+}
+LIBFAUST_API Tree CboxLT()
+{
+    return boxLT();
+}
+LIBFAUST_API Tree CboxGE()
+{
+    return boxGE();
+}
+LIBFAUST_API Tree CboxLE()
+{
+    return boxLE();
+}
+LIBFAUST_API Tree CboxEQ()
+{
+    return boxEQ();
+}
+LIBFAUST_API Tree CboxNE()
+{
+    return boxNE();
+}
+
+LIBFAUST_API Tree CboxAND()
+{
+    return boxAND();
+}
+LIBFAUST_API Tree CboxOR()
+{
+    return boxOR();
+}
+LIBFAUST_API Tree CboxXOR()
+{
+    return boxXOR();
+}
+
+// Extended unary of binary mathematical functions
+
+LIBFAUST_API Tree CboxAbs()
+{
+    return boxAbs();
+}
+LIBFAUST_API Tree CboxAcos()
+{
+    return boxAcos();
+}
+LIBFAUST_API Tree CboxTan()
+{
+    return boxTan();
+}
+LIBFAUST_API Tree CboxSqrt()
+{
+    return boxSqrt();
+}
+LIBFAUST_API Tree CboxSin()
+{
+    return boxSin();
+}
+LIBFAUST_API Tree CboxRint()
+{
+    return boxRint();
+}
+LIBFAUST_API Tree CboxRemainder()
+{
+    return boxRemainder();
+}
+LIBFAUST_API Tree CboxPow()
+{
+    return boxPow();
+}
+LIBFAUST_API Tree CboxMin()
+{
+    return boxMin();
+}
+LIBFAUST_API Tree CboxMax()
+{
+    return boxMax();
+}
+LIBFAUST_API Tree CboxLog()
+{
+    return boxLog();
+}
+LIBFAUST_API Tree CboxLog10()
+{
+    return boxLog10();
+}
+LIBFAUST_API Tree CboxFmod()
+{
+    return boxFmod();
+}
+LIBFAUST_API Tree CboxFloor()
+{
+    return boxFloor();
+}
+LIBFAUST_API Tree CboxExp()
+{
+    return boxExp();
+}
+LIBFAUST_API Tree CboxExp10()
+{
+    return boxExp10();
+}
+LIBFAUST_API Tree CboxCos()
+{
+    return boxCos();
+}
+LIBFAUST_API Tree CboxCeil()
+{
+    return boxCeil();
+}
+LIBFAUST_API Tree CboxAtan()
+{
+    return boxAtan();
+}
+LIBFAUST_API Tree CboxAtan2()
+{
+    return boxAtan2();
+}
+LIBFAUST_API Tree CboxAsin()
+{
+    return boxAsin();
+}
+
+// User Interface
+
+LIBFAUST_API Tree CboxButton(const char* label)
+{
+    return boxButton(label);
+}
+
+LIBFAUST_API Tree CboxCheckbox(const char* label)
+{
+    return boxButton(label);
+}
+
+LIBFAUST_API Tree CboxVSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
+{
+    return boxVSlider(label, init, min, max, step);
+}
+
+LIBFAUST_API Tree CboxHSlider(const char* label, Tree init, Tree min, Tree max, Tree step)
+{
+    return boxHSlider(label, init, min, max, step);
+}
+
+LIBFAUST_API Tree CboxNumEntry(const char* label, Tree init, Tree min, Tree max, Tree step)
+{
+    return boxNumEntry(label, init, min, max, step);
+}
+
+LIBFAUST_API Tree CboxVBargraph(const char* label, Tree min, Tree max)
+{
+    return boxVBargraph(label, min, max);
+}
+
+LIBFAUST_API Tree CboxHBargraph(const char* label, Tree min, Tree max)
+{
+    return boxHBargraph(label, min, max);
+}
+
+LIBFAUST_API Tree CboxAttach()
+{
+    return boxAttach();
+}
+
+// Box test API
+
+LIBFAUST_API bool CisBoxAbstr(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxAbstr(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxAccess(Tree t, Tree* exp_aux, Tree* id_aux)
+{
+    Tree exp, id;
+    if (isBoxAccess(t, exp, id)) {
+        *exp_aux = exp;
+        *id_aux = id;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxAppl(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxAppl(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxButton(Tree t, Tree* lbl_aux)
+{
+    Tree lbl;
+    if (isBoxButton(t, lbl)) {
+        *lbl_aux = lbl;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxCase(Tree t, Tree* rules_aux)
+{
+    Tree rules;
+    if (isBoxCase(t, rules)) {
+        *rules_aux = rules;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxCheckbox(Tree t, Tree* lbl_aux)
+{
+    Tree lbl;
+    if (isBoxCheckbox(t, lbl)) {
+        *lbl_aux = lbl;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxComponent(Tree t, Tree* filename_aux)
+{
+    Tree filename;
+    if (isBoxComponent(t, filename)) {
+        *filename_aux = filename;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxCut(Tree t)
+{
+    return isBoxCut(t);
+}
+
+LIBFAUST_API bool CisBoxEnvironment(Tree t)
+{
+    return isBoxEnvironment(t);
+}
+
+LIBFAUST_API bool CisBoxError(Tree t)
+{
+    return isBoxError(t);
+}
+
+LIBFAUST_API bool CisBoxFConst(Tree t, Tree* type_aux, Tree* name_aux, Tree* file_aux)
+{
+    Tree type, name, file;
+    if (isBoxFConst(t, type, name, file)) {
+        *type_aux = type;
+        *name_aux = name;
+        *file_aux = file;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxFFun(Tree t, Tree* ff_aux)
+{
+    Tree ff;
+    if (isBoxFFun(t, ff)) {
+        *ff_aux = ff;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxFVar(Tree t, Tree* type_aux, Tree* name_aux, Tree* file_aux)
+{
+    Tree type, name, file;
+    if (isBoxFVar(t, type, name, file)) {
+        *type_aux = type;
+        *name_aux = name;
+        *file_aux = file;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxHBargraph(Tree t, Tree* lbl_aux, Tree* min_aux, Tree* max_aux)
+{
+    Tree lbl, min, max;
+    if (isBoxHBargraph(t, lbl, min, max)) {
+        *lbl_aux = lbl;
+        *min_aux = min;
+        *max_aux = max;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxHGroup(Tree t, Tree* lbl_aux, Tree* x_aux)
+{
+    Tree lbl, x;
+    if (isBoxHGroup(t, lbl, x)) {
+        *lbl_aux = lbl;
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxHSlider(Tree t, Tree* lbl_aux, Tree* cur_aux, Tree* min_aux, Tree* max_aux, Tree* step_aux)
+{
+    Tree lbl, cur, min, max, step;
+    if (isBoxHSlider(t, lbl, cur, min, max, step)) {
+        *lbl_aux = lbl;
+        *cur_aux = cur;
+        *min_aux = min;
+        *max_aux = max;
+        *step_aux = step;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxIdent(Tree t, const char** str)
+{
+    return isBoxIdent(t, str);
+}
+
+LIBFAUST_API bool CisBoxInputs(Tree t, Tree* x_aux)
+{
+    Tree x;
+    if (isBoxInputs(t, x)) {
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxInt(Tree t, int* i)
+{
+    return isBoxInt(t, i);
+}
+
+LIBFAUST_API bool CisBoxIPar(Tree t, Tree* x_aux, Tree* y_aux, Tree* z_aux)
+{
+    Tree x, y, z;
+    if (isBoxIPar(t, x, y, z)) {
+        *x_aux = x;
+        *y_aux = y;
+        *z_aux = z;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxIProd(Tree t, Tree* x_aux, Tree* y_aux, Tree* z_aux)
+{
+    Tree x, y, z;
+    if (isBoxIProd(t, x, y, z)) {
+        *x_aux = x;
+        *y_aux = y;
+        *z_aux = z;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxISeq(Tree t, Tree* x_aux, Tree* y_aux, Tree* z_aux)
+{
+    Tree x, y, z;
+    if (isBoxISeq(t, x, y, z)) {
+        *x_aux = x;
+        *y_aux = y;
+        *z_aux = z;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxISum(Tree t, Tree* x_aux, Tree* y_aux, Tree* z_aux)
+{
+    Tree x, y, z;
+    if (isBoxISum(t, x, y, z)) {
+        *x_aux = x;
+        *y_aux = y;
+        *z_aux = z;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxLibrary(Tree t, Tree* filename_aux)
+{
+    Tree filename;
+    if (isBoxLibrary(t, filename)) {
+        *filename_aux = filename;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxMerge(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxMerge(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxMetadata(Tree t, Tree* exp_aux, Tree* mdlist_aux)
+{
+    Tree exp, mdlist;
+    if (isBoxMetadata(t, exp, mdlist)) {
+        *exp_aux = exp;
+        *mdlist_aux = mdlist;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxNumEntry(Tree t, Tree* lbl_aux, Tree* cur_aux, Tree* min_aux, Tree* max_aux, Tree* step_aux)
+{
+    Tree lbl, cur, min, max, step;
+    if (isBoxNumEntry(t, lbl, cur, min, max, step)) {
+        *lbl_aux = lbl;
+        *cur_aux = cur;
+        *min_aux = min;
+        *max_aux = max;
+        *step_aux = step;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxOutputs(Tree t, Tree* x_aux)
+{
+    Tree x;
+    if (isBoxOutputs(t, x)) {
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxPar(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxPar(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxPrim0(Tree t)
+{
+    return isBoxPrim0(t);
+}
+
+LIBFAUST_API bool CisBoxPrim1(Tree t)
+{
+    return isBoxPrim1(t);
+}
+
+LIBFAUST_API bool CisBoxPrim2(Tree t)
+{
+    return isBoxPrim2(t);
+}
+
+LIBFAUST_API bool CisBoxPrim3(Tree t)
+{
+    return isBoxPrim3(t);
+}
+
+LIBFAUST_API bool CisBoxPrim4(Tree t)
+{
+    return isBoxPrim4(t);
+}
+
+LIBFAUST_API bool CisBoxPrim5(Tree t)
+{
+    return isBoxPrim5(t);
+}
+
+LIBFAUST_API bool CisBoxReal(Tree t, double* r)
+{
+    return isBoxReal(t, r);
+}
+
+LIBFAUST_API bool CisBoxRec(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxRec(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxRoute(Tree t, Tree* n_aux, Tree* m_aux, Tree* r_aux)
+{
+    Tree n, m, r;
+    if (isBoxRoute(t, n, m, r)) {
+        *n_aux = n;
+        *m_aux = m;
+        *r_aux = r;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxSeq(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxSeq(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxSlot(Tree t, int* id)
+{
+    return isBoxSlot(t, id);
+}
+
+LIBFAUST_API bool CisBoxSoundfile(Tree t, Tree* label_aux, Tree* chan_aux)
+{
+    Tree label, chan;
+    if (isBoxSoundfile(t, label, chan)) {
+        *label_aux = label;
+        *chan_aux = chan;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxSplit(Tree t, Tree* x_aux, Tree* y_aux)
+{
+    Tree x, y;
+    if (isBoxSplit(t, x, y)) {
+        *x_aux = x;
+        *y_aux = y;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxSymbolic(Tree t, Tree* slot_aux, Tree* body_aux)
+{
+    Tree slot, body;
+    if (isBoxSymbolic(t, slot, body)) {
+        *slot_aux = slot;
+        *body_aux = body;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxTGroup(Tree t, Tree* lbl_aux, Tree* x_aux)
+{
+    Tree lbl, x;
+    if (isBoxTGroup(t, lbl, x)) {
+        *lbl_aux = lbl;
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxVBargraph(Tree t, Tree* lbl_aux, Tree* min_aux, Tree* max_aux)
+{
+    Tree lbl, min, max;
+    if (isBoxVBargraph(t, lbl, min, max)) {
+        *lbl_aux = lbl;
+        *min_aux = min;
+        *max_aux = max;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxVGroup(Tree t, Tree* lbl_aux, Tree* x_aux)
+{
+    Tree lbl, x;
+    if (isBoxVGroup(t, lbl, x)) {
+        *lbl_aux = lbl;
+        *x_aux = x;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxVSlider(Tree t, Tree* lbl_aux, Tree* cur_aux, Tree* min_aux, Tree* max_aux, Tree* step_aux)
+{
+    Tree lbl, cur, min, max, step;
+    if (isBoxVSlider(t, lbl, cur, min, max, step)) {
+        *lbl_aux = lbl;
+        *cur_aux = cur;
+        *min_aux = min;
+        *max_aux = max;
+        *step_aux = step;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+LIBFAUST_API bool CisBoxWaveform(Tree t)
+{
+    return isBoxWaveform(t);
+}
+
+LIBFAUST_API bool CisBoxWire(Tree t)
+{
+    return isBoxWire(t);
+}
+
+LIBFAUST_API bool CisBoxWithLocalDef(Tree t, Tree* body_aux, Tree* ldef_aux)
+{
+    Tree body, ldef;
+    if (isBoxWithLocalDef(t, body, ldef)) {
+        *body_aux = body;
+        *ldef_aux = ldef;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// Helpers
+
+LIBFAUST_API Tree CboxPar3(Tree x, Tree y, Tree z)
+{
+    return CboxPar(x, CboxPar(y, z));
+}
+
+LIBFAUST_API Tree CboxPar4(Tree a, Tree b, Tree c, Tree d)
+{
+    return CboxPar(a, CboxPar3(b, c, d));
+}
+
+LIBFAUST_API Tree CboxPar5(Tree a, Tree b, Tree c, Tree d, Tree e)
+{
+    return CboxPar(a, CboxPar4(b, c, d, e));
+}
+
+LIBFAUST_API Tree CboxDelayAux(Tree s, Tree del)
+{
+    return CboxSeq(CboxPar(s, del), CboxDelay());
+}
+
+LIBFAUST_API Tree CboxIntCastAux(Tree s)
+{
+    return CboxSeq(s, CboxIntCast());
+}
+
+LIBFAUST_API Tree CboxFloatCastAux(Tree s)
+{
+    return CboxSeq(s, CboxFloatCast());
+}
+
+LIBFAUST_API Tree CboxReadOnlyTableAux(Tree n, Tree init, Tree ridx)
+{
+    return CboxSeq(CboxPar3(n, init, ridx), CboxReadOnlyTable());
+}
+
+LIBFAUST_API Tree CboxWriteReadTableAux(Tree n, Tree init, Tree widx, Tree wsig, Tree ridx)
+{
+    return CboxSeq(boxPar5(n, init, widx, wsig, ridx), CboxWriteReadTable());
+}
+
+LIBFAUST_API Tree CoxSoundfileAux(const char* label, Tree chan, Tree part, Tree ridx)
+{
+    return CboxSeq(CboxPar(part, ridx), CboxSoundfile(label, chan));
+}
+
+LIBFAUST_API Tree CboxSelect2Aux(Tree selector, Tree s1, Tree s2)
+{
+    return CboxSeq(CboxPar3(selector, s1, s2), CboxSelect2());
+}
+
+LIBFAUST_API Tree CboxSelect3Aux(Tree selector, Tree s1, Tree s2, Tree s3)
+{
+    return CboxSeq(CboxPar4(selector, s1, s2, s3), CboxSelect3());
+}
+
+LIBFAUST_API Tree CboxBinOpAux(SOperator op, Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxBinOp(op));
+}
+
+LIBFAUST_API Tree CboxAddAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxAdd());
+}
+
+LIBFAUST_API Tree CboxSubAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxSub());
+}
+
+LIBFAUST_API Tree CboxMulAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxMul());
+}
+
+LIBFAUST_API Tree CboxDivAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxDiv());
+}
+
+LIBFAUST_API Tree CboxRemAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxRem());
+}
+
+LIBFAUST_API Tree CboxLeftShiftAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxLeftShift());
+}
+
+LIBFAUST_API Tree CboxLRightShiftAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxLRightShift());
+}
+
+LIBFAUST_API Tree CboxARightShiftAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxARightShift());
+}
+
+LIBFAUST_API Tree CboxGTAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxGT());
+}
+
+LIBFAUST_API Tree CboxLTAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxLT());
+}
+
+LIBFAUST_API Tree CboxGEAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxGE());
+}
+
+LIBFAUST_API Tree CboxLEAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxLE());
+}
+
+LIBFAUST_API Tree CboxEQAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxEQ());
+}
+
+LIBFAUST_API Tree CboxNEAux(Tree b1, Tree b2)
+{
     return CboxSeq(CboxPar(b1, b2), CboxNE());
-    }
-    
-    LIBFAUST_API Tree CboxANDAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxAND());
-    }
-    
-    LIBFAUST_API Tree CboxORAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxOR());
-    }
-    
-    LIBFAUST_API Tree CboxXORAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxXOR());
-    }
-    
-    LIBFAUST_API Tree CboxAbsAux(Tree x)
-    {
-        return CboxSeq(x, CboxAbs());
-    }
-    
-    LIBFAUST_API Tree CboxAcosAux(Tree x)
-    {
-        return CboxSeq(x, CboxAcos());
-    }
-    
-    LIBFAUST_API Tree CboxTanAux(Tree x)
-    {
-        return CboxSeq(x, CboxTan());
-    }
-    
-    LIBFAUST_API Tree CboxSqrtAux(Tree x)
-    {
-        return CboxSeq(x, CboxSqrt());
-    }
-    
-    LIBFAUST_API Tree CboxSinAux(Tree x)
-    {
-        return CboxSeq(x, CboxSin());
-    }
-    
-    LIBFAUST_API Tree CboxRintAux(Tree x)
-    {
-        return CboxSeq(x, CboxRint());
-    }
-    
-    LIBFAUST_API Tree CboxLogAux(Tree x)
-    {
-        return CboxSeq(x, CboxLog());
-    }
-    
-    LIBFAUST_API Tree CboxLog10Aux(Tree x)
-    {
-        return CboxSeq(x, CboxLog10());
-    }
-    
-    LIBFAUST_API Tree CboxFloorAux(Tree x)
-    {
-        return CboxSeq(x, CboxFloor());
-    }
-    
-    LIBFAUST_API Tree CboxExpAux(Tree x)
-    {
-        return CboxSeq(x, CboxExp());
-    }
-    
-    LIBFAUST_API Tree CboxExp10Aux(Tree x)
-    {
-        return CboxSeq(x, CboxExp10());
-    }
-    
-    LIBFAUST_API Tree CboxCosAux(Tree x)
-    {
-        return CboxSeq(x, CboxCos());
-    }
-    
-    LIBFAUST_API Tree CboxCeilAux(Tree x)
-    {
-        return CboxSeq(x, CboxCeil());
-    }
-    
-    LIBFAUST_API Tree CboxAtanAux(Tree x)
-    {
-        return CboxSeq(x, CboxAtan());
-    }
-    
-    LIBFAUST_API Tree CboxAsinAux(Tree x)
-    {
-        return CboxSeq(x, CboxAsin());
-    }
-    
-    LIBFAUST_API Tree CboxRemainderAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxRemainder());
-    }
-    
-    LIBFAUST_API Tree CboxPowAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxPow());
-    }
-    
-    LIBFAUST_API Tree CboxMinAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxMin());
-    }
-    
-    LIBFAUST_API Tree CboxMaxAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxMax());
-    }
-    
-    LIBFAUST_API Tree CboxFmodAux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxFmod());
-    }
-    
-    LIBFAUST_API Tree CboxAtan2Aux(Tree b1, Tree b2)
-    {
-        return CboxSeq(CboxPar(b1, b2), CboxAtan2());
-    }
-    
-    LIBFAUST_API Tree CboxVBargraphAux(const char* label, Tree min, Tree max, Tree x)
-    {
-        return CboxSeq(x, CboxVBargraph(label, min, max));
-    }
-    
-    LIBFAUST_API Tree CboxHBargraphAux(const char* label, Tree min, Tree max, Tree x)
-    {
-        return CboxSeq(x, CboxHBargraph(label, min, max));
-    }
-    
-    LIBFAUST_API Tree CboxAttachAux(Tree s1, Tree s2)
-    {
-        return CboxSeq(CboxPar(s1, s2), CboxAttach());
-    }
+}
+
+LIBFAUST_API Tree CboxANDAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxAND());
+}
+
+LIBFAUST_API Tree CboxORAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxOR());
+}
+
+LIBFAUST_API Tree CboxXORAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxXOR());
+}
+
+LIBFAUST_API Tree CboxAbsAux(Tree x)
+{
+    return CboxSeq(x, CboxAbs());
+}
+
+LIBFAUST_API Tree CboxAcosAux(Tree x)
+{
+    return CboxSeq(x, CboxAcos());
+}
+
+LIBFAUST_API Tree CboxTanAux(Tree x)
+{
+    return CboxSeq(x, CboxTan());
+}
+
+LIBFAUST_API Tree CboxSqrtAux(Tree x)
+{
+    return CboxSeq(x, CboxSqrt());
+}
+
+LIBFAUST_API Tree CboxSinAux(Tree x)
+{
+    return CboxSeq(x, CboxSin());
+}
+
+LIBFAUST_API Tree CboxRintAux(Tree x)
+{
+    return CboxSeq(x, CboxRint());
+}
+
+LIBFAUST_API Tree CboxLogAux(Tree x)
+{
+    return CboxSeq(x, CboxLog());
+}
+
+LIBFAUST_API Tree CboxLog10Aux(Tree x)
+{
+    return CboxSeq(x, CboxLog10());
+}
+
+LIBFAUST_API Tree CboxFloorAux(Tree x)
+{
+    return CboxSeq(x, CboxFloor());
+}
+
+LIBFAUST_API Tree CboxExpAux(Tree x)
+{
+    return CboxSeq(x, CboxExp());
+}
+
+LIBFAUST_API Tree CboxExp10Aux(Tree x)
+{
+    return CboxSeq(x, CboxExp10());
+}
+
+LIBFAUST_API Tree CboxCosAux(Tree x)
+{
+    return CboxSeq(x, CboxCos());
+}
+
+LIBFAUST_API Tree CboxCeilAux(Tree x)
+{
+    return CboxSeq(x, CboxCeil());
+}
+
+LIBFAUST_API Tree CboxAtanAux(Tree x)
+{
+    return CboxSeq(x, CboxAtan());
+}
+
+LIBFAUST_API Tree CboxAsinAux(Tree x)
+{
+    return CboxSeq(x, CboxAsin());
+}
+
+LIBFAUST_API Tree CboxRemainderAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxRemainder());
+}
+
+LIBFAUST_API Tree CboxPowAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxPow());
+}
+
+LIBFAUST_API Tree CboxMinAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxMin());
+}
+
+LIBFAUST_API Tree CboxMaxAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxMax());
+}
+
+LIBFAUST_API Tree CboxFmodAux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxFmod());
+}
+
+LIBFAUST_API Tree CboxAtan2Aux(Tree b1, Tree b2)
+{
+    return CboxSeq(CboxPar(b1, b2), CboxAtan2());
+}
+
+LIBFAUST_API Tree CboxVBargraphAux(const char* label, Tree min, Tree max, Tree x)
+{
+    return CboxSeq(x, CboxVBargraph(label, min, max));
+}
+
+LIBFAUST_API Tree CboxHBargraphAux(const char* label, Tree min, Tree max, Tree x)
+{
+    return CboxSeq(x, CboxHBargraph(label, min, max));
+}
+
+LIBFAUST_API Tree CboxAttachAux(Tree s1, Tree s2)
+{
+    return CboxSeq(CboxPar(s1, s2), CboxAttach());
+}
 
 #ifdef __cplusplus
 }

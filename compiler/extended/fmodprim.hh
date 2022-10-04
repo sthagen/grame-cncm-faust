@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -33,7 +33,7 @@ class FmodPrim : public xtended {
 
     virtual bool needCache() { return true; }
 
-    virtual ::Type infereSigType(const vector<::Type>& args)
+    virtual ::Type infereSigType(ConstTypes args)
     {
         faustassert(args.size() == arity());
     
@@ -65,28 +65,22 @@ class FmodPrim : public xtended {
         } else {
             if (gGlobal->gMathApprox) {
                 // res = x - (y * T(int(x / y)))
-                return sigBinOp(kSub, args[0], sigBinOp(kMul, args[1], sigIntCast(sigBinOp(kDiv, args[0], args[1]))));
+                return sigSub(args[0], sigMul(args[1], sigFloatCast(sigIntCast(sigDiv(args[0], args[1])))));
             } else {
                 return tree(symbol(), args[0], args[1]);
             }
         }
     }
 
-    virtual ValueInst* generateCode(CodeContainer* container, Values& args, ::Type result,
-                                    vector< ::Type> const& types)
+    virtual ValueInst* generateCode(CodeContainer* container, Values& args, ::Type result, ConstTypes types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());
 
-        Typed::VarType         result_type;
-        vector<Typed::VarType> arg_types;
-        Values       casted_args;
-        prepareTypeArgsResult(result, args, types, result_type, arg_types, casted_args);
-
-        return container->pushFunction(subst("fmod$0", isuffix()), result_type, arg_types, casted_args);
+        return generateFun(container, subst("fmod$0", isuffix()), args, result, types);
     }
 
-    virtual string generateCode(Klass* klass, const vector<string>& args, const vector<::Type>& types)
+    virtual string generateCode(Klass* klass, const vector<string>& args, ConstTypes types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());
@@ -94,7 +88,7 @@ class FmodPrim : public xtended {
         return subst("fmod$2($0,$1)", args[0], args[1], isuffix());
     }
 
-    virtual string generateLateq(Lateq* lateq, const vector<string>& args, const vector<::Type>& types)
+    virtual string generateLateq(Lateq* lateq, const vector<string>& args, ConstTypes types)
     {
         faustassert(args.size() == arity());
         faustassert(types.size() == arity());

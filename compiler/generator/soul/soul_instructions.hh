@@ -4,16 +4,16 @@
     Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -445,17 +445,17 @@ class SOULInstVisitor : public TextInstVisitor {
         indexed->fAddress->accept(this);
         DeclareStructTypeInst* struct_type = isStructType(indexed->getName());
         if (struct_type) {
-            Int32NumInst* field_index = static_cast<Int32NumInst*>(indexed->fIndex);
+            Int32NumInst* field_index = static_cast<Int32NumInst*>(indexed->getIndex());
             *fOut << "." << struct_type->fType->getName(field_index->fNum);
         } else {
-            if (dynamic_cast<Int32NumInst*>(indexed->fIndex)) {
+            if (dynamic_cast<Int32NumInst*>(indexed->getIndex())) {
                 *fOut << "[";
-                indexed->fIndex->accept(this);
+                indexed->getIndex()->accept(this);
                 *fOut << "]";
             } else {
                 // wrap code is automatically added by the SOUL compiler (and the same if [idex] syntax is used)
                 *fOut << ".at (";
-                indexed->fIndex->accept(this);
+                indexed->getIndex()->accept(this);
                 *fOut << ")";
             }
         }
@@ -589,8 +589,8 @@ class SOULInstVisitor : public TextInstVisitor {
 
     virtual void visit(BinopInst* inst)
     {
-        bool cond1 = needParenthesis(inst, inst->fInst1);
-        bool cond2 = needParenthesis(inst, inst->fInst2);
+        bool cond1 = leftArgNeedsParentheses(inst, inst->fInst1);
+        bool cond2 = rightArgNeedsParentheses(inst, inst->fInst2);
     
         bool int_as_bool = fIntAsBool;
         if (isBoolOpcode(inst->fOpcode) && !int_as_bool) {
@@ -599,11 +599,10 @@ class SOULInstVisitor : public TextInstVisitor {
 
         // Hack to make it work again with 'soul' version 0.0.6
         if (isLogicalOpcode(inst->fOpcode)) {
-            TypingVisitor typing;
-            inst->fInst1->accept(&typing);
-            if (isInt64Type(typing.fCurType)) {
+            Typed::VarType type = TypingVisitor::getType(inst->fInst1);
+            if (isInt64Type(type)) {
                 *fOut << "int64 (";
-            } else if (isInt32Type(typing.fCurType) || isBoolType(typing.fCurType)) {
+            } else if (isInt32Type(type) || isBoolType(type)) {
                 *fOut << "int32 (";
             } else {
                 faustassert(false);
@@ -625,11 +624,10 @@ class SOULInstVisitor : public TextInstVisitor {
 
         // Hack to make it work again with 'soul' version 0.0.6
         if (isLogicalOpcode(inst->fOpcode)) {
-            TypingVisitor typing;
-            inst->fInst2->accept(&typing);
-            if (isInt64Type(typing.fCurType)) {
+            Typed::VarType type = TypingVisitor::getType(inst->fInst2);
+            if (isInt64Type(type)) {
                 *fOut << "int64 (";
-            } else if (isInt32Type(typing.fCurType) || isBoolType(typing.fCurType)) {
+            } else if (isInt32Type(type) || isBoolType(type)) {
                 *fOut << "int32 (";
             } else {
                 faustassert(false);

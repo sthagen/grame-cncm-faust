@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -32,9 +32,9 @@
 #include <cstdlib>
 
 #include "compatibility.hh"
+#include "environment.hh"
 #include "errormsg.hh"
 #include "eval.hh"
-#include "environment.hh"
 #include "exception.hh"
 #include "global.hh"
 #include "names.hh"
@@ -95,6 +95,8 @@ static bool getNumericProperty(Tree t, Tree& num);
  */
 Tree evalprocess(Tree eqlist)
 {
+    // Init stack overflow detector
+    gGlobal->gStackOverflowDetector = stackOverflowDetector(MAX_STACK_SIZE);
     Tree b = a2sb(eval(boxIdent(gGlobal->gProcessName.c_str()), gGlobal->nil,
                        pushMultiClosureDefs(eqlist, gGlobal->nil, gGlobal->nil)));
 
@@ -109,6 +111,8 @@ Tree evalprocess(Tree eqlist)
 
 Tree evaldocexpr(Tree docexpr, Tree eqlist)
 {
+    // Init stack overflow detector 
+    gGlobal->gStackOverflowDetector = stackOverflowDetector(MAX_STACK_SIZE);
     return a2sb(eval(docexpr, gGlobal->nil, pushMultiClosureDefs(eqlist, gGlobal->nil, gGlobal->nil)));
 }
 
@@ -429,7 +433,7 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
         const char* fname = tree2str(label);
         Tree        eqlst = gGlobal->gReader.expandList(gGlobal->gReader.getList(fname));
         Tree        res   = closure(boxIdent("process"), gGlobal->nil, gGlobal->nil,
-                           pushMultiClosureDefs(eqlst, gGlobal->nil, gGlobal->nil));
+                                    pushMultiClosureDefs(eqlst, gGlobal->nil, gGlobal->nil));
         setDefNameProperty(res, label);
         // cerr << "component is " << boxpp(res) << endl;
         return res;
@@ -438,7 +442,7 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
         const char* fname = tree2str(label);
         Tree        eqlst = gGlobal->gReader.expandList(gGlobal->gReader.getList(fname));
         Tree        res   = closure(boxEnvironment(), gGlobal->nil, gGlobal->nil,
-                           pushMultiClosureDefs(eqlst, gGlobal->nil, gGlobal->nil));
+                                    pushMultiClosureDefs(eqlst, gGlobal->nil, gGlobal->nil));
         setDefNameProperty(res, label);
         // cerr << "component is " << boxpp(res) << endl;
         return res;
@@ -649,9 +653,8 @@ static Tree realeval(Tree exp, Tree visited, Tree localValEnv)
         }
 
     } else {
-        stringstream error;
-        error << "ERROR : eval doesn't intercept : " << *exp << endl;
-        throw faustexception(error.str());
+        cerr << "ERROR : eval doesn't intercept : " << *exp << endl;
+        faustassert(false);
     }
 
     return nullptr;
@@ -846,6 +849,9 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
             } else if (isIdentChar(*src)) {
                 ident += *src++;
                 state = 2;
+            } else if (*src == '{') {
+                src++;
+                state = 3;
             } else {
                 // punctuation character and no identifier, stops
                 dst += '%';
@@ -862,10 +868,24 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
                 state = 0;
             }
 
+        } else if (state == 3) {
+            if (isIdentChar(*src)) {
+                ident += *src++;
+                state = 3;
+            } else if (*src == '}') {
+                writeIdentValue(dst, format, ident, visited, localValEnv);
+                src++;
+                state = 0;
+            } else {
+                // end and no identifier, stops
+                dst += '%';
+                dst += format;
+                state = -1;
+            }
+
         } else {
-            stringstream error;
-            error << "ERROR in evallabel : undefined state " << state << std::endl;
-            throw faustexception(error.str());
+            cerr << "ERROR : evallabel, undefined state " << state << std::endl;
+            faustassert(false);
         }
     }
 
@@ -888,15 +908,49 @@ static string evalLabel(const char* src, Tree visited, Tree localValEnv)
 static Tree iteratePar(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iteratePar called with 0 iteration", id);
+        // zero iteration: return neutral circuit (0->0) for parallel composition
+        return boxRoute(boxInt(0), boxInt(0), boxPar(boxInt(0), boxInt(0)));
+    } else {
+        Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
+        for (int i = num - 2; i >= 0; i--) {
+            res = boxPar(eval(body, visited, pushValueDef(id, tree(i), localValEnv)), res);
+        }
+        return res;
     }
+}
 
-    Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
-    for (int i = num - 2; i >= 0; i--) {
-        res = boxPar(eval(body, visited, pushValueDef(id, tree(i), localValEnv)), res);
+/**
+ * @brief Compute the neutral element for sequential composition modeled after body
+ *
+ * @param id
+ * @param body
+ * @param visited
+ * @param localValEnv
+ * @return a bus: _,...,_
+ */
+static Tree neutralExpSeq(Tree id, Tree body, Tree visited, Tree localValEnv)
+{
+    // We need to find the number of inputs and outputs of body
+    // We eval body with binding id to 0
+    Tree res = a2sb(eval(body, visited, pushValueDef(id, tree(0), localValEnv)));
+
+    int ins, outs;
+    getBoxType(res, &ins, &outs);
+    if (ins != outs) {
+        stringstream error;
+        error << "ERROR in seq() expressions. The iterated function must have the same number of inputs and outputs. "
+                 "Here "
+              << boxpp(res) << " has " << ins << " inputs and " << outs << " outputs" << endl;
+        throw faustexception(error.str());
+    } else if (outs > 0) {
+        Tree bus = boxWire();
+        for (int j = 1; j < outs; j++) {
+            bus = boxPar(bus, boxWire());
+        }
+        return bus;
+    } else {
+        return boxRoute(boxInt(0), boxInt(0), boxPar(boxInt(0), boxInt(0)));
     }
-
-    return res;
 }
 
 /**
@@ -909,20 +963,21 @@ static Tree iteratePar(Tree id, int num, Tree body, Tree visited, Tree localValE
  * @param body the body expression of the iteration
  * @param globalDefEnv the global environment
  * @param visited list of visited definition to detect recursive definitions
+ * @param localValEnv the local environment
  * @return a block diagram in normal form
  */
 static Tree iterateSeq(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateSeq called with 0 iteration", id);
+        Tree neutral = neutralExpSeq(id, body, visited, localValEnv);
+        return neutral;
+    } else {
+        Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
+        for (int i = num - 2; i >= 0; i--) {
+            res = boxSeq(eval(body, visited, pushValueDef(id, tree(i), localValEnv)), res);
+        }
+        return res;
     }
-
-    Tree res = eval(body, visited, pushValueDef(id, tree(num - 1), localValEnv));
-    for (int i = num - 2; i >= 0; i--) {
-        res = boxSeq(eval(body, visited, pushValueDef(id, tree(i), localValEnv)), res);
-    }
-
-    return res;
 }
 
 /**
@@ -941,15 +996,14 @@ static Tree iterateSeq(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateSum(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateSum called with 0 iterations", id);
+        return boxRoute(boxInt(0), boxInt(0), boxPar(boxInt(0), boxInt(0)));
+    } else {
+        Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
+        for (int i = 1; i < num; i++) {
+            res = boxSeq(boxPar(res, eval(body, visited, pushValueDef(id, tree(i), localValEnv))), boxPrim2(sigAdd));
+        }
+        return res;
     }
-
-    Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
-    for (int i = 1; i < num; i++) {
-        res = boxSeq(boxPar(res, eval(body, visited, pushValueDef(id, tree(i), localValEnv))), boxPrim2(sigAdd));
-    }
-
-    return res;
 }
 
 /**
@@ -968,15 +1022,14 @@ static Tree iterateSum(Tree id, int num, Tree body, Tree visited, Tree localValE
 static Tree iterateProd(Tree id, int num, Tree body, Tree visited, Tree localValEnv)
 {
     if (num == 0) {
-        evalerror(yyfilename, -1, "iterateProd called with 0 iterations", id);
+        return boxRoute(boxInt(0), boxInt(0), boxPar(boxInt(0), boxInt(0)));
+    } else {
+        Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
+        for (int i = 1; i < num; i++) {
+            res = boxSeq(boxPar(res, eval(body, visited, pushValueDef(id, tree(i), localValEnv))), boxPrim2(sigMul));
+        }
+        return res;
     }
-
-    Tree res = eval(body, visited, pushValueDef(id, tree(0), localValEnv));
-    for (int i = 1; i < num; i++) {
-        res = boxSeq(boxPar(res, eval(body, visited, pushValueDef(id, tree(i), localValEnv))), boxPrim2(sigMul));
-    }
-
-    return res;
 }
 
 /**
@@ -1057,7 +1110,7 @@ static Tree applyList(Tree fun, Tree larg)
     Tree body;
 
     PM::Automaton* automat;
-    int        state;
+    int            state;
 
     prim2 p2;
 
@@ -1424,7 +1477,7 @@ static Tree numericBoxSimplification(Tree box)
 
     if (!getBoxType(box, &ins, &outs)) {
         stringstream error;
-        error << "ERROR in file " << __FILE__ << ':' << __LINE__ << ", can't compute the box type of : ";
+        error << "ERROR : file " << __FILE__ << ':' << __LINE__ << ", can't compute the box type of : ";
         error << *box << endl;
         throw faustexception(error.str());
     }
@@ -1625,8 +1678,7 @@ static Tree insideBoxSimplification(Tree box)
         return boxMetadata(s1, t2);
     }
 
-    stringstream error;
-    error << "ERROR in file " << __FILE__ << ':' << __LINE__ << ", unrecognised box expression : " << *box << endl;
-    throw faustexception(error.str());
+    cerr << "ERROR : in file " << __FILE__ << ':' << __LINE__ << ", unrecognised box expression : " << *box << endl;
+    faustassert(false);
     return nullptr;
 }

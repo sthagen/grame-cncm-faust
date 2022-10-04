@@ -54,7 +54,6 @@ enum SOperator { kAdd, kSub, kMul, kDiv, kRem, kLsh, kARsh, kLRsh, kGT, kLT, kGE
 #ifndef LIBFAUSTBOX_C_H
 #define LIBFAUSTBOX_C_H
 
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -69,7 +68,43 @@ extern "C"
      * Destroy global compilation context, has to be done last.
      */
     LIBFAUST_API void destroyLibContext();
-    
+
+    /**
+     * Check if a box is nil.
+     *
+     * @param b - the box
+     *
+     * @return true if the box is nil, otherwise false.
+     */
+    LIBFAUST_API bool CisNil(Box b);
+
+    /**
+     * Convert a box (such as the label of a UI) to a string.
+     *
+     * @param b - the box to convert
+     *
+     * @return a string representation of a box.
+     */
+    LIBFAUST_API const char* Ctree2str(Box b);
+
+    /**
+     * If t has a node of type int, return it. Otherwise error
+     *
+     * @param b - the box to convert
+     *
+     * @return the int value of the box.
+     */
+    LIBFAUST_API int Ctree2int(Box b);
+
+    /**
+     * Return the xtended type of a box.
+     *
+     * @param b - the box whose xtended type to return
+     *
+     * @return a pointer to xtended type if it exists, otherwise nullptr.
+     */
+    LIBFAUST_API void* CgetUserData(Box b);
+
     /**
      * Constant integer : for all t, x(t) = n.
      *
@@ -180,7 +215,7 @@ extern "C"
      
      * @return the delayed box.
      */
-    LIBFAUST_API Box CboxDelayAux(Box s, Box del);
+    LIBFAUST_API Box CboxDelayAux(Box b, Box del);
     
     /**
      * Create a casted box.
@@ -196,7 +231,7 @@ extern "C"
      *
      * @return the casted box.
      */
-    LIBFAUST_API Box CboxIntCastAux(Box s);
+    LIBFAUST_API Box CboxIntCastAux(Box b);
     
     /**
      * Create a casted box.
@@ -212,7 +247,7 @@ extern "C"
      *
      * @return the casted box.
      */
-    LIBFAUST_API Box CboxFloatCastAux(Box s);
+    LIBFAUST_API Box CboxFloatCastAux(Box b);
     
     /**
      * Create a read only table.
@@ -299,7 +334,7 @@ extern "C"
      *
      * @return the selected box depending of the selector value at each time t.
      */
-    LIBFAUST_API Box CboxSelect2Aux(Box selector, Box s1, Box s2);
+    LIBFAUST_API Box CboxSelect2Aux(Box selector, Box b1, Box b2);
     
     /**
      * Create a selector between three boxes.
@@ -314,11 +349,11 @@ extern "C"
      * @param selector - when 0 at time t returns s1[t], when 1 at time t returns s2[t], otherwise returns s3[t]
      * @param s1 - first box to be selected
      * @param s2 - second box to be selected
-     * @param s3 - third signal to be selected
+     * @param s3 - third box to be selected
      *
      * @return the selected box depending of the selector value at each time t.
      */
-    LIBFAUST_API Box CboxSelect3Aux(Box selector, Box s1, Box s2, Box s3);
+    LIBFAUST_API Box CboxSelect3Aux(Box selector, Box b1, Box b2, Box b3);
     
     /**
      * Create a foreign constant box.
@@ -545,7 +580,7 @@ extern "C"
      * @param max - the max box, a constant numerical expression (see [1])
      * @param x - the input box
      *
-     * @return the vertical horizontal box.
+     * @return the horizontal bargraph box.
      */
     LIBFAUST_API Box CboxHBargraphAux(const char* label, Box min, Box max, Box x);
     
@@ -565,24 +600,104 @@ extern "C"
      *
      * The attach primitive takes two input box and produces one output box
      * which is a copy of the first input. The role of attach is to force
-     * its second input signal to be compiled with the first one.
+     * its second input box to be compiled with the first one.
      *
      * @param s1 - the first box
      * @param s2 - the second box
      *
-     * @return the attach signal.
+     * @return the attach box.
      */
-    LIBFAUST_API Box CboxAttachAux(Box s1, Box s2);
+    LIBFAUST_API Box CboxAttachAux(Box b1, Box b2);
+
+    LIBFAUST_API bool CisBoxAbstr(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxAccess(Box t, Box* exp, Box* id);
+    LIBFAUST_API bool CisBoxAppl(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxButton(Box b, Box* lbl);
+    LIBFAUST_API bool CisBoxCase(Box b, Box* rules);
+    LIBFAUST_API bool CisBoxCheckbox(Box b, Box* lbl);
+    LIBFAUST_API bool CisBoxComponent(Box b, Box* filename);
+    LIBFAUST_API bool CisBoxCut(Box t);
+    LIBFAUST_API bool CisBoxEnvironment(Box b);
+    LIBFAUST_API bool CisBoxError(Box t);
+    LIBFAUST_API bool CisBoxFConst(Box b, Box* type, Box* name, Box* file);
+    LIBFAUST_API bool CisBoxFFun(Box b, Box* ff);
+    LIBFAUST_API bool CisBoxFVar(Box b, Box* type, Box* name, Box* file);
+    LIBFAUST_API bool CisBoxHBargraph(Box b, Box* lbl, Box* min, Box* max);
+    LIBFAUST_API bool CisBoxHGroup(Box b, Box* lbl, Box* x);
+    LIBFAUST_API bool CisBoxHSlider(Box b, Box* lbl, Box* cur, Box* min, Box* max, Box* step);
+    LIBFAUST_API bool CisBoxIdent(Box t, const char** str);
+    LIBFAUST_API bool CisBoxInputs(Box t, Box* x);
+    LIBFAUST_API bool CisBoxInt(Box t, int* i);
+    LIBFAUST_API bool CisBoxIPar(Box t, Box* x, Box* y, Box* z);
+    LIBFAUST_API bool CisBoxIProd(Box t, Box* x, Box* y, Box* z);
+    LIBFAUST_API bool CisBoxISeq(Box t, Box* x, Box* y, Box* z);
+    LIBFAUST_API bool CisBoxISum(Box t, Box* x, Box* y, Box* z);
+    LIBFAUST_API bool CisBoxLibrary(Box b, Box* filename);
+    LIBFAUST_API bool CisBoxMerge(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxMetadata(Box b, Box* exp, Box* mdlist);
+    LIBFAUST_API bool CisBoxNumEntry(Box b, Box* lbl, Box* cur, Box* min, Box* max, Box* step);
+    LIBFAUST_API bool CisBoxOutputs(Box t, Box* x);
+    LIBFAUST_API bool CisBoxPar(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxPatternMatcher(Box b);
+    LIBFAUST_API bool CisBoxPatternVar(Box b, Box* id);
+    LIBFAUST_API bool CisBoxPrim0(Box b);
+    LIBFAUST_API bool CisBoxPrim1(Box b);
+    LIBFAUST_API bool CisBoxPrim2(Box b);
+    LIBFAUST_API bool CisBoxPrim3(Box b);
+    LIBFAUST_API bool CisBoxPrim4(Box b);
+    LIBFAUST_API bool CisBoxPrim5(Box b);
+    LIBFAUST_API bool CisBoxReal(Box t, double* r);
+    LIBFAUST_API bool CisBoxRec(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxRoute(Box b, Box* n, Box* m, Box* r);
+    LIBFAUST_API bool CisBoxSeq(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxSlot(Box t, int* id);
+    LIBFAUST_API bool CisBoxSoundfile(Box b, Box* label, Box* chan);
+    LIBFAUST_API bool CisBoxSplit(Box t, Box* x, Box* y);
+    LIBFAUST_API bool CisBoxSymbolic(Box t, Box* slot, Box* body);
+    LIBFAUST_API bool CisBoxTGroup(Box b, Box* lbl, Box* x);
+    LIBFAUST_API bool CisBoxVBargraph(Box b, Box* lbl, Box* min, Box* max);
+    LIBFAUST_API bool CisBoxVGroup(Box b, Box* lbl, Box* x);
+    LIBFAUST_API bool CisBoxVSlider(Box b, Box* lbl, Box* cur, Box* min, Box* max, Box* step);
+    LIBFAUST_API bool CisBoxWaveform(Box b);
+    LIBFAUST_API bool CisBoxWire(Box t);
+    LIBFAUST_API bool CisBoxWithLocalDef(Box t, Box* body, Box* ldef);
+
+    /**
+     * Compile a DSP source code as a string in a flattened box
+     *
+     * @param name_app - the name of the Faust program
+     * @param dsp_content - the Faust program as a string
+     * @param argc - the number of parameters in argv array
+     * @param argv - the array of parameters
+     * @param inputs - the place to return the number of inputs of the resulting box
+     * @param outputs - the place to return the number of outputs of the resulting box
+     * @param error_msg - the error string to be filled
+     *
+     * @return a flattened box on success, otherwise a null pointer.
+     */
+    LIBFAUST_API Box CDSPToBoxes(const char* name_appp, const char* dsp_content, int argc, const char* argv[], int* inputs, int* outputs, char* error_msg);
     
     /**
-     * Compile a box expression in a null terminated array of signals.
+     * Return the number of inputs and outputs of a box
+     *
+     * @param box - the box we want to know the number of inputs and outputs
+     * @param inputs - the place to return the number of inputs
+     * @param outputs - the place to return the number of outputs
+     *
+     * @return true if type is defined, false if undefined.
+     */
+    LIBFAUST_API bool CgetBoxType(Box box, int* inputs, int* outputs);
+
+    /**
+     * Compile a box expression in a null terminated array of signals in normal form
+     * (see CsimplifyToNormalForm in libfaust-signal-c.h)
      *
      * @param box - the box expression
      * @param error_msg - the error string to be filled, has to be 4096 characters long
      *
      * @return a null terminated array of signals on success (to be deleted by the caller using freeCMemory), otherwise a nullptr.
      */
-    Signal* CboxesToSignals(Box box, char* error_msg);
+    LIBFAUST_API Signal* CboxesToSignals(Box box, char* error_msg);
     
     /*
      [1] Constant numerical expression : see https://faustdoc.grame.fr/manual/syntax/#constant-numerical-expressions
@@ -598,5 +713,3 @@ extern "C"
  */
 
 #endif
-
-

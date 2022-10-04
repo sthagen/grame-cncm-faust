@@ -4,16 +4,16 @@
  Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
  This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation; either version 2 of the License, or
+ it under the terms of the GNU Lesser General Public License as published by
+ the Free Software Foundation; either version 2.1 of the License, or
  (at your option) any later version.
 
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+ GNU Lesser General Public License for more details.
 
- You should have received a copy of the GNU General Public License
+ You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software
  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -22,11 +22,8 @@
 #pragma once
 
 #include <cstdlib>
-#include "property.hh"
 #include "signalVisitor.hh"
-#include "sigtyperules.hh"
-#include "tree.hh"
-#include "treeTraversal.hh"
+#include "global.hh"
 #include "xtended.hh"
 #include "old_occurences.hh"
 
@@ -38,12 +35,10 @@ using namespace std;
 #define HIGH 8  //  gGlobal->gVHDLFloatMSB
 #define LOW -23 //  gGlobal->gVHDLFloatLSB
 
-class Signal2VHDLVisitor : public TreeTraversal {
+class Signal2VHDLVisitor : public SignalVisitor {
 
     private:
         old_OccMarkup* fOccMarkup;
-        bool fVisitGen;
-        set<Tree> fVisited;          // Avoid visiting a tree twice
         map<string, bool> fEntity;
         /** Fields used to accumulate strings for different parts of the .vhd file */
         string fInput;
@@ -120,11 +115,18 @@ class Signal2VHDLVisitor : public TreeTraversal {
             return gGlobal->gVHDLFloatType == 0;
         }
 
-        string getSuffix(int nature)
+        string getObjectSuffix(int nature)
+        {
+            if (nature == kReal) {
+                return "_" + getRealCoding();
+            }   else return "_int";
+        }
+
+        string getSignalType(int nature)
         {
             if (nature == kReal) {
                 return getRealCoding();
-            }   else return "int";
+            }   else return "sfixed";
         }
 
         string getRealCoding() {
@@ -138,7 +140,12 @@ class Signal2VHDLVisitor : public TreeTraversal {
 
         string getFloatMSB(int nature)
         {
-            return (nature == kReal) ? ((gGlobal->gVHDLFloatType == 1) ? "" : " msb ") : to_string(31);
+            return (nature == kReal) ? ((globalCodingFloat()) ? "" : " msb ") : to_string(31);
+        }
+
+        string getFloatLSB(int nature)
+        {
+            return (nature == kReal) ? ((globalCodingFloat()) ? "" : " lsb ") : to_string(0);
         }
 
         string getLSB(int nature)
@@ -149,11 +156,6 @@ class Signal2VHDLVisitor : public TreeTraversal {
         string getRange(int nature)
         {
             return "(" + getMSB(nature) + " downto " + getLSB(nature) + ")";
-        }
-
-        string getFloatLSB(int nature)
-        {
-            return (nature == kReal) ? ((gGlobal->gVHDLFloatType == 1) ? "" : " lsb ") : to_string(0);
         }
 
         int getHigh(int nature)
@@ -167,11 +169,13 @@ class Signal2VHDLVisitor : public TreeTraversal {
         }
 
     public:
-        Signal2VHDLVisitor(old_OccMarkup* occ_markup) : TreeTraversal(), fOccMarkup(occ_markup), fVisitGen(false){};
+        Signal2VHDLVisitor(old_OccMarkup* occ_markup) : SignalVisitor(), fOccMarkup(occ_markup) {};
 
-        void self(Tree t);
-        void sigToVHDL(Tree sig, ofstream& fout);
+        void sigToVHDL(Tree sig, ostream& fout);
 
     protected:
         void visit(Tree sig) override;
 };
+
+// Public API
+void sigVHDLFile(old_OccMarkup* markup, Tree L, bool trace);

@@ -11,7 +11,7 @@ system := $(shell echo $(system) | grep MINGW > /dev/null && echo MINGW || echo 
 # output directories
 FAUSTDIR ?= faustdir
 IOSDIR   := iosdir
-VERSION := 2.41.1
+VERSION := 2.50.6
 
 #===============================================================
 # current generator and backends
@@ -52,8 +52,8 @@ endif
 CMAKEOPT ?= -DCMAKE_BUILD_TYPE=Release $(WORKLETOPT)
 BUILDOPT ?= --config Release
 
-#CMAKEOPT ?= -DCMAKE_BUILD_TYPE=Debug $(WORKLETOPT)
-#BUILDOPT ?= --config Debug
+# CMAKEOPT ?= -DCMAKE_BUILD_TYPE=Debug $(WORKLETOPT)
+# BUILDOPT ?= --config Debug
 
 #===============================================================
 # options
@@ -201,8 +201,8 @@ macpack: package/README.html
 	hdiutil create Faust-$(VERSION).dmg -fs HFS+ -srcfolder $(PACK) -format UDBZ -ov
 
 mactools:
-	$(MAKE) -C ../tools/benchmark FAUST=$(FAUSTDIR)/bin/faust TARGETS="dynamic-faust faustbench-llvm"
-	$(MAKE) -C ../tools/benchmark install PREFIX=$(FAUSTDIR) FAUST=$(FAUSTDIR)/bin/faust TARGETS="dynamic-faust faustbench-llvm"
+	$(MAKE) -C ../tools/benchmark FAUST=$(FAUSTDIR)/bin/faust TARGETS="dynamic-faust faustbench-llvm interp-tracer"
+	$(MAKE) -C ../tools/benchmark install PREFIX=$(FAUSTDIR) FAUST=$(FAUSTDIR)/bin/faust TARGETS="dynamic-faust faustbench-llvm interp-tracer"
 
 linuxpack:
 	@echo Linux packaging not implemented. 

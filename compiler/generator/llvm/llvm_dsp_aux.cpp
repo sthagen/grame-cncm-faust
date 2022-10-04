@@ -4,16 +4,16 @@
  Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
  This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation; either version 2 of the License, or
+ it under the terms of the GNU Lesser General Public License as published by
+ the Free Software Foundation; either version 2.1 of the License, or
  (at your option) any later version.
 
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+ GNU Lesser General Public License for more details.
 
- You should have received a copy of the GNU General Public License
+ You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software
  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -49,7 +49,7 @@ using namespace llvm;
 using namespace std;
 
 // Used by LLVM backend (for now)
-Soundfile* dynamic_defaultsound = new Soundfile(64);
+Soundfile* dynamic_defaultsound = new Soundfile(MAX_CHAN);
 
 #define LLVM_BACKEND_NAME "Faust LLVM backend"
 
@@ -90,6 +90,8 @@ extern "C" LIBFAUST_API void printPtr(void* val)
 int llvm_dsp_factory_aux::gInstance = 0;
 
 dsp_factory_table<SDsp_factory> llvm_dsp_factory_aux::gLLVMFactoryTable;
+
+set<string> llvm_dsp_factory_aux::gForeignFunctions;
 
 uint64_t llvm_dsp_factory_aux::loadOptimize(const string& function)
 {
@@ -618,6 +620,12 @@ LIBFAUST_API void llvm_dsp::operator delete(void* ptr)
     }
 }
 
+LIBFAUST_API void registerForeignFunction(const string& name)
+{
+    LOCK_API
+    llvm_dsp_factory_aux::gForeignFunctions.insert(name);
+}
+
 // Public C interface : lock management is done by called C++ API
 
 #ifdef __cplusplus
@@ -873,7 +881,13 @@ LIBFAUST_API void deleteCDSPInstance(llvm_dsp* dsp)
 {
     delete dsp;
 }
+    
+LIBFAUST_API void registerCForeignFunction(const char* name)
+{
+    registerForeignFunction(name);
+}
 
 #ifdef __cplusplus
 }
 #endif
+

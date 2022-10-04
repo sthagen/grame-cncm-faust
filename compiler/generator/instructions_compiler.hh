@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -40,8 +40,6 @@
 #define _DNF_ 1
 
 using namespace std;
-
-typedef ValueInst* InstType;
 
 class InstructionsCompiler : public virtual Garbageable {
    protected:
@@ -75,15 +73,15 @@ class InstructionsCompiler : public virtual Garbageable {
   
     void getTypedNames(::Type t, const string& prefix, Typed::VarType& ctype, string& vname);
 
-    bool     getCompiledExpression(Tree sig, InstType& cexp);
-    InstType setCompiledExpression(Tree sig, const InstType& cexp);
+    bool getCompiledExpression(Tree sig, ValueType& cexp);
+    ValueType setCompiledExpression(Tree sig, const ValueType& cexp);
 
-    void setVectorNameProperty(Tree sig, const string& vecname);
     bool getVectorNameProperty(Tree sig, string& vecname);
-
-    void setTableNameProperty(Tree sig, const string& vecname);
+    void setVectorNameProperty(Tree sig, const string& vecname);
+    
     bool getTableNameProperty(Tree sig, string& vecname);
-
+    void setTableNameProperty(Tree sig, const string& vecname);
+  
     // Redefined by RustInstructionsCompiler
     virtual StatementInst* generateInitArray(const string& vname, Typed::VarType ctype, int delay);
     virtual StatementInst* generateCopyArray(const string& vname, int index_from, int index_to);
@@ -96,7 +94,7 @@ class InstructionsCompiler : public virtual Garbageable {
     ValueInst* generateSliderAux(Tree sig, Tree path, Tree cur, Tree min, Tree max, Tree step, const string& name);
     ValueInst* generateBargraphAux(Tree sig, Tree path, Tree min, Tree max, ValueInst* exp, const string& name);
 
-    // wrapper functions to access code container
+    // Wrapper functions to access code container
     StatementInst* pushInitMethod(StatementInst* inst) { return fContainer->pushInitMethod(inst); }
     StatementInst* pushResetUIInstructions(StatementInst* inst) { return fContainer->pushResetUIInstructions(inst); }
     StatementInst* pushClearMethod(StatementInst* inst) { return fContainer->pushClearMethod(inst); }
@@ -161,7 +159,10 @@ class InstructionsCompiler : public virtual Garbageable {
     ValueInst* and2code(Tree oc);
     
     ValueInst* getConditionCode(Tree sig);
-
+    
+    ValueInst* genCastedOutput(int type, ValueInst* value);
+    ValueInst* genCastedInput(ValueInst* value);
+ 
    public:
     InstructionsCompiler(CodeContainer* container);
 
@@ -240,7 +241,7 @@ class InstructionsCompiler : public virtual Garbageable {
     void generateMacroInterfaceElements(const string& pathname, Tree elements);
     void generateWidgetMacro(const string& pathname, Tree fulllabel, Tree varname, Tree sig);
 
-    void         setDescription(Description* descr) { fDescription = descr; }
+    void setDescription(Description* descr) { fDescription = descr; }
     Description* getDescription() { return fDescription; }
     
     Tree prepare(Tree LS);

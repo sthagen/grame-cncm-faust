@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -251,9 +251,9 @@ class CodeContainer : public virtual Garbageable {
     virtual DeclareFunInst* generateAllocate(const string& name, const string& obj, bool ismethod, bool isvirtual);
     virtual DeclareFunInst* generateDestroy(const string& name, const string& obj, bool ismethod, bool isvirtual);
 
-    DeclareFunInst* generateGetIO(const string& name, const string& obj, int io, bool ismethod, bool isvirtual);
-    DeclareFunInst* generateGetInputs(const string& name, const string& obj, bool ismethod, bool isvirtual);
-    DeclareFunInst* generateGetOutputs(const string& name, const string& obj, bool ismethod, bool isvirtual);
+    DeclareFunInst* generateGetIO(const string& name, const string& obj, int io, bool ismethod, FunTyped::FunAttribute funtype);
+    DeclareFunInst* generateGetInputs(const string& name, const string& obj, bool ismethod, FunTyped::FunAttribute funtype);
+    DeclareFunInst* generateGetOutputs(const string& name, const string& obj, bool ismethod, FunTyped::FunAttribute funtype);
 
     DeclareFunInst* generateGetIORate(const string& name, const string& obj, vector<int>& io, bool ismethod,
                                       bool isvirtual);
@@ -298,8 +298,8 @@ class CodeContainer : public virtual Garbageable {
     DeclareFunInst* generateNewDsp(const string& name, int size);
     DeclareFunInst* generateDeleteDsp(const string& name, const string& obj);
 
-    void produceInfoFunctions(int tabs, const string& classname, const string& obj, bool ismethod, bool isvirtual,
-                              TextInstVisitor* producer);
+    void produceInfoFunctions(int tabs, const string& classname, const string& obj, bool ismethod, FunTyped::FunAttribute funtype,
+                              TextInstVisitor* producer, const string& in_fun = "getNumInputs", const string& out_fun = "getNumOutputs");
 
     void generateDAGLoop(BlockInst* loop_code, DeclareVarInst* count);
     
@@ -378,11 +378,13 @@ class CodeContainer : public virtual Garbageable {
     /* Can be overridden by subclasses to transform the FIR before the actual code generation */
     virtual void processFIR(void);
 
+    /* Create a single block containing all FIR */
     virtual BlockInst* flattenFIR(void);
 
     // Fill code for each method
     StatementInst* pushDeclare(StatementInst* inst)
     {
+        faustassert(inst);
         fDeclarationInstructions->pushBackInst(inst);
         // TODO : add inter-loop vectors in current loop
         return inst;
@@ -390,12 +392,14 @@ class CodeContainer : public virtual Garbageable {
 
     StatementInst* pushGlobalDeclare(StatementInst* inst)
     {
+        faustassert(inst);
         fGlobalDeclarationInstructions->pushBackInst(inst);
         return inst;
     }
 
     StatementInst* pushExtGlobalDeclare(StatementInst* inst)
     {
+        faustassert(inst);
         fExtGlobalDeclarationInstructions->pushBackInst(inst);
         return inst;
     }
@@ -511,83 +515,97 @@ class CodeContainer : public virtual Garbageable {
 
     StatementInst* pushInitMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fInitInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushClearMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fClearInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushResetUIInstructions(StatementInst* inst)
     {
+        faustassert(inst);
         fResetUserInterfaceInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushPostInitMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fPostInitInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushPreInitMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fInitInstructions->pushFrontInst(inst);
         return inst;
     }
 
     StatementInst* pushUserInterfaceMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fUserInterfaceInstructions->pushBackInst(inst);
         return inst;
     }
 
     StatementInst* pushAllocateMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fAllocateInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushDestroyMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fDestroyInstructions->pushBackInst(inst);
         return inst;
     }
 
     StatementInst* pushStaticInitMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fStaticInitInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushStaticDestroyMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fStaticDestroyInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushPostStaticInitMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fPostStaticInitInstructions->pushBackInst(inst);
         return inst;
     }
 
     StatementInst* pushComputeBlockMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fComputeBlockInstructions->pushBackInst(inst);
         return inst;
     }
     StatementInst* pushPostComputeBlockMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fPostComputeBlockInstructions->pushBackInst(inst);
         return inst;
     }
 
     StatementInst* pushOtherComputeMethod(StatementInst* inst)
     {
+        faustassert(inst);
         fComputeFunctions->pushBackInst(inst);
         return inst;
     }
 
-    StatementInst* pushPreComputeDSPMethod(StatementInst* inst) { return fCurLoop->pushPreComputeDSPMethod(inst); }
-    StatementInst* pushComputeDSPMethod(StatementInst* inst) { return fCurLoop->pushComputeDSPMethod(inst); }
-    StatementInst* pushPostComputeDSPMethod(StatementInst* inst) { return fCurLoop->pushPostComputeDSPMethod(inst); }
+    StatementInst* pushPreComputeDSPMethod(StatementInst* inst) { faustassert(inst); return fCurLoop->pushPreComputeDSPMethod(inst); }
+    StatementInst* pushComputeDSPMethod(StatementInst* inst) { faustassert(inst); return fCurLoop->pushComputeDSPMethod(inst); }
+    StatementInst* pushPostComputeDSPMethod(StatementInst* inst) { faustassert(inst); return fCurLoop->pushPostComputeDSPMethod(inst); }
 
     void generateSubContainers()
     {

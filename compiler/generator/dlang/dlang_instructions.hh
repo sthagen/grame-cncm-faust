@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -320,11 +320,10 @@ class DLangInstVisitor : public TextInstVisitor {
     {
         // Special case for 'logical right-shift'
         if (strcmp(gBinOpTable[inst->fOpcode]->fName, ">>>") == 0) {
-            TypingVisitor typing;
-            inst->fInst1->accept(&typing);
-            if (isInt64Type(typing.fCurType)) {
+            Typed::VarType type = TypingVisitor::getType(inst->fInst1);
+            if (isInt64Type(type)) {
                 *fOut << "(cast(long)(cast(ulong)";
-            } else if (isInt32Type(typing.fCurType)) {
+            } else if (isInt32Type(type)) {
                 *fOut << "(cast(int)(cast(uint)";
             } else {
                 faustassert(false);
@@ -334,22 +333,15 @@ class DLangInstVisitor : public TextInstVisitor {
             inst->fInst2->accept(this);
             *fOut << "))";
         } else {
-            // We keep the fully parenthesized version
-            *fOut << "(";
-            inst->fInst1->accept(this);
-            *fOut << " ";
-            *fOut << gBinOpTable[inst->fOpcode]->fName;
-            *fOut << " ";
-            inst->fInst2->accept(this);
-            *fOut << ")";
+            TextInstVisitor::visit(inst);
         }
     }
 
     virtual void visit(::CastInst* inst)
     {
-        string type = fTypeManager->generateType(inst->fType);
-        *fOut << "cast(" << type << ")";
+        *fOut << "cast(" << fTypeManager->generateType(inst->fType) << ")(";
         inst->fInst->accept(this);
+        *fOut << ")";
     }
 
     /*
@@ -360,11 +352,11 @@ class DLangInstVisitor : public TextInstVisitor {
         indexed->fAddress->accept(this);
         DeclareStructTypeInst* struct_type = isStructType(indexed->getName());
         if (struct_type) {
-            Int32NumInst* field_index = static_cast<Int32NumInst*>(indexed->fIndex);
+            Int32NumInst* field_index = static_cast<Int32NumInst*>(indexed->getIndex());
             *fOut << "." << struct_type->fType->getName(field_index->fNum);
         } else {
             *fOut << "[";
-            indexed->fIndex->accept(this);
+            indexed->getIndex()->accept(this);
             *fOut << "]";
         }
     }

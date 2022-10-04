@@ -4,16 +4,16 @@
     Copyright (C) 2019-2020 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -51,7 +51,7 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
 
     LLVMValueRef  fLLVMStack[512];
     InstructionIT fAddressStack[64];
-
+ 
     int fLLVMStackIndex;
     int fAddrStackIndex;
 
@@ -59,6 +59,8 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
     LLVMValueRef fLLVMRealHeap;
     LLVMValueRef fLLVMInputs;
     LLVMValueRef fLLVMOutputs;
+    
+    LLVMValueRef fLLVMSoundTable;
    
     LLVMValueRef genFloat(float num) { return LLVMConstReal(LLVMFloatType(), num); }
     LLVMValueRef genDouble(double num) { return LLVMConstReal(LLVMDoubleType(), num); }
@@ -72,6 +74,32 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
     LLVMTypeRef getInt32Ty() { return LLVMInt32Type(); }
     LLVMTypeRef getInt64Ty() { return LLVMInt64Type(); }
     LLVMTypeRef getInt1Ty() { return LLVMInt1Type(); }
+    
+    LLVMTypeRef genSoundFileTy()
+    {
+        LLVMTypeRef types[] = {
+            LLVMVoidType(),
+            LLVMPointerType(LLVMInt32Type(), 0),
+            LLVMPointerType(LLVMInt32Type(), 0),
+            LLVMPointerType(LLVMInt32Type(), 0),
+            LLVMInt32Type(),
+            LLVMInt32Type(),
+            LLVMInt1Type()
+        };
+        
+        return LLVMStructType(types, 7, true);
+    }
+    
+    LLVMTypeRef genSoundFileMapTy()
+    {
+        LLVMTypeRef types[] = {
+            genSoundFileTy(), genSoundFileTy(),
+            genSoundFileTy(), genSoundFileTy(),
+            genSoundFileTy(), genSoundFileTy(),
+            genSoundFileTy(), genSoundFileTy()
+        };
+        return LLVMStructType(types, 8, true);
+    }
   
     std::string getMathName(const std::string& name) { return (sizeof(REAL) == sizeof(float)) ? (name + "f") : name; }
 
@@ -134,15 +162,15 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
         pushValue(LLVMBuildSelect(fBuilder, cond_value, v1, v2, ""));
     }
 
-    void pushUnaryCall(const std::string& name_aux, LLVMTypeRef res_type, LLVMTypeRef arg_type, bool rename)
+    void pushUnaryCall(const std::string& name_aux, LLVMTypeRef res_type, LLVMTypeRef atype, bool rename)
     {
         std::string  name     = (rename) ? getMathName(name_aux) : name_aux;
         LLVMValueRef function = LLVMGetNamedFunction(fModule, name.c_str());
         if (!function) {
             // Define it
-            LLVMTypeRef param_types[] = { arg_type };
-            LLVMTypeRef ret_type      = LLVMFunctionType(res_type, param_types, 1, false);
-            function                  = LLVMAddFunction(fModule, name.c_str(), ret_type);
+            LLVMTypeRef args_types[] = { atype };
+            LLVMTypeRef rtype      = LLVMFunctionType(res_type, args_types, 1, false);
+            function               = LLVMAddFunction(fModule, name.c_str(), rtype);
         }
         // Create the function call
         LLVMValueRef fun_args[] = { popValue() };
@@ -164,9 +192,9 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
         LLVMValueRef function = LLVMGetNamedFunction(fModule, name.c_str());
         if (!function) {
             // Define it
-            LLVMTypeRef param_types[] = { arg1_type, arg2_type };
-            LLVMTypeRef ret_type      = LLVMFunctionType(res_type, param_types, 2, false);
-            function                  = LLVMAddFunction(fModule, name.c_str(), ret_type);
+            LLVMTypeRef args_types[] = { arg1_type, arg2_type };
+            LLVMTypeRef rtype      = LLVMFunctionType(res_type, args_types, 2, false);
+            function               = LLVMAddFunction(fModule, name.c_str(), rtype);
         }
         // Create the function call
         LLVMValueRef fun_args[] = { popValue(), popValue() };
@@ -308,7 +336,7 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
                     pushLoadArray(fLLVMIntHeap, (*it)->fOffset1);
                     it++;
                     break;
-
+                    
                 case FBCInstruction::kStoreReal:
                     pushStoreArray(fLLVMRealHeap, (*it)->fOffset1);
                     it++;
@@ -324,6 +352,51 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
                     LLVMValueRef offset = LLVMBuildAdd(fBuilder, genInt32((*it)->fOffset1), popValue(), "");
                     pushLoadArray(fLLVMRealHeap, offset);
                     it++;
+                    break;
+                }
+                    
+                case FBCInstruction::kLoadSoundFieldInt: {
+                    /*
+                        faustassert(this->fSoundTable.find((*it)->fName) != this->fSoundTable.end());
+                        Soundfile* sf = this->fSoundTable[(*it)->fName];
+                        LLVMTypeRef sf_type = genSoundFileTy();
+                        LLVMValueRef field_index = popValue();
+                        LLVMValueRef part = popValue();
+                        int* field;
+                        switch (field_index) {
+                            case Soundfile::kLength: {
+                                field = sf->fLength;
+                                break;
+                            }
+                            case Soundfile::kSR: {
+                                field = sf->fSR;
+                                break;
+                            }
+                            case Soundfile::kOffset: {
+                                field = sf->fOffset;
+                                break;
+                            }
+                        }
+                        pushValue(genInt32(field[part]));
+                        it++;
+                     */
+                    throw faustexception("ERROR : kLoadSoundFieldInt not yet supported in FBCLLVMCompiler\n");
+                    break;
+                }
+                    
+                case FBCInstruction::kLoadSoundFieldReal: {
+                    /*
+                         faustassert(this->fSoundTable.find((*it)->fName) != this->fSoundTable.end());
+                         Soundfile* sf = this->fSoundTable[(*it)->fName];
+                         // field_index (unused)
+                         popValue();
+                         LLVMValueRef chan = popValue();
+                         LLVMValueRef offset = popValue();
+                         REAL* buffer = reinterpret_cast<REAL**>(sf->fBuffers)[chan];
+                         pushValue(genReal(buffer[offset]));
+                         it++;
+                     */
+                    throw faustexception("ERROR : kLoadSoundFieldReal not yet supported in FBCLLVMCompiler\n");
                     break;
                 }
 
@@ -818,11 +891,12 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
     }
 
    public:
-    FBCLLVMCompiler(FBCBlockInstruction<REAL>* fbc_block)
+    FBCLLVMCompiler(FBCBlockInstruction<REAL>* fbc_block, soundTable& sound_table)
+    :FBCExecuteFun<REAL>(fbc_block, sound_table)
     {
         fLLVMStackIndex = 0;
         fAddrStackIndex = 0;
-
+      
         LLVMInitializeCore(LLVMGetGlobalPassRegistry());
 
         /*
@@ -841,17 +915,21 @@ class FBCLLVMCompiler : public FBCExecuteFun<REAL> {
 
         fBuilder       = LLVMCreateBuilder();
         fAllocaBuilder = LLVMCreateBuilder();
+    
         
         fModule      = LLVMModuleCreateWithName(FAUSTVERSION);
         char* triple = LLVMGetDefaultTargetTriple();
         LLVMSetTarget(fModule, triple);
-
+    
+        // TODO : finish initialization
+        fLLVMSoundTable = LLVMAddGlobal(fModule, genSoundFileMapTy(), "sound_table");
+        
         // Compile compute function
-        LLVMTypeRef param_types[] = {LLVMPointerType(getInt32Ty(), 0), LLVMPointerType(getRealTy(), 0),
+        LLVMTypeRef args_types[] = {LLVMPointerType(getInt32Ty(), 0), LLVMPointerType(getRealTy(), 0),
                                      LLVMPointerType(LLVMPointerType(getRealTy(), 0), 0),
                                      LLVMPointerType(LLVMPointerType(getRealTy(), 0), 0)};
 
-        LLVMTypeRef  execute_type = LLVMFunctionType(LLVMVoidType(), param_types, 4, false);
+        LLVMTypeRef  execute_type = LLVMFunctionType(LLVMVoidType(), args_types, 4, false);
         LLVMValueRef execute      = LLVMAddFunction(fModule, "execute", execute_type);
         
         LLVMBasicBlockRef alloca_block = LLVMAppendBasicBlock(execute, "alloca_block");

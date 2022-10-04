@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -33,37 +33,37 @@ storage of trees.
 
  API:
  ----
- tree (n) 				: tree of node n with no branch
- tree (n, t1) 			: tree of node n with a branch t
- tree (n, t1,...,tm)	: tree of node n with m branches t1,...,tm
+ tree (n)            : tree of node n with no branch
+ tree (n, t1)        : tree of node n with a branch t
+ tree (n, t1,...,tm) : tree of node n with m branches t1,...,tm
 
  Pattern matching :
 
- if (isTree (t, n)) 		... : t has node n and no branches;
- if (isTree (t, n, &t1)		... : t has node n and 1 branch, t1 is set accordingly;
- if (isTree (t, n, &t1...&tm)...: t has node n and m branches, ti's are set accordingly;
+ if (isTree (t, n))           : t has node n and no branches;
+ if (isTree (t, n, &t1)       : t has node n and 1 branch, t1 is set accordingly;
+ if (isTree (t, n, &t1...&tm) : t has node n and m branches, ti's are set accordingly;
 
  Accessors :
 
- t->node()			: the node of t		{ return fNode; }
- t->arity() 		: the number of branches of t return fArity; }
- t->branch(i) 		: the ith branch of t
+ t->node()    : the node of t { return fNode; }
+ t->arity()   : the number of branches of t { return fArity; }
+ t->branch(i) : the ith branch of t
 
  Attributs :
 
- t->attribut() 		: return the attribut (also a tree) of t
- t->attribut(t')	: set the attribut of t to t'
+ t->attribut()   : return the attribute (also a tree) of t
+ t->attribut(t') : set the attribute of t to t'
 
  Warning :
  ---------
  Since reference counters are used for garbage collecting, one must be careful not to
- create cycles in trees The only possible source of cycles is by setting the attribut
+ create cycles in trees. The only possible source of cycles is by setting the attribute
  of a tree t to a tree t' that contains t as a subtree.
 
  Properties:
  -----------
-    If p and q are two CTree pointers  :
-        p != q  <=>  *p != *q
+    If p and q are two CTree pointers :
+        p != q <=> *p != *q
 
  History :
  ---------
@@ -219,11 +219,14 @@ void CTree::control()
 
 void CTree::init()
 {
+    gSerialCounter = 0;
+    gVisitTime = 0;
+    gDetails = false;
     memset(gHashTable, 0, sizeof(Tree) * kHashTableSize);
 }
 
-// if t has a node of type int, return it otherwise error
-int tree2int(Tree t)
+// if t has a node of type int, return it, or float, return casted to int, otherwise error
+LIBFAUST_API int tree2int(Tree t)
 {
     double x;
     int    i;
@@ -241,7 +244,7 @@ int tree2int(Tree t)
     return i;
 }
 
-// if t has a node of type float, return it otherwise error
+// if t has a node of type int, return casted to float, or float, return it, otherwise error
 double tree2float(Tree t)
 {
     double x;
@@ -280,7 +283,7 @@ double tree2double(Tree t)
 }
 
 // if t has a node of type symbol, return its name otherwise error
-const char* tree2str(Tree t)
+LIBFAUST_API const char* tree2str(Tree t)
 {
     Sym s;
     if (!isSym(t->node(), &s)) {
@@ -317,7 +320,7 @@ bool isTree (const Tree& t, const Node& n)
 }
 */
 
-// Si ca ne pose pas de problemes, c'est plus pratique
+// If it's not a problem, it's more practical
 bool isTree(const Tree& t, const Node& n)
 {
     return (t->node() == n);
@@ -383,9 +386,8 @@ bool isTree(const Tree& t, const Node& n, Tree& a, Tree& b, Tree& c, Tree& d, Tr
     }
 }
 
-// July 2005, support for symbol user data
-
-void* getUserData(Tree t)
+// Support for symbol user data
+LIBFAUST_API void* getUserData(Tree t)
 {
     Sym s;
     if (isSym(t->node(), &s)) {
@@ -399,7 +401,6 @@ void* getUserData(Tree t)
  * export the properties of a CTree as two vectors, one for the keys
  * and one for the associated values
  */
-
 void CTree::exportProperties(vector<Tree>& keys, vector<Tree>& values)
 {
     for (plist::const_iterator p = fProperties.begin(); p != fProperties.end(); p++) {

@@ -80,6 +80,12 @@ struct TestUI : public GenericUI {
     
 };
 
+// The foreign function has to be exported with C linkage and should be made public
+FAUST_API extern "C" float ForeignLLVM(float val)
+{
+    return val + 0.12345;
+}
+
 int main(int argc, char* argv[])
 {
     if (isopt((char**)argv, "-h") || isopt((char**)argv, "-help") || argc < 2) {
@@ -96,7 +102,7 @@ int main(int argc, char* argv[])
     cout << "=============================\n";
     cout << "Test createDSPFactoryFromFile\n";
     {
-        llvm_dsp_factory* factory = createDSPFactoryFromFile(dspFile, 0, NULL, JIT_TARGET, error_msg, -1);
+        llvm_dsp_factory* factory = createDSPFactoryFromFile(dspFile, 0, nullptr, JIT_TARGET, error_msg, -1);
         
         if (!factory) {
             cerr << "Cannot create factory : " << error_msg;
@@ -154,6 +160,45 @@ int main(int argc, char* argv[])
         cout << "getName " << factory->getName() << endl;
         cout << "getSHAKey " << factory->getSHAKey() << endl;
         
+        dummyaudio audio(1);
+        if (!audio.init("FaustDSP", DSP)) {
+            return 0;
+        }
+        
+        audio.start();
+        audio.stop();
+        
+        delete DSP;
+        deleteDSPFactory(factory);
+    }
+    
+    cout << "=============================\n";
+    cout << "Test createDSPFactoryFromString with registerForeignFunction\n";
+    {
+        registerForeignFunction("ForeignLLVM");
+        llvm_dsp_factory* factory = createDSPFactoryFromString("FaustDSP", "process = ffunction(float ForeignLLVM(float), <dummy.h>, \"\");", 0, NULL, JIT_TARGET, error_msg, -1);
+     
+        if (!factory) {
+            cerr << "Cannot create factory : " << error_msg;
+            exit(EXIT_FAILURE);
+        }
+        
+        cout << "getCompileOptions " << factory->getCompileOptions() << endl;
+        printList(factory->getLibraryList());
+        printList(factory->getIncludePathnames());
+    
+        // Print LLVM IR code
+        // cout << "Code = " << writeDSPFactoryToIR(factory) << endl;
+        
+        dsp* DSP = factory->createDSPInstance();
+        if (!DSP) {
+            cerr << "Cannot create instance "<< endl;
+            exit(EXIT_FAILURE);
+        }
+        
+        cout << "getName " << factory->getName() << endl;
+        cout << "getSHAKey " << factory->getSHAKey() << endl;
+          
         dummyaudio audio(1);
         if (!audio.init("FaustDSP", DSP)) {
             return 0;

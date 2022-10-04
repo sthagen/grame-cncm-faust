@@ -243,14 +243,17 @@ class FAUST_API ScopedNoDenormals {
     
     private:
     
-        intptr_t fpsr;
+        intptr_t fpsr = 0;
         
         void setFpStatusRegister(intptr_t fpsr_aux) noexcept
         {
         #if defined (__arm64__) || defined (__aarch64__)
-           asm volatile("msr fpcr, %0" : : "ri" (fpsr_aux));
+            asm volatile("msr fpcr, %0" : : "ri" (fpsr_aux));
         #elif defined (__SSE__)
-            _mm_setcsr(static_cast<uint32_t>(fpsr_aux));
+            // The volatile keyword here is needed to workaround a bug in AppleClang 13.0
+            // which aggressively optimises away the variable otherwise
+            volatile uint32_t fpsr_w = static_cast<uint32_t>(fpsr_aux);
+            _mm_setcsr(fpsr_w);
         #endif
         }
         
@@ -258,7 +261,7 @@ class FAUST_API ScopedNoDenormals {
         {
         #if defined (__arm64__) || defined (__aarch64__)
             asm volatile("mrs %0, fpcr" : "=r" (fpsr));
-        #elif defined ( __SSE__)
+        #elif defined (__SSE__)
             fpsr = static_cast<intptr_t>(_mm_getcsr());
         #endif
         }
@@ -269,16 +272,14 @@ class FAUST_API ScopedNoDenormals {
         {
         #if defined (__arm64__) || defined (__aarch64__)
             intptr_t mask = (1 << 24 /* FZ */);
+        #elif defined (__SSE__)
+        #if defined (__SSE2__)
+            intptr_t mask = 0x8040;
         #else
-            #if defined(__SSE__)
-            #if defined(__SSE2__)
-                intptr_t mask = 0x8040;
-            #else
-                intptr_t mask = 0x8000;
-            #endif
-            #else
-                intptr_t mask = 0x0000;
-            #endif
+            intptr_t mask = 0x8000;
+        #endif
+        #else
+            intptr_t mask = 0x0000;
         #endif
             getFpStatusRegister();
             setFpStatusRegister(fpsr | mask);
@@ -291,7 +292,7 @@ class FAUST_API ScopedNoDenormals {
 
 };
 
-#define AVOIDDENORMALS ScopedNoDenormals();
+#define AVOIDDENORMALS ScopedNoDenormals ftz_scope;
 
 #endif
 

@@ -2,7 +2,7 @@
 
 #####################################################################
 #                                                                   #
-#               Compiles Faust programs to JACK-QT  (server mode)   #
+#               Compiles Faust programs to JACK-QT (server mode)    #
 #               (c) Grame, 2014                                     #
 #                                                                   #
 #####################################################################
@@ -19,7 +19,7 @@ ARCHLIB="-L/usr/local/lib -ljackserver"
 #-------------------------------------------------------------------------------
 # Search for qmake or qmake-qt4
 
-QMAKE=$(which qmake-qt4 || echo qmake) 
+QMAKE=$(which qmake-qt4 || echo qmake)
 
 #-------------------------------------------------------------------
 # Analyze command arguments :
@@ -39,7 +39,7 @@ OSCLIB=""
 for p in $@; do
     if [ $p = "-help" ] || [ $p = "-h" ]; then
         usage faust2jackserver "[options] [Faust options] <file.dsp>"
-        require Jack, Qt
+        require Jack, QT
         echo "Compiles Faust programs to JACK and QT (server mode)"
         option
         options -httpd -osc -qrcode
@@ -51,7 +51,7 @@ for p in $@; do
          OSCLIBS="-lOSCFaust"
     elif [ "$p" = "-httpd" ]; then
         HTTPDEFS="DEFINES += HTTPCTRL"
-        HTTPLIBS="-lHTTPDFaust -lmicrohttpd"
+        HTTPLIBS="-lHTTPDFaust"
         HTTPLIBS1=`pkg-config --cflags --libs libmicrohttpd`
     elif [ "$p" = "-qrcode" ]; then # requires -httpd
         QRDEFS="DEFINES += QRCODECTRL"
@@ -60,7 +60,7 @@ for p in $@; do
     elif [[ -f "$p" ]] && [ ${p: -4} == ".dsp" ]; then
         FILES="$FILES $p"
     else
-        OPTIONS="$OPTIONS $p"        
+        OPTIONS="$OPTIONS $p"
     fi
 done
 
@@ -81,7 +81,7 @@ for p in $FILES; do
     f=$(basename "$p")
     SRCDIR=$(dirname "$p")
 
-    # creates a temporary dir 
+    # creates a temporary dir
     TDR=$(mktemp -d faust.XXX)
     TMP="$TDR/${f%.dsp}"
     mkdir "$TMP"
@@ -92,7 +92,7 @@ for p in $FILES; do
     # compile c++ to binary
     (
         cd "$TMP"
-        $QMAKE -project "QT += widgets printsupport network" "CONFIG+=warn_off" "INCLUDEPATH+=$CUR" "INCLUDEPATH+=$FAUSTINC" "QMAKE_CXXFLAGS=$CXXFLAGS -Wno-unused-parameter $FAUSTTOOLSFLAGS" "LIBS+=$ARCHLIB $OSCLIBS $HTTPLIBS $HTTPLIBS1" "HEADERS+=$FAUSTINC/faust/gui/QTUI.h" "$OSCDEFS" "$HTTPDEFS" "$QRDEFS"   
+        $QMAKE -project "QT += widgets printsupport network" "CONFIG+=warn_off" "INCLUDEPATH+=$CUR" "INCLUDEPATH+=$FAUSTINC" "QMAKE_CXXFLAGS=$CXXFLAGS -Wno-unused-parameter $FAUSTTOOLSFLAGS" "LIBS+=$ARCHLIB $OSCLIBS $HTTPLIBS $HTTPLIBS1" "HEADERS+=$FAUSTINC/faust/gui/QTUI.h" "$OSCDEFS" "$HTTPDEFS" "$QRDEFS"
         $QMAKE $SPEC QMAKE_CFLAGS_ISYSTEM=-I
         make
     ) > /dev/null || exit

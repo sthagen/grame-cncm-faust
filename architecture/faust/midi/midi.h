@@ -27,6 +27,7 @@ architecture section is not modified.
 
 #include <vector>
 #include <string>
+#include <string.h>
 #include <algorithm>
 #include <assert.h>
 
@@ -48,7 +49,7 @@ struct MIDIMessage
 #pragma pack (pop)
 
 /**
- * For timestamped MIDI messages.
+ * For timestamped MIDI messages (in usec).
  */
 struct DatedMessage {
     

@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -166,10 +166,12 @@ static int infereSigOrder(Tree sig)
     else if (isSigControl(sig, s1, s2))
         return std::max(O(s1), O(s2));  // O(s1);
 
-    else if (isSigSoundfile(sig, l))
-        throw faustexception("ERROR inferring signal order : isSigSoundfile\n");  // not supposed to happen.;
+    else if (isSigSoundfile(sig, l)) {
+        cerr << "ERROR : inferring signal order : isSigSoundfile\n";  // not supposed to happen
+        faustassert(false);
+        return -1;
 
-    else if (isSigSoundfileLength(sig, sf, x))
+    } else if (isSigSoundfileLength(sig, sf, x))
         return 2;
 
     else if (isSigSoundfileRate(sig, sf, x))
@@ -181,13 +183,17 @@ static int infereSigOrder(Tree sig)
     else if (isSigAttach(sig, s1, s2))
         return std::max(1, O(s1));  // at least a constant
 
-    else if (isRec(sig, var, body))
-        throw faustexception("ERROR inferring signal order : isRec\n");  // return 3;  // not supposed to happen.
+    else if (isRec(sig, var, body)) {
+        cerr << "ERROR : inferring signal order : isRec\n";  // not supposed to happen
+        faustassert(false);
+        return -1;
 
-    else if (isRef(sig, var))
-        throw faustexception("ERROR inferring signal order : isRef\n");  // return 3;  // not supposed to happen.
-
-    else if (isProj(sig, &i, s1))
+    } else if (isRef(sig, var)) {
+        cerr << "ERROR : inferring signal order : isRef\n";  // not supposed to happen.
+        faustassert(false);
+        return -1;
+        
+    } else if (isProj(sig, &i, s1))
         return 3;
 
     else if (isSigTable(sig, id, s1, s2))
@@ -223,6 +229,8 @@ static int infereSigOrder(Tree sig)
         return r1;
     }
 
-    // unrecognized signal here
-    throw faustexception("ERROR inferring signal order : unrecognized signal\n");
+    // Unrecognized signal here
+    cerr << "ERROR : inferring signal order : unrecognized signal\n";
+    faustassert(false);
+    return -1;
 }

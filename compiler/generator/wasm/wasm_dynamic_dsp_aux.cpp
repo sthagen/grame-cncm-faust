@@ -4,16 +4,16 @@
     Copyright (C) 2003-2014 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -37,10 +37,10 @@
 using namespace emscripten;
 #endif
 
-wasm_dsp_factory* wasm_dynamic_dsp_factory::createWasmDSPFactoryFromString2(const string&         name_app,
-                                                                            const string&         dsp_content,
-                                                                            const vector<string>& argv,
-                                                                            bool                  internal_memory)
+wasm_dsp_factory* wasm_dynamic_dsp_factory::createWasmDSPFactoryFromString2(const string& name_app,
+                                                                        const string& dsp_content,
+                                                                        const vector<string>& argv,
+                                                                        bool internal_memory)
 {
     int         argc1 = 0;
     const char* argv1[64];
@@ -53,10 +53,10 @@ wasm_dsp_factory* wasm_dynamic_dsp_factory::createWasmDSPFactoryFromString2(cons
                                                                wasm_dsp_factory::gErrorMessage, internal_memory);
 }
 
-std::string wasm_dynamic_dsp_factory::generateWasmFromString2(const std::string&           name_app,
-                                                            const std::string&              dsp_content,
-                                                            const std::vector<std::string>& argv,
-                                                            bool                            internal_memory)
+string wasm_dynamic_dsp_factory::generateWasmFromString2(const string& name_app,
+                                                     const string& dsp_content,
+                                                     const vector<string>& argv,
+                                                     bool internal_memory)
 {
     int         argc1 = 0;
     const char* argv1[64];
@@ -86,7 +86,7 @@ LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromFile(const string& filena
 }
 
 LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromString(const string& name_app, const string& dsp_content, int argc,
-                                                        const char* argv[], string& error_msg, bool internal_memory)
+                                                            const char* argv[], string& error_msg, bool internal_memory)
 {
     string expanded_dsp_content, sha_key;
 
@@ -121,9 +121,9 @@ LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromString(const string& name
     }
 }
 
-LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromSignals(const std::string& name_app, tvec signals,
-                                                         int argc, const char* argv[], std::string& error_msg,
-                                                         bool internal_memory)
+LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromSignals(const string& name_app, tvec signals,
+                                                            int argc, const char* argv[], string& error_msg,
+                                                            bool internal_memory)
 {
     int         argc1 = 0;
     const char* argv1[64];
@@ -150,7 +150,7 @@ LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromSignals(const std::string
     }
 }
 
-LIBFAUST_API std::string generateWasmFromString(const string& name_app, const string& dsp_content, int argc,
+LIBFAUST_API string generateWasmFromString(const string& name_app, const string& dsp_content, int argc,
                                          const char* argv[], string& error_msg, bool internal_memory)
 {
     int         argc1 = 0;

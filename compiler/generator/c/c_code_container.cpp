@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -128,7 +128,7 @@ void CCodeContainer::produceInternal()
         tab(n, *fOut);
         tab(n, *fOut);
     }
-    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    produceInfoFunctions(n, fKlassName, "dsp", false, FunTyped::kDefault, fCodeProducer);
 
     // Init
     // TODO
@@ -282,7 +282,7 @@ void CCodeContainer::produceClass()
     generateGetSampleRate("getSampleRate" + fKlassName, "dsp", false, false)->accept(fCodeProducer);
   
     tab(n, *fOut);
-    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    produceInfoFunctions(n, fKlassName, "dsp", false, FunTyped::kDefault, fCodeProducer);
 
     // Inits
 
@@ -517,7 +517,7 @@ void CScalarOneSampleCodeContainer1::produceClass()
     generateGetSampleRate("getSampleRate" + fKlassName, "dsp", false, false)->accept(fCodeProducer);
     
     tab(n, *fOut);
-    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    produceInfoFunctions(n, fKlassName, "dsp", false, FunTyped::kDefault, fCodeProducer);
     
     // Inits
     
@@ -766,7 +766,7 @@ void CScalarOneSampleCodeContainer2::produceClass()
     generateGetSampleRate("getSampleRate" + fKlassName, "dsp", false, false)->accept(fCodeProducer);
     
     tab(n, *fOut);
-    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    produceInfoFunctions(n, fKlassName, "dsp", false, FunTyped::kDefault, fCodeProducer);
     
     // Inits
     
@@ -1039,7 +1039,7 @@ void CScalarOneSampleCodeContainer3::produceClass()
     generateGetSampleRate("getSampleRate" + fKlassName, "dsp", false, false)->accept(fCodeProducer);
     
     tab(n, *fOut);
-    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    produceInfoFunctions(n, fKlassName, "dsp", false, FunTyped::kDefault, fCodeProducer);
     
     // Inits
     
@@ -1271,11 +1271,12 @@ void CScalarOneSampleCodeContainer4::produceClass()
     
     // Fields
     fCodeProducer->Tab(n + 1);
+    
     // Additional fields
     pushDeclare(InstBuilder::genDecStructVar("iControl", InstBuilder::genArrayTyped(InstBuilder::genInt32Typed(), 0)));
-    pushDeclare(InstBuilder::genDecStructVar("fControl", InstBuilder::genArrayTyped(InstBuilder::genBasicTyped(itfloat()), 0)));
+    pushDeclare(InstBuilder::genDecStructVar("fControl", InstBuilder::genArrayTyped(InstBuilder::genItFloatTyped(), 0)));
     pushDeclare(InstBuilder::genDecStructVar("iZone", InstBuilder::genArrayTyped(InstBuilder::genInt32Typed(), 0)));
-    pushDeclare(InstBuilder::genDecStructVar("fZone", InstBuilder::genArrayTyped(InstBuilder::genBasicTyped(itfloat()), 0)));
+    pushDeclare(InstBuilder::genDecStructVar("fZone", InstBuilder::genArrayTyped(InstBuilder::genItFloatTyped(), 0)));
     generateDeclarations(fCodeProducer);
     
     // Kept here because staticInit incorrectly change the size later on
@@ -1371,7 +1372,7 @@ void CScalarOneSampleCodeContainer4::produceClass()
     generateGetSampleRate("getSampleRate" + fKlassName, "dsp", false, false)->accept(fCodeProducer);
     
     tab(n, *fOut);
-    produceInfoFunctions(n, fKlassName, "dsp", false, false, fCodeProducer);
+    produceInfoFunctions(n, fKlassName, "dsp", false, FunTyped::kDefault, fCodeProducer);
     
     // Inits
     

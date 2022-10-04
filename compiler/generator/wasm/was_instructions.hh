@@ -4,16 +4,16 @@
     Copyright (C) 2003-2016 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -97,7 +97,6 @@ struct WASInst {
         int            fArgs;
     };
 
-    TypingVisitor            fTypingVisitor;
     map<string, bool>        fFunctionSymbolTable;  // Already generated functions
     map<string, MathFunDesc> fMathLibTable;         // Table : field_name, math description
     map<string, MemoryDesc>  fFieldTable;           // Table : field_name, { offset, size, type }
@@ -221,7 +220,7 @@ struct WASInst {
                 return tmp.fOffset;
             } else if (indexed) {
                 Int32NumInst* num;
-                if ((num = dynamic_cast<Int32NumInst*>(indexed->fIndex))) {
+                if ((num = dynamic_cast<Int32NumInst*>(indexed->getIndex()))) {
                     return tmp.fOffset + (num->fNum << offStrNum);
                 }
             }

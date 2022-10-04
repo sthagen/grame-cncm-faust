@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -58,7 +58,6 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
 
     int fIntHeapSize;
     int fRealHeapSize;
-    int fSoundHeapSize;
     int fSROffset;
     int fCountOffset;
     int fIOTAOffset;
@@ -78,7 +77,7 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
 
     interpreter_dsp_factory_aux(const std::string& name, const std::string& compile_options, const std::string& sha_key,
                                 int version_num, int inputs, int outputs, int int_heap_size, int real_heap_size,
-                                int sound_heap_size, int sr_offset, int count_offset, int iota_offset, int opt_level,
+                                int sr_offset, int count_offset, int iota_offset, int opt_level,
                                 FIRMetaBlockInstruction* meta, FIRUserInterfaceBlockInstruction<REAL>* firinterface,
                                 FBCBlockInstruction<REAL>* static_init, FBCBlockInstruction<REAL>* init,
                                 FBCBlockInstruction<REAL>* resetui, FBCBlockInstruction<REAL>* clear,
@@ -89,7 +88,6 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
           fNumOutputs(outputs),
           fIntHeapSize(int_heap_size),
           fRealHeapSize(real_heap_size),
-          fSoundHeapSize(sound_heap_size),
           fSROffset(sr_offset),
           fCountOffset(count_offset),
           fIOTAOffset(iota_offset),
@@ -128,8 +126,7 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
  
     void write(std::ostream* out, bool binary = false, bool small = false)
     {
-        *out << std::setprecision(std::numeric_limits<REAL>::max_digits10);
-
+        *out << std::setprecision(std::numeric_limits<REAL>::digits10+1);
         if (small) {
             *out << "i " << ((sizeof(REAL) == sizeof(double)) ? "double" : "float") << std::endl;
             *out << "f " << INTERP_FILE_VERSION << std::endl;
@@ -140,7 +137,7 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
             *out << "o " << fOptLevel << std::endl;
             *out << "i " << fNumInputs << " o " << fNumOutputs << std::endl;
 
-            *out << "i " << fIntHeapSize << " r " << fRealHeapSize << " s " << fSoundHeapSize << " s " << fSROffset
+            *out << "i " << fIntHeapSize << " r " << fRealHeapSize << " s " << fSROffset
                  << " c " << fCountOffset << " i " << fIOTAOffset << std::endl;
 
             *out << "m" << std::endl;
@@ -177,8 +174,8 @@ struct interpreter_dsp_factory_aux : public dsp_factory_imp {
 
             *out << "inputs " << fNumInputs << " outputs " << fNumOutputs << std::endl;
 
-            *out << "int_heap_size " << fIntHeapSize << " real_heap_size " << fRealHeapSize << " sound_heap_size "
-                 << fSoundHeapSize << " sr_offset " << fSROffset << " count_offset " << fCountOffset << " iota_offset "
+            *out << "int_heap_size " << fIntHeapSize << " real_heap_size " << fRealHeapSize << " sr_offset "
+                 << fSROffset << " count_offset " << fCountOffset << " iota_offset "
                  << fIOTAOffset << std::endl;
 
             *out << "meta_block" << std::endl;
@@ -748,7 +745,7 @@ class interpreter_dsp_aux : public interpreter_dsp_base {
             }
 
             if (fTraceOutput) {
-                std::cout << std::setprecision(std::numeric_limits<REAL>::max_digits10);
+                std::cout << std::setprecision(std::numeric_limits<REAL>::digits10+1);
                 for (int chan = 0; chan < fFactory->fNumOutputs; chan++) {
                     for (int frame = 0; frame < count; frame++) {
                         std::cout << "Index : " << ((fCycle * count) + frame) << " chan: " << chan << " sample: " << outputs[chan][frame] << std::endl;

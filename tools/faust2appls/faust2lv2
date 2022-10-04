@@ -53,7 +53,7 @@ for ((i=1; i<$#+1; i++)); do
     p=${!i}
     if [ $p = "-help" ] || [ $p = "-h" ]; then
         usage faust2lv2 "[options ...] <file.dsp>"
-        require Qt
+        require QT
         echo  "Compiles Faust programs to lv2 plugins"
         option
         option -dyn-manifest "use dynamic manifests (requires LV2 host support)."
@@ -66,7 +66,7 @@ for ((i=1; i<$#+1; i++)); do
         option "-nvoices N" "number of synth voices (instruments only; arg must be an integer)"
         option -osx "-osx to compile on OSX"
         option "-qt4, -qt5" "select the GUI toolkit (requires Qt4/5; implies -gui)"
-        option "-style S" "select the stylesheet (arg must be Default, Blue, Grey or Salmon)."    
+        option "-style S" "select the stylesheet (arg must be Default, Blue, Grey or Salmon)."
         cat <<EOF
 Environment variables:
   FAUSTINC: specify the location of the Faust include directory
@@ -89,7 +89,7 @@ EOF
     elif [ $p = "-httpd" ]; then
         # not implemented for now
         HTTPDEFS="DEFINES += HTTPCTRL"
-        HTTPLIBS="-lHTTPDFaust -lmicrohttpd"
+        HTTPLIBS="-lHTTPDFaust"
         HTTPLIBS1=`pkg-config --cflags --libs libmicrohttpd`
     elif [ $p = "-qrcode" ]; then # requires -httpd
         QRDEFS="DEFINES += QRCODECTRL"

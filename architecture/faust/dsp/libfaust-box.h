@@ -27,6 +27,7 @@
 
 #include <string>
 #include <vector>
+#include <ostream>
 
 #include "faust/export.h"
 
@@ -40,6 +41,40 @@
  */
 class LIBFAUST_API CTree;
 typedef std::vector<CTree*> tvec;
+
+typedef CTree* Signal;
+typedef CTree* Box;
+typedef CTree* Tree;
+
+typedef Tree (*prim0)();
+typedef Tree (*prim1)(Tree x);
+typedef Tree (*prim2)(Tree x, Tree y);
+typedef Tree (*prim3)(Tree x, Tree y, Tree z);
+typedef Tree (*prim4)(Tree w, Tree x, Tree y, Tree z);
+typedef Tree (*prim5)(Tree v, Tree w, Tree x, Tree y, Tree z);
+
+LIBFAUST_API const char* prim0name(prim0);
+LIBFAUST_API const char* prim1name(prim1);
+LIBFAUST_API const char* prim2name(prim2);
+LIBFAUST_API const char* prim3name(prim3);
+LIBFAUST_API const char* prim4name(prim4);
+LIBFAUST_API const char* prim5name(prim5);
+
+/**
+ *  Return the name parameter of a foreign function.
+ *
+ * @param  s - the signal
+ * @return the name
+*/
+LIBFAUST_API const char* ffname(Signal s);
+
+/**
+ *  Return the arity of a foreign function.
+ *
+ * @param  s - the signal
+ * @return the name
+ */
+LIBFAUST_API int ffarity(Signal s);
 
 enum SType { kSInt, kSReal };
 
@@ -55,15 +90,49 @@ struct LIBFAUST_API dsp_factory_base {
     virtual void write(std::ostream* out, bool binary = false, bool compact = false) {}
 };
 
+/**
+ *  Print the box.
+ *
+ * @param box - the box to be printed
+ * @param shared - whether the identical sub boxes are printed as indentifier
+ *
+ * @return the printed box as a string
+ */
+LIBFAUST_API std::string printBox(Box box, bool shared);
+
+/**
+ *  Print the signal.
+ *
+ * @param sig - the signal to be printed
+ * @param shared - whether the identical sub signals are printed as indentifier
+ *
+ * @return the printed signal as a string
+ */
+LIBFAUST_API std::string printSignal(Signal sig, bool shared);
+
 #endif
 
 #ifndef LIBFAUSTBOX_H
 #define LIBFAUSTBOX_H
 
 /**
- * Opaque types.
- */
-typedef CTree* Box;
+ * Indicates the identifier (if any) the expression was a definition of.
+ *
+ * @param b the expression
+ * @param id reference to the identifier
+ *
+ * @return true if the expression b was a definition of id
+ **/
+LIBFAUST_API bool getDefNameProperty(Box b, Box& id);
+
+/**
+ * Extract the name from a label.
+ *
+ * @param full_label the label to be analyzed
+ *
+ * @return the extracted name
+ **/
+LIBFAUST_API std::string extractName(Box full_label);
 
 /**
  * Create global compilation context, has to be done first.
@@ -74,6 +143,42 @@ extern "C" LIBFAUST_API void createLibContext();
  * Destroy global compilation context, has to be done last.
  */
 extern "C" LIBFAUST_API void destroyLibContext();
+
+/**
+ * Check if a box is nil.
+ *
+ * @param b - the box
+ *
+ * @return true if the box is nil, otherwise false.
+ */
+LIBFAUST_API bool isNil(Box b);
+
+/**
+ * Convert a box (such as the label of a UI) to a string.
+ *
+ * @param b - the box to convert
+ *
+ * @return a string representation of a box.
+ */
+LIBFAUST_API const char* tree2str(Box b);
+
+/**
+ * If t has a node of type int, return it. Otherwise error
+ *
+ * @param b - the box to convert
+ *
+ * @return the int value of the box.
+ */
+LIBFAUST_API int tree2int(Box b);
+
+/**
+ * Return the xtended type of a box.
+ *
+ * @param b - the box whose xtended type to return
+ *
+ * @return a pointer to xtended type if it exists, otherwise nullptr.
+ */
+LIBFAUST_API void* getUserData(Box b);
 
 /**
  * Constant integer : for all t, x(t) = n.
@@ -185,7 +290,7 @@ LIBFAUST_API Box boxDelay();
 
  * @return the delayed box.
  */
-LIBFAUST_API Box boxDelay(Box s, Box del);
+LIBFAUST_API Box boxDelay(Box b, Box del);
 
 /**
  * Create a casted box.
@@ -201,7 +306,7 @@ LIBFAUST_API Box boxIntCast();
  *
  * @return the casted box.
  */
-LIBFAUST_API Box boxIntCast(Box s);
+LIBFAUST_API Box boxIntCast(Box b);
 
 /**
  * Create a casted box.
@@ -217,7 +322,7 @@ LIBFAUST_API Box boxFloatCast();
  *
  * @return the casted box.
  */
-LIBFAUST_API Box boxFloatCast(Box s);
+LIBFAUST_API Box boxFloatCast(Box b);
 
 /**
  * Create a read only table.
@@ -304,7 +409,7 @@ LIBFAUST_API Box boxSelect2();
  *
  * @return the selected box depending of the selector value at each time t.
  */
-LIBFAUST_API Box boxSelect2(Box selector, Box s1, Box s2);
+LIBFAUST_API Box boxSelect2(Box selector, Box b1, Box b2);
 
 /**
  * Create a selector between three boxes.
@@ -319,11 +424,11 @@ LIBFAUST_API Box boxSelect3();
  * @param selector - when 0 at time t returns s1[t], when 1 at time t returns s2[t], otherwise returns s3[t]
  * @param s1 - first box to be selected
  * @param s2 - second box to be selected
- * @param s3 - third signal to be selected
+ * @param s3 - third box to be selected
  *
  * @return the selected box depending of the selector value at each time t.
  */
-LIBFAUST_API Box boxSelect3(Box selector, Box s1, Box s2, Box s3);
+LIBFAUST_API Box boxSelect3(Box selector, Box b1, Box b2, Box b3);
 
 /**
  * Create a foreign constant box.
@@ -552,7 +657,7 @@ LIBFAUST_API Box boxHBargraph(const std::string& label, Box min, Box max);
  * @param max - the max box, a constant numerical expression (see [1])
  * @param x - the input box
  *
- * @return the vertical horizontal box.
+ * @return the horizontal bargraph box.
  */
 LIBFAUST_API Box boxHBargraph(const std::string& label, Box min, Box max, Box x);
 
@@ -572,39 +677,155 @@ LIBFAUST_API Box boxAttach();
  *
  * The attach primitive takes two input box and produces one output box
  * which is a copy of the first input. The role of attach is to force
- * its second input signal to be compiled with the first one.
+ * its second input box to be compiled with the first one.
  *
  * @param s1 - the first box
  * @param s2 - the second box
  *
- * @return the attach signal.
+ * @return the attach box.
  */
-LIBFAUST_API Box boxAttach(Box s1, Box s2);
+LIBFAUST_API Box boxAttach(Box b1, Box b2);
+
+LIBFAUST_API Box boxPrim2(prim2 foo);
+/**
+ * Compile a DSP source code as a string in a flattened box
+ *
+ * @param name_app - the name of the Faust program
+ * @param dsp_content - the Faust program as a string
+ * @param argc - the number of parameters in argv array
+ * @param argv - the array of parameters
+ * @param inputs - the place to return the number of inputs of the resulting box
+ * @param outputs - the place to return the number of outputs of the resulting box
+ * @param error_msg - the error string to be filled
+ *
+ * @return a flattened box on success, otherwise a null pointer.
+ */
+LIBFAUST_API Box DSPToBoxes(const std::string& name_app, const std::string& dsp_content, int argc, const char* argv[], int* inputs, int* outputs, std::string& error_msg);
 
 /**
- * Compile a box expression in a list of signals.
+ * Return the number of inputs and outputs of a box
+ *
+ * @param box - the box we want to know the number of inputs and outputs
+ * @param inputs - the place to return the number of inputs
+ * @param outputs - the place to return the number of outputs
+ *
+ * @return true if type is defined, false if undefined.
+ */
+LIBFAUST_API bool getBoxType(Box box, int* inputs, int* outputs);
+
+/**
+ * Compile a box expression in a list of signals in normal form
+ * (see simplifyToNormalForm in libfaust-signal.h)
  *
  * @param box - the box expression
  * @param error_msg - the error string to be filled
  *
- * @return a list of signals on success, otherwise an empty list.
+ * @return a list of signals in normal form on success, otherwise an empty list.
  */
 LIBFAUST_API tvec boxesToSignals(Box box, std::string& error_msg);
 
 /**
- * Create a C++ Faust DSP factory from a box expression.
+ * Create source code in a target language from a box expression.
  *
  * @param name_app - the name of the Faust program
  * @param box - the box expression
+ * @param lang - the target source code's language which can be one of "c",
+ * "cpp", "csharp", "dlang", "fir", "java", "julia", "ocpp", "rust", "soul" or "wast"
+ * (depending of which of the corresponding backends are compiled in libfaust)
  * @param argc - the number of parameters in argv array
  * @param argv - the array of parameters
  * @param error_msg - the error string to be filled
  *
- * @return a DSP factory on success, otherwise a null pointer.
+ * @return a string of source code on success, setting error_msg on error.
  */
-LIBFAUST_API  dsp_factory_base* createCPPDSPFactoryFromBoxes(const std::string& name_app, Box box,
-                                                             int argc, const char* argv[],
-                                                             std::string& error_msg);
+LIBFAUST_API std::string createSourceFromBoxes(const std::string& name_app, Box box,
+                                               const std::string& lang,
+                                               int argc, const char* argv[],
+                                               std::string& error_msg);
+
+/**
+ * Test each box and fill additional boxe specific parameters.
+ *
+ * @return true and fill the specific parameters if the box is of a given type, false otherwise
+ */
+LIBFAUST_API bool isBoxAbstr(Box t);
+LIBFAUST_API bool isBoxAbstr(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxAccess(Box t, Box& exp, Box& id);
+LIBFAUST_API bool isBoxAppl(Box t);
+LIBFAUST_API bool isBoxAppl(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxButton(Box b);
+LIBFAUST_API bool isBoxButton(Box b, Box& lbl);
+LIBFAUST_API bool isBoxCase(Box b);
+LIBFAUST_API bool isBoxCase(Box b, Box& rules);
+LIBFAUST_API bool isBoxCheckbox(Box b);
+LIBFAUST_API bool isBoxCheckbox(Box b, Box& lbl);
+LIBFAUST_API bool isBoxComponent(Box b, Box& filename);
+LIBFAUST_API bool isBoxCut(Box t);
+LIBFAUST_API bool isBoxEnvironment(Box b);
+LIBFAUST_API bool isBoxError(Box t);
+LIBFAUST_API bool isBoxFConst(Box b);
+LIBFAUST_API bool isBoxFConst(Box b, Box& type, Box& name, Box& file);
+LIBFAUST_API bool isBoxFFun(Box b);
+LIBFAUST_API bool isBoxFFun(Box b, Box& ff);
+LIBFAUST_API bool isBoxFVar(Box b);
+LIBFAUST_API bool isBoxFVar(Box b, Box& type, Box& name, Box& file);
+LIBFAUST_API bool isBoxHBargraph(Box b);
+LIBFAUST_API bool isBoxHBargraph(Box b, Box& lbl, Box& min, Box& max);
+LIBFAUST_API bool isBoxHGroup(Box b);
+LIBFAUST_API bool isBoxHGroup(Box b, Box& lbl, Box& x);
+LIBFAUST_API bool isBoxHSlider(Box b);
+LIBFAUST_API bool isBoxHSlider(Box b, Box& lbl, Box& cur, Box& min, Box& max, Box& step);
+LIBFAUST_API bool isBoxIdent(Box t);
+LIBFAUST_API bool isBoxIdent(Box t, const char** str);
+LIBFAUST_API bool isBoxInputs(Box t, Box& x);
+LIBFAUST_API bool isBoxInt(Box t);
+LIBFAUST_API bool isBoxInt(Box t, int* i);
+LIBFAUST_API bool isBoxIPar(Box t, Box& x, Box& y, Box& z);
+LIBFAUST_API bool isBoxIProd(Box t, Box& x, Box& y, Box& z);
+LIBFAUST_API bool isBoxISeq(Box t, Box& x, Box& y, Box& z);
+LIBFAUST_API bool isBoxISum(Box t, Box& x, Box& y, Box& z);
+LIBFAUST_API bool isBoxLibrary(Box b, Box& filename);
+LIBFAUST_API bool isBoxMerge(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxMetadata(Box b, Box& exp, Box& mdlist);
+LIBFAUST_API bool isBoxNumEntry(Box b);
+LIBFAUST_API bool isBoxNumEntry(Box b, Box& lbl, Box& cur, Box& min, Box& max, Box& step);
+LIBFAUST_API bool isBoxOutputs(Box t, Box& x);
+LIBFAUST_API bool isBoxPar(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxPrim0(Box b);
+LIBFAUST_API bool isBoxPrim1(Box b);
+LIBFAUST_API bool isBoxPrim2(Box b);
+LIBFAUST_API bool isBoxPrim3(Box b);
+LIBFAUST_API bool isBoxPrim4(Box b);
+LIBFAUST_API bool isBoxPrim5(Box b);
+LIBFAUST_API bool isBoxPrim0(Box b, prim0* p);
+LIBFAUST_API bool isBoxPrim1(Box b, prim1* p);
+LIBFAUST_API bool isBoxPrim2(Box b, prim2* p);
+LIBFAUST_API bool isBoxPrim3(Box b, prim3* p);
+LIBFAUST_API bool isBoxPrim4(Box b, prim4* p);
+LIBFAUST_API bool isBoxPrim5(Box b, prim5* p);
+LIBFAUST_API bool isBoxReal(Box t);
+LIBFAUST_API bool isBoxReal(Box t, double* r);
+LIBFAUST_API bool isBoxRec(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxRoute(Box b, Box& n, Box& m, Box& r);
+LIBFAUST_API bool isBoxSeq(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxSlot(Box t);
+LIBFAUST_API bool isBoxSlot(Box t, int* id);
+LIBFAUST_API bool isBoxSoundfile(Box b);
+LIBFAUST_API bool isBoxSoundfile(Box b, Box& label, Box& chan);
+LIBFAUST_API bool isBoxSplit(Box t, Box& x, Box& y);
+LIBFAUST_API bool isBoxSymbolic(Box t);
+LIBFAUST_API bool isBoxSymbolic(Box t, Box& slot, Box& body);
+LIBFAUST_API bool isBoxTGroup(Box b);
+LIBFAUST_API bool isBoxTGroup(Box b, Box& lbl, Box& x);
+LIBFAUST_API bool isBoxVBargraph(Box b);
+LIBFAUST_API bool isBoxVBargraph(Box b, Box& lbl, Box& min, Box& max);
+LIBFAUST_API bool isBoxVGroup(Box b);
+LIBFAUST_API bool isBoxVGroup(Box b, Box& lbl, Box& x);
+LIBFAUST_API bool isBoxVSlider(Box b);
+LIBFAUST_API bool isBoxVSlider(Box b, Box& lbl, Box& cur, Box& min, Box& max, Box& step);
+LIBFAUST_API bool isBoxWaveform(Box b);
+LIBFAUST_API bool isBoxWire(Box t);
+LIBFAUST_API bool isBoxWithLocalDef(Box t, Box& body, Box& ldef);
 
 /*
  [1] Constant numerical expression : see https://faustdoc.grame.fr/manual/syntax/#constant-numerical-expressions

@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -35,7 +35,27 @@
 #include "floats.hh"
 #include "global.hh"
 
-static string substitution(const string& model, const vector<string>& args);
+static string substitution(const string& model, const vector<string>& args)
+{
+    char   c;
+    int    i = 0, ilast = (int)model.length() - 1;
+    string result;
+    while (i < ilast) {
+        c = model[i++];
+        if (c != '$') {
+            result += c;
+        } else {
+            c = model[i++];
+            if (c >= '0' && c <= '9') {
+                result += args[c - '0'];
+            } else {
+                result += c;
+            }
+        }
+    }
+    if (i == ilast) result += model[i];
+    return result;
+}
 
 /**
  * Text substitution. Creates a string by replacing all the $n
@@ -120,28 +140,6 @@ string subst(const string& model, const string& a0, const string& a1, const stri
     return substitution(model, args);
 }
 
-static string substitution(const string& model, const vector<string>& args)
-{
-    char   c;
-    int    i = 0, ilast = (int)model.length() - 1;
-    string result;
-    while (i < ilast) {
-        c = model[i++];
-        if (c != '$') {
-            result += c;
-        } else {
-            c = model[i++];
-            if (c >= '0' && c <= '9') {
-                result += args[c - '0'];
-            } else {
-                result += c;
-            }
-        }
-    }
-    if (i == ilast) result += model[i];
-    return result;
-}
-
 string T(char* c)
 {
     return string(c);
@@ -200,21 +198,14 @@ static string encodeJuliaFloat(const string& c, bool& need_suffix)
     return (isInt) ? (res + ".0") : res;
 }
 
-/**
- * Convert a REAL (float/double) into a string.
- * Adjusts the precision p to the needs.
- */
-template <typename REAL>
-static string TAux(REAL n)
+static string addSuffix(const string& num)
 {
-    stringstream num;
-    num << setprecision(numeric_limits<REAL>::max_digits10) << n;
     if (gGlobal->gOutputLang == "julia") {
         bool need_suffix = true;
-        string res = encodeJuliaFloat(num.str(), need_suffix);
+        string res = encodeJuliaFloat(num, need_suffix);
         return (need_suffix) ? (res + inumix()) : res;
     } else {
-        return ensureFloat(num.str()) + inumix();
+        return ensureFloat(num) + inumix();
     }
 }
 
@@ -222,13 +213,43 @@ static string TAux(REAL n)
  * Convert a single-precision float into a string.
  * Adjusts the precision p to the needs.
  */
-string T(float n) { return TAux<float>(n); }
+string TAux(float n)
+{
+    char c[512];
+    int  p = 1;
+    
+    do { snprintf(c, 512, "%.*g", p++, n); } while (strtof(c, 0) != n);
+    
+    ensureFloat(c);
+    return string(c);
+}
+
+string T(float n) { return addSuffix(TAux(n)); }
 
 /**
 * Convert a double-precision float into a string.
 * Adjusts the precision p to the needs.
 */
-string T(double n) { return TAux<double>(n); }
+string TAux(double n)
+{
+    char  c[512];
+    char* endp;
+    int   p = 1;
+    
+    if (gGlobal->gFloatSize == 1) {
+        float v = (float)n;
+        do { snprintf(c, 512, "%.*g", p++, v); endp = nullptr; } while (strtof(c, &endp) != v);
+    } else if (gGlobal->gFloatSize == 2) {
+        do { snprintf(c, 512, "%.*g", p++, n); endp = nullptr; } while (strtod(c, &endp) != n);
+    } if (gGlobal->gFloatSize == 3) {
+        long double q = (long double)n;
+        do { snprintf(c, 512, "%.*Lg", p++, q); endp = nullptr; } while (strtold(c, &endp) != q);
+    }
+    ensureFloat(c);
+    return string(c);
+}
+
+string T(double n) { return addSuffix(TAux(n)); }
 
 /**
  * remove quotes from a string

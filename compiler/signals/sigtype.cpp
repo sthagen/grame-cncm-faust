@@ -4,16 +4,16 @@
     Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
+    You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  ************************************************************************
@@ -259,7 +259,7 @@ Type checkInt(Type t)
 {
     // check that t is an integer
     SimpleType* st = isSimpleType(t);
-    if (st == 0 || st->nature() > kInt) {
+    if (st == nullptr || st->nature() > kInt) {
         stringstream error;
         error << "ERROR : checkInt failed for type " << t << endl;
         throw faustexception(error.str());
@@ -357,7 +357,7 @@ Tree codeAudioType(AudioType* t)
         r = codeTupletType(nt);
     } else {
         stringstream error;
-        error << "ERROR in codeAudioType() : invalid pointer " << t << endl;
+        error << "ERROR : codeAudioType(), invalid pointer " << t << endl;
         throw faustexception(error.str());
     }
 
@@ -476,7 +476,7 @@ static Tree codeTupletType(TupletType* nt)
     return CTree::make(gGlobal->TUPLETTYPE, elems);
 }
 
-AudioType* makeTupletType(const vector<Type>& vt)
+AudioType* makeTupletType(ConstTypes vt)
 {
     TupletType prototype(vt);
     Tree       code = codeAudioType(&prototype);
@@ -493,7 +493,7 @@ AudioType* makeTupletType(const vector<Type>& vt)
     }
 }
 
-AudioType* makeTupletType(const vector<Type>& vt, int n, int v, int c, int vec, int b, const interval& i)
+AudioType* makeTupletType(ConstTypes vt, int n, int v, int c, int vec, int b, const interval& i)
 {
     TupletType prototype(vt, n, v, c, vec, b, i);
     Tree       code = codeAudioType(&prototype);
