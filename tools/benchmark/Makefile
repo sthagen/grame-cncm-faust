@@ -100,6 +100,9 @@ interp-tracer: interp-tracer.cpp $(LIB)/libfaust.a
 signal-tester: signal-tester.cpp $(LIB)/libfaust.a
 	$(CXX) $(COMPILEOPT) $(ARCHS) signal-tester.cpp -L $(LIB_FLAGS) $(LIBS) -I $(INC) $(LLVM) `pkg-config --cflags --libs jack gtk+-2.0` $(STRIP) -lz -lncurses -lpthread -o $@
 
+ciaramella: ciaramella.cpp $(LIB)/libfaust.a
+	$(CXX) $(COMPILEOPT) ciaramella.cpp -L/opt/local/lib $(LIBS) -I $(INC) $(LLVM) `pkg-config --cflags --libs jack gtk+-2.0` $(STRIP) -lz -lncurses -lpthread -o $@
+
 signal-tester-c: signal-tester.c $(LIB)/libfaust.a
 	$(CXX) $(COMPILEOPT1) $(ARCHS) signal-tester.c -L $(LIB_FLAGS) $(LIBS) -I $(INC) $(LLVM) $(STRIP) -lz -lncurses -lpthread -o signal-tester-c
 
