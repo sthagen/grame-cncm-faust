@@ -240,7 +240,12 @@ inline float tanfx(float x)
 #define maxfx(x, y) { (((x) < (y)) ? (y) : (x)) }
 */
 
+// For C++ backend
 inline float minfx(float x, float y) { return (x < y) ? x : y; }
 inline float maxfx(float x, float y) { return (x < y) ? y : x; }
+
+// For C backend
+inline float fminfx(float x, float y) { return (x < y) ? x : y; }
+inline float fmaxfx(float x, float y) { return (x < y) ? y : x; }
 
 #endif
