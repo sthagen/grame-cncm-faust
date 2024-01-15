@@ -439,8 +439,8 @@ void global::reset()
     gRangeUI       = false;
     gFreezeUI      = false;
 
-    gFloatSize      = 1;  // -single by default
-    gFixedPointSize = -1;
+    gFloatSize      = 1;              // -single by default
+    gFixedPointSize = AP_INT_MAX_W;   // Special -1 value will be used to generate fixpoint_t type
     gFixedPointMSB  = 0;
     gFixedPointLSB  = 0;
 

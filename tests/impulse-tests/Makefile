@@ -67,7 +67,8 @@ help:
 	@echo " 'c2'     : check double outputs with the c backend in scalar one-sample mode (-os1)"
 	@echo " 'c3'     : check double outputs with the c backend in scalar one-sample mode (-os2)"
 	@echo " 'c4'     : check double outputs with the c backend in scalar one-sample mode (-os3)"
-	@echo " 'fx'     : check double outputs with the cpp backend in -fx mode"
+	@echo " 'fx'     : check double outputs with the cpp and c backends in -fx and -fx-size mode"
+	@echo " 'fx1'    : check double outputs with the cpp and c backends in -fx and -fx-size -1 mode"
 	@echo " 'mute'   : check double output with mute"
 	@echo " 'wasm'   : check double output with wasm backend and various options"
 	@echo " 'wast'   : check double output with wast backend and various options"
@@ -164,6 +165,10 @@ fx:
 	$(MAKE) -f Make.gcc outdir=c/fx/os1          lang=c arch=impulsearch2ter.cpp FAUSTOPTIONS="-I dsp -fx -fx-size 64 -os1"
 	$(MAKE) -f Make.gcc outdir=c/fx/os2          lang=c arch=impulsearch2ter.cpp FAUSTOPTIONS="-I dsp -fx -fx-size 64 -os2"
 	$(MAKE) -f Make.gcc outdir=c/fx/os3          lang=c arch=impulsearch2qua.cpp FAUSTOPTIONS="-I dsp -fx -fx-size 64 -os3"
+
+fx1:
+	$(MAKE) -f Make.gcc outdir=cpp/fx1           lang=cpp arch=impulsearchfx.cpp   FAUSTOPTIONS="-I dsp -fx -fx-size -1"
+	$(MAKE) -f Make.gcc outdir=c/fx1             lang=c arch=impulsearch2.cpp FAUSTOPTIONS="-I dsp -fx -fx-size -1"
 
 cpp1:
 	$(MAKE) -f Make.gcc outdir=cpp1/double       lang=cpp arch=impulsearch.cpp FAUSTOPTIONS="-I dsp -double -os0"
