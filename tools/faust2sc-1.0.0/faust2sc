@@ -2,6 +2,7 @@
 # ======================================================================
 # faust2sc - Generate language modules from Faust XML.
 # Copyright (C) 2005-2008 Stefan Kersten
+# Copyright (C) 2024 GRAME, Centre National de Creation Musicale
 # ======================================================================
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +27,7 @@ require 'getoptlong'
 require 'rexml/document'
 
 PROGRAM         = File.basename($0)
-PROGRAM_VERSION = "1.1.0"
+PROGRAM_VERSION = "1.2.0"
 
 class Array
   def flatten1

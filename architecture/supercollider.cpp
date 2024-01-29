@@ -9,7 +9,7 @@
 /************************************************************************
  FAUST Architecture File
  Copyright (C) 2005-2012 Stefan Kersten.
- Copyright (C) 2003-2019 GRAME, Centre National de Creation Musicale
+ Copyright (C) 2003-2024 GRAME, Centre National de Creation Musicale
  ---------------------------------------------------------------------
  This Architecture section is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public License
@@ -33,6 +33,7 @@
  ************************************************************************/
 
 // The prefix is set to "Faust" in the faust2supercollider script, otherwise set empty
+
 #if !defined(SC_FAUST_PREFIX)
 #define SC_FAUST_PREFIX ""
 #endif
@@ -421,9 +422,8 @@ inline static void copyBuffer(float* dst, int n, float* src)
 
 inline static void Faust_updateInputControls(Faust* unit)
 {
-    size_t numControlInput = unit->mNumControlInput;
     int curControl = unit->mDSP->getNumInputs();
-    for (int i = 0; i < numControlInput; ++i) {
+    for (int i = 0; i < unit->mNumControlInput; ++i) {
         unit->getInputControl(i)->updateInput(IN0(curControl));
         curControl++;
     }
@@ -431,10 +431,9 @@ inline static void Faust_updateInputControls(Faust* unit)
 
 inline static void Faust_updateOutputControls(Faust* unit, int inNumSamples)
 {
-    size_t numControlOutput = unit->mNumControlOutput;
     int curControl = unit->mDSP->getNumOutputs();
-    for (int i = 0; i < numControlOutput; ++i) {
-        // Copy one value
+    for (int i = 0; i <  unit->mNumControlOutput; ++i) {
+        // Copy one control value
         // OUT0(curControl) = unit->getOutputControl(i)->updateOutput();
         // Copy control on the entire control buffer
         fillBuffer(OUT(curControl), inNumSamples, unit->getOutputControl(i)->updateOutput());
@@ -501,12 +500,6 @@ void Faust_Ctor(Faust* unit)  // module constructor
     unit->mNumControlInput = g_numControlInput;
     unit->mNumControlOutput = g_numControlOutput;
     
-    Print("Faust  unit->mNumControlInput  %d\n", unit->mNumControlInput);
-    Print("Faust  unit->mNumControlOutput  %d\n", unit->mNumControlOutput);
-    
-    Print("Faust  unit->mNumInputs  %d\n", unit->mNumInputs);
-    Print("Faust  unit->mNumOutputs  %d\n", unit->mNumOutputs);
-          
     ControlAllocator ca(unit->mControls);
     unit->mDSP->buildUserInterface(&ca);
     unit->mInBufCopy  = nullptr;
