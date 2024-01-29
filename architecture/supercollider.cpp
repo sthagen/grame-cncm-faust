@@ -434,12 +434,10 @@ inline static void Faust_updateOutputControls(Faust* unit, int inNumSamples)
     size_t numControlOutput = unit->mNumControlOutput;
     int curControl = unit->mDSP->getNumOutputs();
     for (int i = 0; i < numControlOutput; ++i) {
+        // Copy one value
         // OUT0(curControl) = unit->getOutputControl(i)->updateOutput();
-        // fillBuffer(OUT(curControl), inNumSamples, unit->getOutputControl(i));
         // Copy control on the entire control buffer
-        Control* control = unit->getOutputControl(i);
-        // TODO : this crash
-        //if (control) fillBuffer(OUT(curControl), inNumSamples, control->updateOutput());
+        fillBuffer(OUT(curControl), inNumSamples, unit->getOutputControl(i)->updateOutput());
         curControl++;
     }
 }
@@ -505,6 +503,9 @@ void Faust_Ctor(Faust* unit)  // module constructor
     
     Print("Faust  unit->mNumControlInput  %d\n", unit->mNumControlInput);
     Print("Faust  unit->mNumControlOutput  %d\n", unit->mNumControlOutput);
+    
+    Print("Faust  unit->mNumInputs  %d\n", unit->mNumInputs);
+    Print("Faust  unit->mNumOutputs  %d\n", unit->mNumOutputs);
           
     ControlAllocator ca(unit->mControls);
     unit->mDSP->buildUserInterface(&ca);
@@ -518,9 +519,7 @@ void Faust_Ctor(Faust* unit)  // module constructor
 
     // Check input/output channel configuration
     const size_t numInputs = unit->mDSP->getNumInputs() + unit->mNumControlInput;
-    const size_t numOutputs = unit->mDSP->getNumOutputs();
-    // The control outputs are not part of unit->mNumOutputs ?
-    //const size_t numOutputs = unit->mDSP->getNumOutputs() + unit->mNumControlOutput;
+    const size_t numOutputs = unit->mDSP->getNumOutputs() + unit->mNumControlOutput;
 
     bool channelsValid = (numInputs == unit->mNumInputs) && (numOutputs == unit->mNumOutputs);
 

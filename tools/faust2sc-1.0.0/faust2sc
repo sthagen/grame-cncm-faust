@@ -131,6 +131,9 @@ module Faust
     def total_inputs
       inputs + ui.active_widgets.size
     end
+    def total_outputs
+      outputs + ui.passive_widgets.size
+    end
     def Plugin::from_file(path)
       self.new(path, REXML::Document.new(File.open(path) { |io| io.read }))
     end
@@ -367,10 +370,10 @@ module Faust
         @plugin.inputs
       end
       def outputs
-        @plugin.outputs
+        @plugin.total_outputs
       end
       def superclass_name
-        @plugin.outputs > 1 ? "MultiOutUGen" : "UGen"
+        @plugin.total_outputs > 1 ? "MultiOutUGen" : "UGen"
       end
       def input_names
         (1..self.inputs).collect { |i| "in#{i}" }
